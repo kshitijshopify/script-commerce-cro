@@ -1540,8 +1540,8 @@
         "type": "text",
         "id": "cart_free_gift_remaining_message",
         "label": "Gift amount left message",
-        "info": "Use {amount} where the missing amount should appear",
-        "default": "Only {amount} left for your free gift"
+        "info": "Use [amount] where the missing amount should appear",
+        "default": "Only [amount] left for your free gift"
       },
       {
         "type": "text",
