@@ -1449,6 +1449,111 @@
         "id": "cart_color_scheme",
         "label": "t:sections.all.colors.label",
         "default": "scheme-1"
+      },
+      {
+        "type": "header",
+        "content": "Free shipping progress bar",
+        "info": "Amounts are in the smallest currency unit (cents), e.g. 3000 = €30.00. Works with the cart drawer only."
+      },
+      {
+        "type": "checkbox",
+        "id": "cart_progress_enabled",
+        "label": "Enable free shipping progress bar",
+        "default": false
+      },
+      {
+        "type": "number",
+        "id": "cart_shipping_threshold",
+        "label": "Free shipping minimum amount",
+        "info": "In cents, e.g. 5000 = €50.00",
+        "default": 7000
+      },
+      {
+        "type": "richtext",
+        "id": "cart_delivery_message",
+        "label": "Delivery reassurance message",
+        "default": "<p><strong>Great choice!</strong><br>Your order will arrive in 2-3 working days</p>"
+      },
+      {
+        "type": "text",
+        "id": "cart_shipping_remaining_message",
+        "label": "Amount left message",
+        "info": "Use [amount] where the missing amount should appear",
+        "default": "Only [amount] left for free shipping"
+      },
+      {
+        "type": "text",
+        "id": "cart_shipping_unlocked_message",
+        "label": "Free shipping reached message",
+        "default": "You've unlocked free shipping!"
+      },
+      {
+        "type": "html",
+        "id": "cart_progress_start_icon",
+        "label": "Progress bar start icon",
+        "info": "Paste SVG code. Leave empty to use the default icon."
+      },
+      {
+        "type": "html",
+        "id": "cart_progress_shipping_icon",
+        "label": "Progress bar free shipping icon",
+        "info": "Paste SVG code. Leave empty to use the default icon."
+      },
+      {
+        "type": "header",
+        "content": "Free gift",
+        "info": "The gift product must cost €0 and its inventory is managed manually. A sold-out gift is shown but cannot be added."
+      },
+      {
+        "type": "checkbox",
+        "id": "cart_free_gift_enabled",
+        "label": "Enable free item",
+        "default": false
+      },
+      {
+        "type": "text",
+        "id": "cart_free_gift_headline",
+        "label": "Cart free gift headline",
+        "default": "Free gift"
+      },
+      {
+        "type": "number",
+        "id": "cart_free_gift_min_amount",
+        "label": "Free gift minimum amount",
+        "info": "In cents, e.g. 3000 = €30.00",
+        "default": 5000
+      },
+      {
+        "type": "product_list",
+        "id": "cart_free_gift_products",
+        "label": "Gift products",
+        "info": "The first available product is used. Use a €0 product or variant.",
+        "limit": 5
+      },
+      {
+        "type": "checkbox",
+        "id": "cart_free_gift_auto_add",
+        "label": "Auto add",
+        "default": true
+      },
+      {
+        "type": "text",
+        "id": "cart_free_gift_remaining_message",
+        "label": "Gift amount left message",
+        "info": "Use {amount} where the missing amount should appear",
+        "default": "Only {amount} left for your free gift"
+      },
+      {
+        "type": "text",
+        "id": "cart_free_gift_unlocked_message",
+        "label": "Gift unlocked message",
+        "default": "Free gift unlocked!"
+      },
+      {
+        "type": "html",
+        "id": "cart_progress_gift_icon",
+        "label": "Progress bar gift icon",
+        "info": "Paste SVG code. Leave empty to use the default icon."
       }
     ]
   },

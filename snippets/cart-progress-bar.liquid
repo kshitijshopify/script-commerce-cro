@@ -1,0 +1,201 @@
+{% doc %}
+  Free shipping progress bar with an optional auto-added free gift (cart drawer only).
+  All amounts are in the smallest currency unit (cents), matching cart.items_subtotal_price.
+
+  @example
+  {% render 'cart-progress-bar' %}
+{% enddoc %}
+
+{%- liquid
+  assign shipping_threshold = settings.cart_shipping_threshold | default: 0
+  assign gift_min = settings.cart_free_gift_min_amount | default: 0
+  assign subtotal = cart.items_subtotal_price
+
+  assign gift_variant = null
+  assign gift_fallback = null
+  if settings.cart_free_gift_enabled and gift_min > 0
+    for gift_product in settings.cart_free_gift_products
+      for variant in gift_product.variants
+        if variant.available and gift_variant == null
+          assign gift_variant = variant
+        endif
+        if gift_fallback == null
+          assign gift_fallback = variant
+        endif
+      endfor
+    endfor
+    if gift_variant == null
+      assign gift_variant = gift_fallback
+    endif
+  endif
+  assign gift_enabled = false
+  if gift_variant != null
+    assign gift_enabled = true
+  endif
+
+  assign bar_max = shipping_threshold
+  if gift_enabled and gift_min > bar_max
+    assign bar_max = gift_min
+  endif
+
+  assign gift_line_key = ''
+  if gift_enabled
+    for item in cart.items
+      if item.variant_id == gift_variant.id and item.properties._free_gift == 'true'
+        assign gift_line_key = item.key
+        break
+      endif
+    endfor
+  endif
+
+  assign shipping_unlocked = false
+  if shipping_threshold > 0 and subtotal >= shipping_threshold
+    assign shipping_unlocked = true
+  endif
+  assign gift_unlocked = false
+  if gift_enabled and subtotal >= gift_min
+    assign gift_unlocked = true
+  endif
+
+  assign should_add = false
+  if gift_unlocked and settings.cart_free_gift_auto_add and gift_variant.available and gift_line_key == blank
+    assign should_add = true
+  endif
+  assign should_remove = false
+  if gift_enabled and gift_line_key != blank and gift_unlocked == false
+    assign should_remove = true
+  endif
+
+  assign progress = 100
+  if bar_max > 0
+    assign progress = subtotal | times: 100.0 | divided_by: bar_max | at_most: 100 | round: 2
+  endif
+-%}
+
+{%- if request.design_mode and settings.cart_free_gift_enabled and gift_enabled == false -%}
+  <p class="sc_cart-progress__delivery">Free gift skipped: pick a product with a variant priced at 0.</p>
+{%- endif -%}
+
+{%- if settings.cart_progress_enabled and cart != empty and bar_max > 0 -%}
+  <sc_free-gift-bar
+    class="sc_cart-progress"
+    data-gift-variant-id="{{ gift_variant.id }}"
+    data-gift-line-key="{{ gift_line_key }}"
+    data-should-add="{{ should_add }}"
+    data-should-remove="{{ should_remove }}"
+  >
+    {%- if settings.cart_delivery_message != blank -%}
+      <div class="sc_cart-progress__delivery-wrapper">
+        <svg xmlns="http://www.w3.org/2000/svg" width="29" height="29" viewBox="0 0 29 29" fill="none">
+          <circle cx="14.5" cy="14.5" r="14.5" fill="currentColor"></circle>
+          <path d="M23.6667 9L12.2083 20.4583L7 15.25" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path>
+        </svg>
+        <div class="sc_cart-progress__delivery">
+          {{ settings.cart_delivery_message }}
+        </div>
+      </div>
+    {%- endif -%}
+
+    <div class="sc_cart-progress__track-wrapper">
+      <div
+        class="sc_cart-progress__track"
+        role="progressbar"
+        aria-valuemin="0"
+        aria-valuemax="100"
+        aria-valuenow="{{ progress | round }}"
+      >
+        <span class="sc_cart-progress__fill" style="width: {{ progress }}%"></span>
+      </div>
+
+      {%- if shipping_threshold > 0 -%}
+        {%- assign shipping_pos = shipping_threshold | times: 100.0 | divided_by: bar_max | round: 2 -%}
+        <span
+          class="sc_cart-progress__icon sc_cart-progress__icon--shipping{% if shipping_unlocked %} is-reached{% endif %}"
+          style="left: {{ shipping_pos }}%"
+        >
+          {%- if settings.cart_progress_shipping_icon != blank -%}
+            {{ settings.cart_progress_shipping_icon }}
+          {%- else -%}
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M1 6h13v10H1zM14 10h4l3 3v3h-7z"/><circle cx="6" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg>
+          {%- endif -%}
+        </span>
+      {%- endif -%}
+
+      {%- if gift_enabled -%}
+        {%- assign gift_pos = gift_min | times: 100.0 | divided_by: bar_max | round: 2 -%}
+        <span
+          class="sc_cart-progress__icon sc_cart-progress__icon--gift{% if gift_unlocked %} is-reached{% endif %}"
+          style="left: {{ gift_pos }}%"
+        >
+          {%- if settings.cart_progress_gift_icon != blank -%}
+            {{ settings.cart_progress_gift_icon }}
+          {%- else -%}
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="8" width="18" height="4"/><path d="M12 8v13M5 12v9h14v-9M7.5 8a2.5 2.5 0 010-5C11 3 12 8 12 8s1-5 4.5-5a2.5 2.5 0 010 5"/></svg>
+          {%- endif -%}
+        </span>
+      {%- endif -%}
+    </div>
+
+    {%- liquid
+      comment
+        Next milestone = the lowest threshold not reached yet (works whichever of shipping/gift is smaller).
+      endcomment
+      assign next_milestone = ''
+      assign next_target = 0
+      if shipping_threshold > 0 and shipping_unlocked == false
+        assign next_milestone = 'shipping'
+        assign next_target = shipping_threshold
+      endif
+      if gift_enabled and gift_unlocked == false
+        if next_milestone == '' or gift_min < next_target
+          assign next_milestone = 'gift'
+          assign next_target = gift_min
+        endif
+      endif
+      assign missing = next_target | minus: subtotal | money
+    -%}
+    <p class="sc_cart-progress__message" role="status">
+      {%- if next_milestone == 'shipping' -%}
+        {{ settings.cart_shipping_remaining_message | escape | replace: '[amount]', missing }}
+      {%- elsif next_milestone == 'gift' -%}
+        {{ settings.cart_free_gift_remaining_message | escape | replace: '[amount]', missing }}
+      {%- else -%}
+        {%- if shipping_unlocked -%}{{ settings.cart_shipping_unlocked_message | escape }}{%- endif -%}
+        {%- if shipping_unlocked and gift_unlocked %} {% endif -%}
+        {%- if gift_unlocked -%}{{ settings.cart_free_gift_unlocked_message | escape }}{%- endif -%}
+      {%- endif -%}
+    </p>
+
+    {%- if gift_enabled -%}
+      <div class="sc_cart-progress__gift{% if gift_unlocked %} is-unlocked{% endif %}">
+        {%- assign gift_image = gift_variant.featured_image | default: gift_variant.product.featured_image -%}
+        {%- if gift_image -%}
+          <img
+            class="sc_cart-progress__gift-image"
+            src="{{ gift_image | image_url: width: 100 }}"
+            alt="{{ gift_image.alt | escape }}"
+            width="50"
+            height="{{ 50 | divided_by: gift_image.aspect_ratio | ceil }}"
+            loading="lazy"
+          >
+        {%- endif -%}
+        <div class="sc_cart-progress__gift-text">
+          <span class="sc_cart-progress__gift-headline">{{ settings.cart_free_gift_headline | escape }}</span>
+          <div class="sc_cart-progress__gift-text-info">
+            <span class="sc_cart-progress__gift-text-info-title">{{ gift_variant.product.title | escape }}</span>
+            {%- if gift_variant.available == false -%}
+              <span class="sc_cart-progress__gift-status">{{ 'products.product.sold_out' | t }}</span>
+            {%- elsif gift_unlocked -%}
+              <span class="sc_cart-progress__gift-status">{{ settings.cart_free_gift_unlocked_message | escape }}</span>
+            {%- endif -%}
+          </div>
+          {%- if gift_unlocked and settings.cart_free_gift_auto_add == false and gift_variant.available and gift_line_key == blank -%}
+            <button type="button" class="button button--secondary sc_cart-progress__gift-add" data-free-gift-add>
+              {{ 'products.product.add_to_cart' | t }}
+            </button>
+          {%- endif -%}
+        </div>
+      </div>
+    {%- endif -%}
+  </sc_free-gift-bar>
+{%- endif -%}

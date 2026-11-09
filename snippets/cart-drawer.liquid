@@ -12,6 +12,10 @@
 
 <script src="{{ 'cart.js' | asset_url }}" defer="defer"></script>
 <script src="{{ 'quantity-popover.js' | asset_url }}" defer="defer"></script>
+{%- if settings.cart_progress_enabled -%}
+  {{ 'component-cart-progress.css' | asset_url | stylesheet_tag }}
+  <script src="{{ 'cart-free-gift.js' | asset_url }}" defer="defer"></script>
+{%- endif -%}
 
 <style>
   .drawer {
@@ -76,6 +80,7 @@
           </span>
         </button>
       </div>
+      {%- render 'cart-progress-bar' -%}
       <cart-drawer-items
         view-event-payload="{{ cart | standard_event_data: 'view', context: 'dialog' | escape }}"
         view-event-trigger="manual"
@@ -124,7 +129,7 @@
                     {%- for item in cart.items -%}
                       <tr
                         id="CartDrawer-Item-{{ item.index | plus: 1 }}"
-                        class="cart-item{% if item.parent_relationship.parent != null %} cart-item__nested-line{% endif %}"
+                        class="cart-item{% if item.parent_relationship.parent != null %} cart-item__nested-line{% endif %}{% if item.properties._free_gift == 'true' %} sc_cart-item--free-gift{% if settings.cart_free_gift_auto_add %} sc_cart-item--free-gift-locked{% endif %}{% endif %}"
                         role="row"
                         {% if item.parent_relationship.parent != null %}
                           aria-label="{{- 'products.product.nested_label' | t: title: item.product.title, parent_title: item.parent_relationship.parent.title | escape -}}"
