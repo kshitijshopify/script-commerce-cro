@@ -1,0 +1,2419 @@
+{%- comment -%}
+  SC – Announcement bar
+  ScriptCommerce CRO section. Self-contained, theme-independent (Dawn, Horizon, any OS 2.0 theme).
+
+  Up to three stacked layers (order is configurable):
+  1. Main bar   – "Message" blocks (icon + text + optional CTA button) and a live "Reviews.io rating" block.
+  2. Countdown  – text before / timer / text after. Fixed end date or a daily deadline (store time zone).
+  3. Promo bar  – text + link, optional dismiss (X). Hidden for N days via localStorage; a new message shows again.
+
+  Sticky per device (all / desktop / mobile) and per page type. Page-type visibility.
+  Exposes to the theme on <html>:
+    --sc-announcement-bar-height     current height of the whole section (px)
+    --enable-sticky-announcement-bar 1 when sticky at the current breakpoint, else 0
+{%- endcomment -%}
+
+{%- liquid
+  assign s = section.settings
+  assign tpl = template.name
+  assign sc_root = '#ScAb-' | append: section.id
+
+  assign page_ok = false
+  case tpl
+    when 'index'
+      assign page_ok = s.show_on_home
+    when 'product'
+      assign page_ok = s.show_on_product
+    when 'collection'
+      assign page_ok = s.show_on_collection
+    when 'cart'
+      assign page_ok = s.show_on_cart
+    else
+      assign page_ok = s.show_on_other
+  endcase
+
+  assign sticky_page = false
+  if s.sticky_pages == 'all'
+    assign sticky_page = true
+  elsif s.sticky_pages == 'home' and tpl == 'index'
+    assign sticky_page = true
+  elsif s.sticky_pages == 'product' and tpl == 'product'
+    assign sticky_page = true
+  elsif s.sticky_pages == 'collection' and tpl == 'collection'
+    assign sticky_page = true
+  endif
+
+  assign sticky_desktop = false
+  assign sticky_mobile = false
+  if sticky_page
+    if s.sticky_position == 'all' or s.sticky_position == 'desktop'
+      assign sticky_desktop = true
+    endif
+    if s.sticky_position == 'all' or s.sticky_position == 'mobile'
+      assign sticky_mobile = true
+    endif
+  endif
+
+  assign has_main = false
+  if section.blocks.size > 0
+    assign has_main = true
+  endif
+  assign has_timer = s.show_timer
+  assign has_promo = false
+  if s.show_promo and s.promo_text != blank
+    assign has_promo = true
+  endif
+
+  assign has_content = false
+  if has_main or has_timer or has_promo
+    assign has_content = true
+  endif
+
+  case s.layer_order
+    when 'timer_main_promo'
+      assign o_main = 2
+      assign o_timer = 1
+      assign o_promo = 3
+    when 'main_promo_timer'
+      assign o_main = 1
+      assign o_timer = 3
+      assign o_promo = 2
+    when 'promo_main_timer'
+      assign o_main = 2
+      assign o_timer = 3
+      assign o_promo = 1
+    else
+      assign o_main = 1
+      assign o_timer = 2
+      assign o_promo = 3
+  endcase
+
+  assign rotate_desktop = false
+  if s.desktop_layout == 'rotate'
+    assign rotate_desktop = true
+  endif
+  assign rotate_mobile = false
+  if s.mobile_layout == 'rotate'
+    assign rotate_mobile = true
+  endif
+
+  assign bg_main = s.color_bg
+  if s.gradient_bg != blank
+    assign bg_main = s.gradient_bg
+  endif
+  assign bg_main_m = bg_main
+  if s.gradient_bg_mobile != blank
+    assign bg_main_m = s.gradient_bg_mobile
+  elsif s.color_bg_mobile != blank
+    assign bg_main_m = s.color_bg_mobile
+  endif
+  assign text_m = s.text_color
+  if s.text_color_mobile != blank
+    assign text_m = s.text_color_mobile
+  endif
+
+  assign bg_timer = s.timer_bg
+  if s.timer_gradient != blank
+    assign bg_timer = s.timer_gradient
+  endif
+  assign bg_promo = s.promo_bg
+  if s.promo_gradient != blank
+    assign bg_promo = s.promo_gradient
+  endif
+
+  assign store_tz = 'now' | date: '%z'
+-%}
+
+{%- if s.enable == false and request.design_mode -%}
+  <div style="padding:10px 16px;border:1px dashed #999;font:13px/1.4 sans-serif;color:#555;text-align:center;">
+    SC – Announcement bar is turned off ("Show announcement bar" is unchecked).
+  </div>
+{%- elsif page_ok == false -%}
+  {%- if request.design_mode -%}
+    <div style="padding:10px 16px;border:1px dashed #999;font:13px/1.4 sans-serif;color:#555;text-align:center;">
+      SC – Announcement bar is hidden on this page type. Change it under "Visibility".
+    </div>
+  {%- endif -%}
+{%- elsif has_content == false -%}
+  {%- if request.design_mode -%}
+    <div style="padding:10px 16px;border:1px dashed #999;font:13px/1.4 sans-serif;color:#555;text-align:center;">
+      SC – Announcement bar: add a Message or Reviews.io block, or turn on the countdown / promo bar.
+    </div>
+  {%- endif -%}
+{%- else -%}
+  <style>
+    {%- if s.use_custom_font -%}
+      {{ s.custom_font | font_face: font_display: 'swap' }}
+    {%- endif -%}
+
+    :root {
+      --enable-sticky-announcement-bar: {% if sticky_mobile %}1{% else %}0{% endif %};
+    }
+    @media screen and (min-width: 750px) {
+      :root {
+        --enable-sticky-announcement-bar: {% if sticky_desktop %}1{% else %}0{% endif %};
+      }
+    }
+
+    {%- unless s.enable -%}
+      #shopify-section-{{ section.id }} { display: none; }
+    {%- endunless -%}
+
+    {%- if sticky_mobile -%}
+      @media screen and (max-width: 749px) {
+        #shopify-section-{{ section.id }} {
+          position: -webkit-sticky;
+          position: sticky;
+          top: {{ s.sticky_offset }}px;
+          z-index: {{ s.z_index }};
+        }
+      }
+    {%- endif -%}
+    {%- if sticky_desktop -%}
+      @media screen and (min-width: 750px) {
+        #shopify-section-{{ section.id }} {
+          position: -webkit-sticky;
+          position: sticky;
+          top: {{ s.sticky_offset }}px;
+          z-index: {{ s.z_index }};
+        }
+      }
+    {%- endif -%}
+
+    {{ sc_root }} {
+      --sc-ab-bg: {{ bg_main }};
+      --sc-ab-text: {{ s.text_color }};
+      --sc-ab-icon: {{ s.icon_color | default: 'currentColor' }};
+      --sc-ab-btn-bg: {{ s.btn_bg }};
+      --sc-ab-btn-text: {{ s.btn_text_color }};
+      --sc-ab-btn-border: {{ s.btn_border_color | default: 'transparent' }};
+      --sc-ab-btn-radius: {{ s.btn_radius }}px;
+      --sc-ab-btn-size: {{ s.btn_font_size }}px;
+      --sc-ab-divider: {{ s.divider_color | default: 'rgba(255,255,255,.35)' }};
+      --sc-ab-size: {{ s.font_size_mobile }}px;
+      --sc-ab-icon-size: {{ s.icon_size_mobile }}px;
+      --sc-ab-pt: {{ s.padding_top_mobile }}px;
+      --sc-ab-pb: {{ s.padding_bottom_mobile }}px;
+      --sc-ab-px: {{ s.padding_side_mobile }}px;
+      --sc-ab-minh: {{ s.min_height_mobile }}px;
+      --sc-ab-gap: {{ s.gap_mobile }}px;
+      --sc-ab-cols: {{ s.mobile_columns }};
+      --sc-ab-maxw: {% if s.content_width == 'boxed' %}{{ s.max_width }}px{% else %}none{% endif %};
+      --sc-ab-weight: {{ s.font_weight }};
+      --sc-ab-ls: {{ s.letter_spacing }}px;
+      --sc-ab-font: {% if s.use_custom_font %}{{ s.custom_font.family }}, {{ s.custom_font.fallback_families }}{% else %}inherit{% endif %};
+      --sc-ab-star: {{ s.star_color }};
+
+      --sc-ab-timer-bg: {{ bg_timer }};
+      --sc-ab-timer-text: {{ s.timer_text_color }};
+      --sc-ab-timer-box-bg: {{ s.timer_box_bg }};
+      --sc-ab-timer-box-text: {{ s.timer_box_text }};
+      --sc-ab-timer-size: {{ s.timer_font_size_mobile }}px;
+      --sc-ab-timer-num: {{ s.timer_number_size_mobile }}px;
+      --sc-ab-timer-py: {{ s.timer_padding_mobile }}px;
+
+      --sc-ab-promo-bg: {{ bg_promo }};
+      --sc-ab-promo-text: {{ s.promo_text_color }};
+      --sc-ab-promo-close: {{ s.promo_close_color | default: s.promo_text_color }};
+      --sc-ab-promo-size: {{ s.promo_font_size_mobile }}px;
+      --sc-ab-promo-py: {{ s.promo_padding_mobile }}px;
+
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      font-family: var(--sc-ab-font);
+      -webkit-font-smoothing: antialiased;
+    }
+    @media screen and (max-width: 749px) {
+      {{ sc_root }} {
+        --sc-ab-bg: {{ bg_main_m }};
+        --sc-ab-text: {{ text_m }};
+      }
+    }
+    @media screen and (min-width: 750px) {
+      {{ sc_root }} {
+        --sc-ab-size: {{ s.font_size }}px;
+        --sc-ab-icon-size: {{ s.icon_size }}px;
+        --sc-ab-pt: {{ s.padding_top }}px;
+        --sc-ab-pb: {{ s.padding_bottom }}px;
+        --sc-ab-px: {{ s.padding_side }}px;
+        --sc-ab-minh: {{ s.min_height }}px;
+        --sc-ab-gap: {{ s.gap }}px;
+        --sc-ab-timer-size: {{ s.timer_font_size }}px;
+        --sc-ab-timer-num: {{ s.timer_number_size }}px;
+        --sc-ab-timer-py: {{ s.timer_padding }}px;
+        --sc-ab-promo-size: {{ s.promo_font_size }}px;
+        --sc-ab-promo-py: {{ s.promo_padding }}px;
+      }
+    }
+
+    {{ sc_root }} *,
+    {{ sc_root }} *::before,
+    {{ sc_root }} *::after { box-sizing: border-box; }
+    {{ sc_root }} [hidden] { display: none !important; }
+    {{ sc_root }} a { color: inherit; text-decoration: none; }
+    {{ sc_root }} .sc-ab__sr {
+      position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px;
+      overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+    }
+    {{ sc_root }} .sc-ab__container {
+      position: relative;
+      width: 100%;
+      max-width: var(--sc-ab-maxw);
+      margin: 0 auto;
+      padding-left: var(--sc-ab-px);
+      padding-right: var(--sc-ab-px);
+    }
+    {{ sc_root }} .sc-ab__overlay { position: absolute; inset: 0; z-index: 1; }
+    {{ sc_root }} .sc-ab__overlay:focus-visible { outline: 2px solid currentColor; outline-offset: -3px; }
+
+    /* ---------- Main bar ---------- */
+    {{ sc_root }} .sc-ab__main {
+      order: {{ o_main }};
+      background: var(--sc-ab-bg);
+      color: var(--sc-ab-text);
+      font-size: var(--sc-ab-size);
+      font-weight: var(--sc-ab-weight);
+      letter-spacing: var(--sc-ab-ls);
+      line-height: 1.3;
+      {%- if s.uppercase %} text-transform: uppercase;{% endif %}
+      {%- if s.show_border %} border-bottom: 1px solid {{ s.border_color }};{% endif %}
+    }
+    {{ sc_root }} .sc-ab__main .sc-ab__container {
+      display: flex;
+      align-items: center;
+      min-height: var(--sc-ab-minh);
+      padding-top: var(--sc-ab-pt);
+      padding-bottom: var(--sc-ab-pb);
+    }
+    {{ sc_root }} .sc-ab__track {
+      position: relative;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      gap: 6px var(--sc-ab-gap);
+      width: 100%;
+      min-width: 0;
+    }
+    {{ sc_root }} .sc-ab__item {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 6px 8px;
+      min-width: 0;
+      text-align: center;
+    }
+    {{ sc_root }} .sc-ab__body {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+    {{ sc_root }} .sc-ab__text { min-width: 0; overflow-wrap: anywhere; }
+    {{ sc_root }} .sc-ab__text p { margin: 0; display: inline; }
+    {%- if s.link_underline_hover %}
+      {{ sc_root }} .sc-ab__item.has-link:hover .sc-ab__text,
+      {{ sc_root }} .sc-ab__item--reviews a:hover .sc-ab__rv-text { text-decoration: underline; text-underline-offset: 2px; }
+    {%- endif %}
+    {{ sc_root }} .sc-ab__icon {
+      display: inline-flex;
+      flex: 0 0 auto;
+      align-items: center;
+      justify-content: center;
+      width: var(--sc-ab-icon-size);
+      height: var(--sc-ab-icon-size);
+      color: var(--sc-ab-icon);
+    }
+    {{ sc_root }} .sc-ab__icon svg,
+    {{ sc_root }} .sc-ab__icon img { display: block; width: 100%; height: 100%; object-fit: contain; }
+    {%- if s.custom_svg_color == 'text' %}
+      {{ sc_root }} .sc-ab__icon--custom svg [fill]:not([fill="none"]) { fill: currentColor !important; }
+      {{ sc_root }} .sc-ab__icon--custom svg [stroke]:not([stroke="none"]) { stroke: currentColor !important; }
+    {%- endif %}
+    {{ sc_root }} .sc-ab__btn {
+      position: relative;
+      z-index: 2;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 4px 12px;
+      border: 1px solid var(--sc-ab-btn-border);
+      border-radius: var(--sc-ab-btn-radius);
+      background: var(--sc-ab-btn-bg);
+      color: var(--sc-ab-btn-text);
+      font-size: var(--sc-ab-btn-size);
+      font-weight: 600;
+      line-height: 1.2;
+      white-space: nowrap;
+      transition: opacity .2s ease;
+    }
+    {{ sc_root }} .sc-ab__btn:hover { opacity: .85; }
+    {{ sc_root }} .sc-ab__btn:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+    {{ sc_root }} .sc-ab__editor-note { opacity: .8; font-style: italic; }
+
+    /* Reviews.io */
+    {{ sc_root }} .sc-ab__rv-link { position: relative; display: inline-flex; align-items: center; gap: 8px; }
+    {{ sc_root }} .sc-ab__rv-link:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+    {{ sc_root }} .sc-ab__rv-logo { display: inline-flex; color: {{ s.reviews_logo_color | default: 'currentColor' }}; }
+    {{ sc_root }} .sc-ab__rv-logo svg { display: block; width: auto; height: calc(var(--sc-ab-size) * .95); }
+    {{ sc_root }} .sc-ab__rv-rating { font-weight: 700; }
+    {{ sc_root }} .sc-ab__item--reviews.is-loading .sc-ab__rv-text,
+    {{ sc_root }} .sc-ab__item--reviews.is-loading .sc-ab__stars { visibility: hidden; }
+    {{ sc_root }} .sc-ab__rv-fallback { display: none; }
+    {{ sc_root }} .sc-ab__item--reviews.is-fallback .sc-ab__rv-fallback { display: inline; }
+    {{ sc_root }} .sc-ab__item--reviews.is-fallback .sc-ab__rv-text,
+    {{ sc_root }} .sc-ab__item--reviews.is-fallback .sc-ab__stars { display: none; }
+    {{ sc_root }} .sc-ab__stars {
+      position: relative;
+      display: inline-block;
+      flex: 0 0 auto;
+      line-height: 0;
+      color: var(--sc-ab-star);
+    }
+    {{ sc_root }} .sc-ab__stars-row { display: inline-flex; gap: 1px; }
+    {{ sc_root }} .sc-ab__stars-row svg { width: calc(var(--sc-ab-size) * 1.05); height: calc(var(--sc-ab-size) * 1.05); }
+    {{ sc_root }} .sc-ab__stars-row--bg { opacity: .3; }
+    {{ sc_root }} .sc-ab__stars-row--fg {
+      position: absolute; top: 0; left: 0; overflow: hidden; white-space: nowrap;
+      width: var(--sc-ab-stars, 100%);
+    }
+
+    /* Arrows (rotating mode) */
+    {{ sc_root }} .sc-ab__arrow {
+      display: none;
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 3;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      padding: 0;
+      margin: 0;
+      border: 0;
+      background: transparent;
+      color: inherit;
+      cursor: pointer;
+      opacity: .8;
+    }
+    {{ sc_root }} .sc-ab__arrow:hover { opacity: 1; }
+    {{ sc_root }} .sc-ab__arrow:focus-visible { outline: 2px solid currentColor; outline-offset: -2px; opacity: 1; }
+    {{ sc_root }} .sc-ab__arrow svg { width: 14px; height: 14px; }
+    {{ sc_root }} .sc-ab__arrow--prev { left: max(0px, calc(var(--sc-ab-px) - 28px)); }
+    {{ sc_root }} .sc-ab__arrow--next { right: max(0px, calc(var(--sc-ab-px) - 28px)); }
+
+    /* Rotating mode (JS adds .is-rotating for the current breakpoint) */
+    {{ sc_root }}.is-rotating .sc-ab__track { display: grid; grid-template-columns: minmax(0, 1fr); }
+    {{ sc_root }}.is-rotating .sc-ab__item {
+      grid-area: 1 / 1;
+      width: 100%;
+      justify-content: center !important;
+      border: 0 !important;
+      padding: 0 !important;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity .45s ease, visibility .45s;
+    }
+    {{ sc_root }}.is-rotating .sc-ab__item.is-active { opacity: 1; visibility: visible; }
+    {%- if s.show_arrows %}
+      {{ sc_root }}.is-rotating.has-multiple .sc-ab__arrow { display: inline-flex; }
+      {{ sc_root }}.is-rotating.has-multiple .sc-ab__main .sc-ab__container { padding-left: max(var(--sc-ab-px), 32px); padding-right: max(var(--sc-ab-px), 32px); }
+    {%- endif %}
+    @media (prefers-reduced-motion: reduce) {
+      {{ sc_root }}.is-rotating .sc-ab__item { transition: none; }
+    }
+
+    /* Mobile grid */
+    @media screen and (max-width: 749px) {
+      {{ sc_root }} .sc-ab__item--hide-m { display: none !important; }
+      {{ sc_root }}:not(.is-rotating) .sc-ab__item {
+        flex: 0 1 calc((100% - (var(--sc-ab-cols) - 1) * var(--sc-ab-gap)) / var(--sc-ab-cols));
+      }
+      {{ sc_root }}:not(.is-rotating) .sc-ab__item--full-m { flex-basis: 100%; }
+      {{ sc_root }} .sc-ab__item--first-m { order: -1; }
+      {{ sc_root }}:not(.is-rotating) .sc-ab__track.is-single .sc-ab__item { flex-basis: 100%; }
+    }
+
+    /* Desktop layouts */
+    @media screen and (min-width: 750px) {
+      {{ sc_root }} .sc-ab__item--hide-d { display: none !important; }
+      {%- case s.desktop_layout -%}
+        {%- when 'spread' %}
+          {{ sc_root }}:not(.is-rotating) .sc-ab__track { flex-wrap: nowrap; justify-content: space-between; }
+          {{ sc_root }}:not(.is-rotating) .sc-ab__item { flex: 1 1 0; }
+          {{ sc_root }}:not(.is-rotating) .sc-ab__track:not(.is-single) .sc-ab__item:first-child { justify-content: flex-start; text-align: left; }
+          {{ sc_root }}:not(.is-rotating) .sc-ab__track:not(.is-single) .sc-ab__item:last-child { justify-content: flex-end; text-align: right; }
+        {%- when 'even' %}
+          {{ sc_root }}:not(.is-rotating) .sc-ab__track { flex-wrap: nowrap; }
+          {{ sc_root }}:not(.is-rotating) .sc-ab__item { flex: 1 1 0; }
+        {%- when 'center' %}
+          {{ sc_root }}:not(.is-rotating) .sc-ab__item { flex: 0 1 auto; }
+      {%- endcase %}
+      {%- if s.show_dividers %}
+        {{ sc_root }}:not(.is-rotating) .sc-ab__track { column-gap: 0; }
+        {{ sc_root }}:not(.is-rotating) .sc-ab__item { padding: 0 calc(var(--sc-ab-gap) / 2); }
+        {{ sc_root }}:not(.is-rotating) .sc-ab__item + .sc-ab__item { border-left: 1px solid var(--sc-ab-divider); }
+      {%- endif %}
+    }
+
+    /* ---------- Countdown bar ---------- */
+    {{ sc_root }} .sc-ab__timer {
+      order: {{ o_timer }};
+      position: relative;
+      background: var(--sc-ab-timer-bg);
+      color: var(--sc-ab-timer-text);
+      font-size: var(--sc-ab-timer-size);
+      font-weight: var(--sc-ab-weight);
+      letter-spacing: var(--sc-ab-ls);
+      line-height: 1.3;
+    }
+    {{ sc_root }} .sc-ab__timer .sc-ab__container {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      gap: 6px 10px;
+      padding-top: var(--sc-ab-timer-py);
+      padding-bottom: var(--sc-ab-timer-py);
+      text-align: center;
+    }
+    {{ sc_root }} .sc-ab__timer-text p { margin: 0; display: inline; }
+    {{ sc_root }} .sc-ab__clock { display: inline-flex; align-items: center; gap: 4px; font-variant-numeric: tabular-nums; }
+    {{ sc_root }} .sc-ab__u { display: inline-flex; align-items: center; gap: 4px; }
+    {{ sc_root }} .sc-ab__box { display: inline-flex; align-items: baseline; gap: 2px; }
+    {{ sc_root }} .sc-ab__num { font-size: var(--sc-ab-timer-num); font-weight: 700; line-height: 1.1; }
+    {{ sc_root }} .sc-ab__lbl { font-size: .8em; opacity: .9; }
+    {{ sc_root }} .sc-ab__sep { font-weight: 700; }
+    {{ sc_root }} .sc-ab__clock--boxes .sc-ab__box {
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
+      min-width: calc(var(--sc-ab-timer-num) * 2.1);
+      padding: 3px 5px;
+      border-radius: 4px;
+      background: var(--sc-ab-timer-box-bg);
+      color: var(--sc-ab-timer-box-text);
+    }
+    {{ sc_root }} .sc-ab__clock--boxes .sc-ab__lbl { font-size: .65em; text-transform: uppercase; letter-spacing: .04em; }
+    {{ sc_root }} .sc-ab__timer-expired { display: none; }
+    {{ sc_root }} .sc-ab__timer.is-expired .sc-ab__timer-expired { display: inline; }
+    {{ sc_root }} .sc-ab__timer.is-expired .sc-ab__timer-text,
+    {{ sc_root }} .sc-ab__timer.is-expired .sc-ab__clock { display: none; }
+
+    /* ---------- Promo bar ---------- */
+    {{ sc_root }} .sc-ab__promo {
+      order: {{ o_promo }};
+      position: relative;
+      background: var(--sc-ab-promo-bg);
+      color: var(--sc-ab-promo-text);
+      font-size: var(--sc-ab-promo-size);
+      font-weight: var(--sc-ab-weight);
+      letter-spacing: var(--sc-ab-ls);
+      line-height: 1.3;
+    }
+    {{ sc_root }} .sc-ab__promo .sc-ab__container {
+      padding-top: var(--sc-ab-promo-py);
+      padding-bottom: var(--sc-ab-promo-py);
+      text-align: center;
+    }
+    {{ sc_root }} .sc-ab__promo.is-dismissible .sc-ab__container { padding-left: max(var(--sc-ab-px), 40px); padding-right: max(var(--sc-ab-px), 40px); }
+    {{ sc_root }} .sc-ab__promo-text p { margin: 0; display: inline; }
+    {%- if s.link_underline_hover %}
+      {{ sc_root }} .sc-ab__promo.has-link:hover .sc-ab__promo-text { text-decoration: underline; text-underline-offset: 2px; }
+    {%- endif %}
+    {{ sc_root }} .sc-ab__close {
+      position: absolute;
+      top: 50%;
+      right: max(4px, calc(var(--sc-ab-px) - 32px));
+      transform: translateY(-50%);
+      z-index: 2;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      padding: 0;
+      margin: 0;
+      border: 0;
+      background: transparent;
+      color: var(--sc-ab-promo-close);
+      cursor: pointer;
+    }
+    {{ sc_root }} .sc-ab__close svg { width: 11px; height: 11px; }
+    {{ sc_root }} .sc-ab__close:hover { opacity: .75; }
+    {{ sc_root }} .sc-ab__close:focus-visible { outline: 2px solid currentColor; outline-offset: -4px; }
+  </style>
+
+  <sc-announcement-bar
+    id="ScAb-{{ section.id }}"
+    class="sc-ab"
+    role="region"
+    aria-label="{{ s.region_label | default: 'Announcements' | escape }}"
+    data-section-id="{{ section.id }}"
+    data-rotate-desktop="{{ rotate_desktop }}"
+    data-rotate-mobile="{{ rotate_mobile }}"
+    data-speed="{{ s.rotate_speed }}"
+    data-sticky-desktop="{{ sticky_desktop }}"
+    data-sticky-mobile="{{ sticky_mobile }}"
+  >
+    {%- comment -%} ======================= MAIN BAR ======================= {%- endcomment -%}
+    {%- if has_main -%}
+      <div class="sc-ab__main">
+        <div class="sc-ab__container">
+          {%- if s.show_arrows -%}
+            <button type="button" class="sc-ab__arrow sc-ab__arrow--prev" data-sc-ab-prev aria-label="{{ s.prev_label | escape }}">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m15 18-6-6 6-6"/></svg>
+            </button>
+          {%- endif -%}
+
+          <div class="sc-ab__track{% if section.blocks.size == 1 %} is-single{% endif %}" data-sc-ab-track aria-live="off">
+            {%- for block in section.blocks -%}
+              {%- liquid
+                assign b = block.settings
+                assign item_cls = ''
+                if b.hide_on_desktop
+                  assign item_cls = item_cls | append: ' sc-ab__item--hide-d'
+                endif
+                if b.hide_on_mobile
+                  assign item_cls = item_cls | append: ' sc-ab__item--hide-m'
+                endif
+                if forloop.first
+                  assign item_cls = item_cls | append: ' is-active'
+                endif
+              -%}
+
+              {%- case block.type -%}
+                {%- when 'message' -%}
+                  {%- capture icon_html -%}
+                    {%- case b.icon_type -%}
+                      {%- when 'library' -%}
+                        <span class="sc-ab__icon" aria-hidden="true">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="{{ s.icon_stroke }}" stroke-linecap="round" stroke-linejoin="round" focusable="false">
+                            {%- case b.icon -%}
+                              {%- when 'truck' -%}<path d="M1 4h14v12H1z"/><path d="M15 8h4l3 3v5h-7z"/><circle cx="5.5" cy="18.5" r="2"/><circle cx="18.5" cy="18.5" r="2"/>
+                              {%- when 'return' -%}<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/>
+                              {%- when 'shield' -%}<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/>
+                              {%- when 'star' -%}<path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8l-6.2 3.2L7 14.2 2 9.3l6.9-1z"/>
+                              {%- when 'gift' -%}<rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13"/><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"/><path d="M7.5 8a2.5 2.5 0 0 1 0-5C10 3 12 8 12 8s2-5 4.5-5a2.5 2.5 0 0 1 0 5"/>
+                              {%- when 'clock' -%}<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
+                              {%- when 'check' -%}<circle cx="12" cy="12" r="10"/><path d="m8 12 3 3 5-6"/>
+                              {%- when 'heart' -%}<path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1.1L12 21l7.8-7.5 1-1.1a5.5 5.5 0 0 0 0-7.8z"/>
+                              {%- when 'lock' -%}<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                              {%- when 'tag' -%}<path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L2 12V2h10l8.6 8.6a2 2 0 0 1 0 2.8z"/><circle cx="7" cy="7" r="1.5"/>
+                              {%- when 'percent' -%}<path d="M19 5 5 19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/>
+                              {%- when 'package' -%}<path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5"/><path d="M12 13v8"/>
+                              {%- when 'chat' -%}<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                              {%- when 'leaf' -%}<path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.5 19 2c1 2 2 4.2 2 8 0 5.5-4.8 10-10 10z"/><path d="M2 21c0-3 1.9-5.4 5.1-6"/>
+                              {%- when 'card' -%}<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/>
+                              {%- when 'globe' -%}<circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15 15 0 0 1 0 20 15 15 0 0 1 0-20z"/>
+                              {%- when 'flash' -%}<path d="M13 2 3 14h9l-1 8 10-12h-9z"/>
+                              {%- else -%}<circle cx="12" cy="12" r="10"/><path d="m8 12 3 3 5-6"/>
+                            {%- endcase -%}
+                          </svg>
+                        </span>
+                      {%- when 'svg' -%}
+                        {%- if b.icon_svg != blank -%}
+                          <span class="sc-ab__icon sc-ab__icon--custom" aria-hidden="true">{{ b.icon_svg }}</span>
+                        {%- endif -%}
+                      {%- when 'image' -%}
+                        {%- if b.icon_image != blank -%}
+                          <span class="sc-ab__icon" aria-hidden="true">
+                            {{- b.icon_image | image_url: width: 96 | image_tag: loading: 'eager', alt: '', width: 48, height: 48 -}}
+                          </span>
+                        {%- endif -%}
+                    {%- endcase -%}
+                  {%- endcapture -%}
+
+                  {%- if b.text != blank or b.btn_text != blank or request.design_mode -%}
+                    <div
+                      class="sc-ab__item sc-ab__item--message{{ item_cls }}{% if b.link != blank %} has-link{% endif %}"
+                      data-sc-ab-item
+                      {{ block.shopify_attributes }}
+                      {% if b.btn_bg != blank or b.btn_text_color != blank %}
+                        style="{% if b.btn_bg != blank %}--sc-ab-btn-bg: {{ b.btn_bg }};{% endif %}{% if b.btn_text_color != blank %}--sc-ab-btn-text: {{ b.btn_text_color }};{% endif %}"
+                      {% endif %}
+                    >
+                      <span class="sc-ab__body">
+                        {{- icon_html -}}
+                        {%- if b.text != blank -%}
+                          <span class="sc-ab__text">{{ b.text }}</span>
+                        {%- elsif request.design_mode and b.btn_text == blank -%}
+                          <span class="sc-ab__text sc-ab__editor-note">Add a message</span>
+                        {%- endif -%}
+                      </span>
+                      {%- if b.link != blank -%}
+                        <a
+                          class="sc-ab__overlay"
+                          href="{{ b.link }}"
+                          {% if b.new_tab %}target="_blank" rel="noopener"{% endif %}
+                          aria-label="{{ b.text | strip_html | escape }}"
+                        ></a>
+                      {%- endif -%}
+                      {%- if b.btn_text != blank -%}
+                        {%- if b.btn_link != blank -%}
+                          <a class="sc-ab__btn" href="{{ b.btn_link }}"{% if b.new_tab %} target="_blank" rel="noopener"{% endif %}>
+                            {{- b.btn_text | escape -}}
+                          </a>
+                        {%- else -%}
+                          <span class="sc-ab__btn">{{ b.btn_text | escape }}</span>
+                        {%- endif -%}
+                      {%- endif -%}
+                    </div>
+                  {%- endif -%}
+
+                {%- when 'reviews_io' -%}
+                  {%- liquid
+                    assign rv_cls = item_cls
+                    if b.full_width_mobile
+                      assign rv_cls = rv_cls | append: ' sc-ab__item--full-m'
+                    endif
+                    if b.first_on_mobile
+                      assign rv_cls = rv_cls | append: ' sc-ab__item--first-m'
+                    endif
+                    assign rv_rating_span = '<span class="sc-ab__rv-rating" data-sc-ab-rating>–</span>'
+                    assign rv_count_span = '<span data-sc-ab-count>–</span>'
+                    assign rv_text = b.rating_text | escape | replace: '[rating]', rv_rating_span | replace: '[count]', rv_count_span
+                    assign rv_count = b.count_text | escape | replace: '[count]', rv_count_span
+                  -%}
+
+                  {%- if b.store_key != blank -%}
+                    {%- capture rv_logo -%}
+                      {%- if b.show_logo -%}
+                        <span class="sc-ab__rv-logo" aria-hidden="true">
+                          <svg viewBox="0 0 20 12" fill="currentColor" xmlns="http://www.w3.org/2000/svg" focusable="false">
+                            <path d="M12.62 9.25c.2 0 .34.14.34.34v.15c0 .2-.14.35-.34.35a.34.34 0 0 1-.35-.35v-.15c0-.2.15-.34.35-.34Z"/>
+                            <path d="M14.14 5.1c0-.18.14-.3.32-.3.19 0 .34.12.34.3v.09c0 .18-.15.3-.34.3-.18 0-.32-.12-.32-.3V5.1Zm.05 1.43c0-.16.12-.29.27-.29.16 0 .29.13.29.29V9.8c0 .16-.12.28-.28.28a.28.28 0 0 1-.28-.28V6.53Z"/>
+                            <path d="M15.82 8.18v-.01c0-1.07.83-1.97 1.97-1.97 1.13 0 1.96.89 1.96 1.95v.02c0 1.06-.84 1.97-1.97 1.97-1.13 0-1.96-.89-1.96-1.96Zm3.35 0v-.01c0-.81-.6-1.48-1.4-1.48-.81 0-1.37.67-1.37 1.46v.02c0 .8.6 1.46 1.39 1.46.82 0 1.38-.66 1.38-1.45Z"/>
+                            <path d="M0 5.67a5.67 5.67 0 1 0 11.33 0A5.67 5.67 0 0 0 0 5.67Zm3.94 1.02a.46.46 0 0 0-.16-.51L1.98 4.83a.23.23 0 0 1 .14-.42h2.15c.2 0 .38-.13.44-.32l.73-2.2a.23.23 0 0 1 .44 0l.74 2.2c.06.19.24.32.44.32h2.16c.1 0 .19.06.22.16a.23.23 0 0 1-.08.26L7.56 6.19a.46.46 0 0 0-.16.51l.7 2.23a.23.23 0 0 1-.36.25L5.95 7.8a.47.47 0 0 0-.57 0L3.6 9.18a.23.23 0 0 1-.36-.25l.7-2.24Z"/>
+                          </svg>
+                        </span>
+                      {%- endif -%}
+                    {%- endcapture -%}
+
+                    <div
+                      class="sc-ab__item sc-ab__item--reviews is-loading{{ rv_cls }}"
+                      data-sc-ab-item
+                      data-sc-ab-reviews
+                      data-key="{{ b.store_key | strip | escape }}"
+                      data-positive="{{ b.positive_only }}"
+                      data-decimals="{{ b.decimals }}"
+                      data-format="{{ b.number_format }}"
+                      {{ block.shopify_attributes }}
+                    >
+                      {%- if b.link != blank -%}
+                        <a class="sc-ab__rv-link" href="{{ b.link }}"{% if b.new_tab %} target="_blank" rel="noopener"{% endif %}>
+                      {%- else -%}
+                        <span class="sc-ab__rv-link">
+                      {%- endif -%}
+                        {%- if b.logo_position == 'before' -%}{{ rv_logo }}{%- endif -%}
+                        {%- if b.show_stars -%}
+                          <span class="sc-ab__stars" aria-hidden="true">
+                            {%- capture star -%}<svg viewBox="0 0 24 24" fill="currentColor" focusable="false"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8l-6.2 3.2L7 14.2 2 9.3l6.9-1z"/></svg>{%- endcapture -%}
+                            <span class="sc-ab__stars-row sc-ab__stars-row--bg">{{ star }}{{ star }}{{ star }}{{ star }}{{ star }}</span>
+                            <span class="sc-ab__stars-row sc-ab__stars-row--fg">{{ star }}{{ star }}{{ star }}{{ star }}{{ star }}</span>
+                          </span>
+                        {%- endif -%}
+                        <span class="sc-ab__text sc-ab__rv-text">
+                          {{- rv_text -}}
+                          {%- if b.show_count and b.count_text != blank %} {{ rv_count }}{%- endif -%}
+                        </span>
+                        {%- if b.fallback_text != blank -%}
+                          <span class="sc-ab__text sc-ab__rv-fallback" data-sc-ab-fallback>{{ b.fallback_text | escape }}</span>
+                        {%- endif -%}
+                        {%- if b.logo_position == 'after' -%}{{ rv_logo }}{%- endif -%}
+                        {%- if b.new_tab and b.link != blank -%}<span class="sc-ab__sr"> (opens in a new tab)</span>{%- endif -%}
+                      {%- if b.link != blank -%}
+                        </a>
+                      {%- else -%}
+                        </span>
+                      {%- endif -%}
+                    </div>
+                  {%- elsif request.design_mode -%}
+                    <div class="sc-ab__item sc-ab__item--reviews{{ rv_cls }}" data-sc-ab-item {{ block.shopify_attributes }}>
+                      <span class="sc-ab__text sc-ab__editor-note">Reviews.io: add your store key in the block settings</span>
+                    </div>
+                  {%- endif -%}
+              {%- endcase -%}
+            {%- endfor -%}
+          </div>
+
+          {%- if s.show_arrows -%}
+            <button type="button" class="sc-ab__arrow sc-ab__arrow--next" data-sc-ab-next aria-label="{{ s.next_label | escape }}">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m9 18 6-6-6-6"/></svg>
+            </button>
+          {%- endif -%}
+        </div>
+      </div>
+    {%- endif -%}
+
+    {%- comment -%} ======================= COUNTDOWN ======================= {%- endcomment -%}
+    {%- if has_timer -%}
+      {%- liquid
+        assign t_expired_text = s.timer_expired_text
+        if t_expired_text == blank and request.design_mode
+          assign t_expired_text = 'Countdown ended – visitors see the "When the timer ends" behaviour.'
+        endif
+      -%}
+      <div
+        class="sc-ab__timer"
+        data-sc-ab-timer
+        data-mode="{{ s.timer_mode }}"
+        data-end="{{ s.timer_end | escape }}"
+        data-daily="{{ s.timer_daily_time | escape }}"
+        {% if s.timer_timezone == 'store' %}data-tz="{{ store_tz }}"{% endif %}
+        data-expire="{{ s.timer_on_expire }}"
+        data-hide-days="{{ s.timer_hide_zero_days }}"
+      >
+        <div class="sc-ab__container">
+          {%- if s.timer_text_before != blank -%}
+            <span class="sc-ab__timer-text">{{ s.timer_text_before }}</span>
+          {%- endif -%}
+          <span class="sc-ab__clock sc-ab__clock--{{ s.timer_style }}" role="timer" aria-live="off">
+            {%- assign units = 'd,h,m,s' | split: ',' -%}
+            {%- for u in units -%}
+              {%- case u -%}
+                {%- when 'd' -%}{%- assign lbl = s.label_days -%}
+                {%- when 'h' -%}{%- assign lbl = s.label_hours -%}
+                {%- when 'm' -%}{%- assign lbl = s.label_minutes -%}
+                {%- else -%}{%- assign lbl = s.label_seconds -%}
+              {%- endcase -%}
+              <span class="sc-ab__u" data-u="{{ u }}">
+                <span class="sc-ab__box">
+                  <span class="sc-ab__num">00</span>
+                  {%- if s.timer_show_labels and lbl != blank -%}<span class="sc-ab__lbl">{{ lbl | escape }}</span>{%- endif -%}
+                </span>
+                {%- unless forloop.last or s.timer_style == 'boxes' -%}<span class="sc-ab__sep" aria-hidden="true">:</span>{%- endunless -%}
+              </span>
+            {%- endfor -%}
+          </span>
+          {%- if s.timer_text_after != blank -%}
+            <span class="sc-ab__timer-text">{{ s.timer_text_after }}</span>
+          {%- endif -%}
+          {%- if t_expired_text != blank -%}
+            <span class="sc-ab__timer-expired">{{ t_expired_text }}</span>
+          {%- endif -%}
+          {%- if s.timer_link != blank -%}
+            <a
+              class="sc-ab__overlay"
+              href="{{ s.timer_link }}"
+              aria-label="{{ s.timer_text_before | append: ' ' | append: s.timer_text_after | strip_html | strip | default: 'View offer' | escape }}"
+            ></a>
+          {%- endif -%}
+        </div>
+      </div>
+    {%- endif -%}
+
+    {%- comment -%} ======================= PROMO BAR ======================= {%- endcomment -%}
+    {%- if has_promo -%}
+      {%- liquid
+        assign promo_hash = s.promo_text | append: s.promo_link | md5 | slice: 0, 10
+        assign promo_key = 'sc-ab-promo:' | append: section.id | append: ':' | append: promo_hash
+      -%}
+      <div
+        id="ScAbPromo-{{ section.id }}"
+        class="sc-ab__promo{% if s.promo_dismissible %} is-dismissible{% endif %}{% if s.promo_link != blank %} has-link{% endif %}"
+        data-sc-ab-promo
+        data-key="{{ promo_key }}"
+        data-days="{{ s.promo_dismiss_days }}"
+      >
+        <div class="sc-ab__container">
+          <span class="sc-ab__promo-text">{{ s.promo_text }}</span>
+          {%- if s.promo_link != blank -%}
+            <a class="sc-ab__overlay" href="{{ s.promo_link }}" aria-label="{{ s.promo_text | strip_html | escape }}"></a>
+          {%- endif -%}
+        </div>
+        {%- if s.promo_dismissible -%}
+          <button type="button" class="sc-ab__close" data-sc-ab-close aria-label="{{ s.promo_close_label | escape }}">
+            <svg viewBox="0 0 11 11" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M1 1l9 9M10 1l-9 9"/></svg>
+          </button>
+        {%- endif -%}
+      </div>
+      {%- if s.promo_dismissible and request.design_mode == false -%}
+        <script>
+          (function () {
+            var b = document.getElementById('ScAbPromo-{{ section.id }}');
+            if (!b) return;
+            var k = b.getAttribute('data-key');
+            var d = parseFloat(b.getAttribute('data-days'));
+            try {
+              if (d > 0) {
+                var v = parseInt(localStorage.getItem(k), 10);
+                if (v && v > Date.now()) b.hidden = true;
+                else if (v) localStorage.removeItem(k);
+              } else if (sessionStorage.getItem(k)) {
+                b.hidden = true;
+              }
+            } catch (e) {}
+          })();
+        </script>
+      {%- endif -%}
+    {%- endif -%}
+  </sc-announcement-bar>
+
+  <script>
+    (function () {
+      if (!window.customElements || window.customElements.get('sc-announcement-bar')) return;
+
+      var MQ = '(min-width: 750px)';
+      var API =
+        'https://api.reviews.io/timeline/data?type=store_review&sort=date_desc&page=1&per_page=1' +
+        '&enable_avatars=false&include_subrating_breakdown=1&include_product_reviews=1&include_local_reviews=1';
+
+      function pad(n) {
+        return (n < 10 ? '0' : '') + n;
+      }
+      function tzMinutes(z) {
+        var m = /^([+-])(\d{2}):?(\d{2})$/.exec(z || '');
+        if (!m) return null;
+        var v = parseInt(m[2], 10) * 60 + parseInt(m[3], 10);
+        return m[1] === '-' ? -v : v;
+      }
+      // "YYYY-MM-DD HH:MM(:SS)" in store time (tz minutes) or visitor time (tz null). Falls back to Date.parse.
+      function parseEnd(str, tz) {
+        str = (str || '').trim();
+        var m = /^(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?$/.exec(str);
+        if (m) {
+          var hasTime = m[4] != null;
+          var p = [+m[1], +m[2] - 1, +m[3], hasTime ? +m[4] : 23, hasTime ? +m[5] : 59, m[6] ? +m[6] : hasTime ? 0 : 59];
+          if (tz == null) return new Date(p[0], p[1], p[2], p[3], p[4], p[5]).getTime();
+          return Date.UTC(p[0], p[1], p[2], p[3], p[4], p[5]) - tz * 60000;
+        }
+        var t = Date.parse(str);
+        return isNaN(t) ? null : t;
+      }
+      // Next occurrence of "HH:MM" today/tomorrow.
+      function nextDaily(str, tz) {
+        var m = /^(\d{1,2}):(\d{2})$/.exec((str || '').trim());
+        if (!m) return null;
+        var off = tz == null ? -new Date().getTimezoneOffset() : tz;
+        var now = Date.now();
+        var local = new Date(now + off * 60000);
+        var t = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate(), +m[1], +m[2], 0) - off * 60000;
+        if (t <= now) t += 864e5;
+        return t;
+      }
+      function onMq(mq, fn) {
+        if (mq.addEventListener) mq.addEventListener('change', fn);
+        else mq.addListener(fn);
+        return function () {
+          if (mq.removeEventListener) mq.removeEventListener('change', fn);
+          else mq.removeListener(fn);
+        };
+      }
+
+      class ScAnnouncementBar extends HTMLElement {
+        connectedCallback() {
+          if (this._ready) return;
+          this._ready = true;
+          this.cleanups = [];
+          this.designMode = !!(window.Shopify && window.Shopify.designMode);
+          this.mq = window.matchMedia(MQ);
+          this.wrapper = this.closest('.shopify-section') || this;
+          this.track = this.querySelector('[data-sc-ab-track]');
+          this.items = [];
+          this.index = 0;
+          this.paused = false;
+
+          var self = this;
+          this.cleanups.push(
+            onMq(this.mq, function () {
+              self.updateRotation();
+              self.updateVars();
+            })
+          );
+
+          this.initRotation();
+          this.initReviews();
+          this.initTimer();
+          this.initPromo();
+          this.initVars();
+          if (this.designMode) this.initEditor();
+        }
+
+        disconnectedCallback() {
+          (this.cleanups || []).forEach(function (fn) {
+            try { fn(); } catch (e) {}
+          });
+          this.cleanups = [];
+          this._ready = false;
+        }
+
+        on(target, type, fn, opts) {
+          target.addEventListener(type, fn, opts);
+          this.cleanups.push(function () {
+            target.removeEventListener(type, fn, opts);
+          });
+        }
+
+        /* ---------- Rotation ---------- */
+        initRotation() {
+          if (!this.track) return;
+          var self = this;
+          this.speed = Math.max(2, parseFloat(this.dataset.speed) || 5) * 1000;
+          var prev = this.querySelector('[data-sc-ab-prev]');
+          var next = this.querySelector('[data-sc-ab-next]');
+          if (prev) this.on(prev, 'click', function () { self.go(self.index - 1); });
+          if (next) this.on(next, 'click', function () { self.go(self.index + 1); });
+
+          var main = this.querySelector('.sc-ab__main');
+          if (main) {
+            var pause = function () { self.paused = true; self.stop(); };
+            var resume = function () {
+              if (main.matches(':hover') || main.contains(document.activeElement)) return;
+              self.paused = false;
+              if (self.isRotating()) self.start();
+            };
+            this.on(main, 'mouseenter', pause);
+            this.on(main, 'mouseleave', resume);
+            this.on(main, 'focusin', pause);
+            this.on(main, 'focusout', function () { setTimeout(resume, 0); });
+          }
+          this.cleanups.push(function () { self.stop(); });
+          this.updateRotation();
+        }
+
+        isRotating() {
+          return this.mq.matches ? this.dataset.rotateDesktop === 'true' : this.dataset.rotateMobile === 'true';
+        }
+
+        updateRotation() {
+          if (!this.track) return;
+          var rot = this.isRotating();
+          this.classList.toggle('is-rotating', rot);
+          this.items = Array.prototype.filter.call(this.track.querySelectorAll('[data-sc-ab-item]'), function (el) {
+            return !el.hidden && window.getComputedStyle(el).display !== 'none';
+          });
+          this.classList.toggle('has-multiple', this.items.length > 1);
+
+          if (!rot) {
+            this.stop();
+            Array.prototype.forEach.call(this.track.querySelectorAll('[data-sc-ab-item]'), function (el) {
+              el.removeAttribute('aria-hidden');
+              el.inert = false;
+            });
+            return;
+          }
+          if (this.index >= this.items.length) this.index = 0;
+          this.show(this.index);
+          if (this.items.length > 1 && !this.paused) this.start();
+          else this.stop();
+        }
+
+        show(i) {
+          var items = this.items;
+          if (!items.length) return;
+          this.index = ((i % items.length) + items.length) % items.length;
+          var active = items[this.index];
+          Array.prototype.forEach.call(this.track.querySelectorAll('[data-sc-ab-item]'), function (el) {
+            var on = el === active;
+            el.classList.toggle('is-active', on);
+            if (on) el.removeAttribute('aria-hidden');
+            else el.setAttribute('aria-hidden', 'true');
+            el.inert = !on;
+          });
+        }
+
+        go(i) {
+          this.show(i);
+          if (!this.paused) this.start();
+        }
+
+        start() {
+          this.stop();
+          if (this.items.length < 2) return;
+          var self = this;
+          this._rot = setInterval(function () { self.show(self.index + 1); }, this.speed);
+        }
+
+        stop() {
+          if (this._rot) clearInterval(this._rot);
+          this._rot = null;
+        }
+
+        /* ---------- Reviews.io ---------- */
+        initReviews() {
+          var self = this;
+          Array.prototype.forEach.call(this.querySelectorAll('[data-sc-ab-reviews]'), function (el) {
+            self.loadReviews(el);
+          });
+        }
+
+        loadReviews(el) {
+          var self = this;
+          var key = el.dataset.key;
+          if (!key) return;
+          var positive = el.dataset.positive === 'true';
+          var ck = 'sc-ab-rv:' + key + ':' + (positive ? 1 : 0);
+          var cached = null;
+          try { cached = JSON.parse(sessionStorage.getItem(ck)); } catch (e) {}
+          if (cached && Date.now() - cached.t < 36e5) {
+            this.fillReviews(el, cached);
+            return;
+          }
+          var url = API + '&store=' + encodeURIComponent(key) + (positive ? '&minRating=4' : '');
+          fetch(url)
+            .then(function (r) {
+              if (!r.ok) throw new Error('HTTP ' + r.status);
+              return r.json();
+            })
+            .then(function (d) {
+              var st = (d && d.stats) || {};
+              var rating = parseFloat(st.average_rating);
+              var count = parseInt(st.results_count, 10);
+              if (!isFinite(rating) || rating <= 0) throw new Error('No rating');
+              var data = { t: Date.now(), r: rating, c: isFinite(count) ? count : 0 };
+              try { sessionStorage.setItem(ck, JSON.stringify(data)); } catch (e) {}
+              self.fillReviews(el, data);
+            })
+            .catch(function () {
+              self.failReviews(el);
+            });
+        }
+
+        fillReviews(el, d) {
+          var dec = parseInt(el.dataset.decimals, 10);
+          if (isNaN(dec)) dec = 2;
+          var fmt = el.dataset.format;
+          var lang = document.documentElement.lang || undefined;
+          var rs;
+          if (fmt === 'auto') {
+            try { rs = new Intl.NumberFormat(lang, { minimumFractionDigits: dec, maximumFractionDigits: dec }).format(d.r); }
+            catch (e) { rs = d.r.toFixed(dec); }
+          } else {
+            rs = d.r.toFixed(dec);
+            if (fmt === 'comma') rs = rs.replace('.', ',');
+          }
+          var cs;
+          try { cs = new Intl.NumberFormat(lang).format(d.c); } catch (e) { cs = String(d.c); }
+          Array.prototype.forEach.call(el.querySelectorAll('[data-sc-ab-rating]'), function (n) { n.textContent = rs; });
+          Array.prototype.forEach.call(el.querySelectorAll('[data-sc-ab-count]'), function (n) { n.textContent = cs; });
+          el.style.setProperty('--sc-ab-stars', Math.max(0, Math.min(100, (d.r / 5) * 100)) + '%');
+          el.classList.remove('is-loading');
+        }
+
+        failReviews(el) {
+          el.classList.remove('is-loading');
+          if (el.querySelector('[data-sc-ab-fallback]')) {
+            el.classList.add('is-fallback');
+          } else if (this.designMode) {
+            el.classList.add('is-fallback');
+            var note = document.createElement('span');
+            note.className = 'sc-ab__text sc-ab__editor-note';
+            note.textContent = 'Reviews.io: could not load the rating. Check the store key (hidden for visitors).';
+            (el.querySelector('.sc-ab__rv-link') || el).appendChild(note);
+          } else {
+            el.hidden = true;
+            this.updateRotation();
+          }
+          this.updateVars();
+        }
+
+        /* ---------- Countdown ---------- */
+        initTimer() {
+          var el = this.querySelector('[data-sc-ab-timer]');
+          if (!el) return;
+          var self = this;
+          var tz = el.dataset.tz ? tzMinutes(el.dataset.tz) : null;
+          var daily = el.dataset.mode === 'daily';
+          var end = daily ? nextDaily(el.dataset.daily, tz) : parseEnd(el.dataset.end, tz);
+          var expire = this.designMode ? 'text' : el.dataset.expire;
+          var hideDays = el.dataset.hideDays === 'true';
+
+          if (end == null) {
+            if (this.designMode) {
+              el.classList.add('is-expired');
+              var exp = el.querySelector('.sc-ab__timer-expired');
+              if (exp) exp.textContent = 'Countdown: invalid date or time format. Use 2026-12-31 23:59 or 23:59 for daily.';
+            } else {
+              el.hidden = true;
+            }
+            this.updateVars();
+            return;
+          }
+
+          var units = {};
+          ['d', 'h', 'm', 's'].forEach(function (u) {
+            var wrap = el.querySelector('[data-u="' + u + '"]');
+            units[u] = { wrap: wrap, num: wrap ? wrap.querySelector('.sc-ab__num') : null };
+          });
+          var clock = el.querySelector('.sc-ab__clock');
+          var id = null;
+
+          var tick = function () {
+            var diff = end - Date.now();
+            if (diff <= 0) {
+              if (daily) {
+                end = nextDaily(el.dataset.daily, tz);
+                diff = end - Date.now();
+              } else {
+                clearInterval(id);
+                self.expireTimer(el, clock, expire);
+                return;
+              }
+            }
+            var sec = Math.floor(diff / 1000);
+            var d = Math.floor(sec / 86400);
+            sec -= d * 86400;
+            var h = Math.floor(sec / 3600);
+            sec -= h * 3600;
+            var m = Math.floor(sec / 60);
+            sec -= m * 60;
+            var vals = { d: d, h: h, m: m, s: sec };
+            Object.keys(vals).forEach(function (u) {
+              if (units[u].num) units[u].num.textContent = pad(vals[u]);
+            });
+            if (units.d.wrap) units.d.wrap.hidden = hideDays && d === 0;
+          };
+          tick();
+          if (!el.classList.contains('is-expired') && !el.hidden) {
+            id = setInterval(tick, 1000);
+            this.cleanups.push(function () { clearInterval(id); });
+          }
+        }
+
+        expireTimer(el, clock, mode) {
+          if (mode === 'hide_bar') el.hidden = true;
+          else if (mode === 'hide_timer' && clock) clock.hidden = true;
+          else el.classList.add('is-expired');
+          this.updateVars();
+        }
+
+        /* ---------- Promo bar ---------- */
+        initPromo() {
+          var bar = this.querySelector('[data-sc-ab-promo]');
+          if (!bar) return;
+          var btn = bar.querySelector('[data-sc-ab-close]');
+          if (!btn) return;
+          var self = this;
+          this.on(btn, 'click', function () {
+            bar.hidden = true;
+            if (!self.designMode) {
+              var key = bar.dataset.key;
+              var days = parseFloat(bar.dataset.days);
+              try {
+                if (days > 0) localStorage.setItem(key, String(Date.now() + days * 864e5));
+                else sessionStorage.setItem(key, '1');
+              } catch (e) {}
+            }
+            self.dispatchEvent(new CustomEvent('sc-announcement-bar:dismiss', { bubbles: true, detail: { key: bar.dataset.key } }));
+            self.updateVars();
+          });
+        }
+
+        /* ---------- CSS variables for the theme ---------- */
+        initVars() {
+          var self = this;
+          this.updateVars();
+          if ('ResizeObserver' in window) {
+            var ro = new ResizeObserver(function () { self.updateVars(); });
+            ro.observe(this.wrapper);
+            this.cleanups.push(function () { ro.disconnect(); });
+          }
+          this.cleanups.push(function () {
+            var st = document.documentElement.style;
+            st.removeProperty('--sc-announcement-bar-height');
+            st.removeProperty('--enable-sticky-announcement-bar');
+          });
+        }
+
+        updateVars() {
+          if (!this.wrapper) return;
+          var st = document.documentElement.style;
+          var visible = window.getComputedStyle(this.wrapper).display !== 'none';
+          st.setProperty('--sc-announcement-bar-height', (visible ? this.wrapper.offsetHeight : 0) + 'px');
+          var sticky = this.mq.matches ? this.dataset.stickyDesktop === 'true' : this.dataset.stickyMobile === 'true';
+          st.setProperty('--enable-sticky-announcement-bar', visible && sticky ? '1' : '0');
+        }
+
+        /* ---------- Theme editor ---------- */
+        initEditor() {
+          var self = this;
+          this.on(document, 'shopify:block:select', function (e) {
+            if (!e.detail || e.detail.sectionId !== self.dataset.sectionId) return;
+            var item = e.target && e.target.closest ? e.target.closest('[data-sc-ab-item]') : null;
+            var idx = self.items.indexOf(item);
+            if (idx > -1 && self.isRotating()) {
+              self.paused = true;
+              self.stop();
+              self.show(idx);
+            }
+          });
+          this.on(document, 'shopify:block:deselect', function (e) {
+            if (!e.detail || e.detail.sectionId !== self.dataset.sectionId) return;
+            self.paused = false;
+            self.updateRotation();
+          });
+        }
+      }
+
+      window.customElements.define('sc-announcement-bar', ScAnnouncementBar);
+    })();
+  </script>
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "SC – Announcement bar",
+  "tag": "div",
+  "class": "sc-ab-section",
+  "max_blocks": 6,
+  "settings": [
+    {
+      "type": "header",
+      "content": "General"
+    },
+    {
+      "type": "checkbox",
+      "id": "enable",
+      "label": "Show announcement bar",
+      "default": true,
+      "info": "When off, the bar is still output but hidden. For an A/B test variant, show it with: .sc-ab-section { display: block !important; }"
+    },
+    {
+      "type": "select",
+      "id": "layer_order",
+      "label": "Bar order (top to bottom)",
+      "options": [
+        { "value": "main_timer_promo", "label": "Main bar, countdown, promo bar" },
+        { "value": "timer_main_promo", "label": "Countdown, main bar, promo bar" },
+        { "value": "main_promo_timer", "label": "Main bar, promo bar, countdown" },
+        { "value": "promo_main_timer", "label": "Promo bar, main bar, countdown" }
+      ],
+      "default": "main_timer_promo"
+    },
+    {
+      "type": "text",
+      "id": "region_label",
+      "label": "Accessible region label",
+      "default": "Announcements",
+      "info": "Read by screen readers."
+    },
+    {
+      "type": "header",
+      "content": "Visibility"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_on_home",
+      "label": "Home page",
+      "default": true
+    },
+    {
+      "type": "checkbox",
+      "id": "show_on_product",
+      "label": "Product pages",
+      "default": true
+    },
+    {
+      "type": "checkbox",
+      "id": "show_on_collection",
+      "label": "Collection pages",
+      "default": true
+    },
+    {
+      "type": "checkbox",
+      "id": "show_on_cart",
+      "label": "Cart page",
+      "default": true
+    },
+    {
+      "type": "checkbox",
+      "id": "show_on_other",
+      "label": "All other pages",
+      "default": true,
+      "info": "Pages, blog, articles, search, account and so on."
+    },
+    {
+      "type": "header",
+      "content": "Sticky"
+    },
+    {
+      "type": "select",
+      "id": "sticky_position",
+      "label": "Sticky",
+      "options": [
+        { "value": "none", "label": "Not sticky" },
+        { "value": "all", "label": "Sticky on all devices" },
+        { "value": "desktop", "label": "Sticky on desktop only" },
+        { "value": "mobile", "label": "Sticky on mobile only" }
+      ],
+      "default": "none"
+    },
+    {
+      "type": "select",
+      "id": "sticky_pages",
+      "label": "Sticky on",
+      "options": [
+        { "value": "all", "label": "All pages" },
+        { "value": "home", "label": "Home page only" },
+        { "value": "product", "label": "Product pages only" },
+        { "value": "collection", "label": "Collection pages only" }
+      ],
+      "default": "all"
+    },
+    {
+      "type": "range",
+      "id": "sticky_offset",
+      "label": "Sticky top offset",
+      "min": 0,
+      "max": 200,
+      "step": 2,
+      "unit": "px",
+      "default": 0
+    },
+    {
+      "type": "range",
+      "id": "z_index",
+      "label": "Stacking order (z-index)",
+      "min": 1,
+      "max": 100,
+      "step": 1,
+      "default": 5,
+      "info": "If the theme header is also sticky, it can sit under this bar. Use the CSS variable --sc-announcement-bar-height in the theme to offset it."
+    },
+    {
+      "type": "header",
+      "content": "Main bar layout"
+    },
+    {
+      "type": "select",
+      "id": "desktop_layout",
+      "label": "Desktop layout",
+      "options": [
+        { "value": "spread", "label": "Spread (first left, last right)" },
+        { "value": "even", "label": "Equal columns, centred" },
+        { "value": "center", "label": "Grouped in the centre" },
+        { "value": "rotate", "label": "Rotate one at a time" }
+      ],
+      "default": "spread"
+    },
+    {
+      "type": "select",
+      "id": "mobile_layout",
+      "label": "Mobile layout",
+      "options": [
+        { "value": "grid", "label": "Grid" },
+        { "value": "rotate", "label": "Rotate one at a time" }
+      ],
+      "default": "grid"
+    },
+    {
+      "type": "select",
+      "id": "mobile_columns",
+      "label": "Mobile grid columns",
+      "options": [
+        { "value": "1", "label": "1" },
+        { "value": "2", "label": "2" }
+      ],
+      "default": "2"
+    },
+    {
+      "type": "range",
+      "id": "rotate_speed",
+      "label": "Rotation speed",
+      "min": 2,
+      "max": 15,
+      "step": 1,
+      "unit": "s",
+      "default": 5
+    },
+    {
+      "type": "checkbox",
+      "id": "show_arrows",
+      "label": "Show arrows when rotating",
+      "default": true
+    },
+    {
+      "type": "checkbox",
+      "id": "show_dividers",
+      "label": "Show dividers between messages (desktop)",
+      "default": false
+    },
+    {
+      "type": "select",
+      "id": "content_width",
+      "label": "Content width",
+      "options": [
+        { "value": "full", "label": "Full width" },
+        { "value": "boxed", "label": "Boxed" }
+      ],
+      "default": "boxed"
+    },
+    {
+      "type": "range",
+      "id": "max_width",
+      "label": "Boxed max width",
+      "min": 600,
+      "max": 1800,
+      "step": 20,
+      "unit": "px",
+      "default": 1200
+    },
+    {
+      "type": "range",
+      "id": "gap",
+      "label": "Space between messages – desktop",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 24
+    },
+    {
+      "type": "range",
+      "id": "gap_mobile",
+      "label": "Space between messages – mobile",
+      "min": 0,
+      "max": 40,
+      "step": 2,
+      "unit": "px",
+      "default": 10
+    },
+    {
+      "type": "header",
+      "content": "Main bar spacing"
+    },
+    {
+      "type": "range",
+      "id": "padding_top",
+      "label": "Top padding – desktop",
+      "min": 0,
+      "max": 40,
+      "step": 1,
+      "unit": "px",
+      "default": 12
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom",
+      "label": "Bottom padding – desktop",
+      "min": 0,
+      "max": 40,
+      "step": 1,
+      "unit": "px",
+      "default": 12
+    },
+    {
+      "type": "range",
+      "id": "padding_top_mobile",
+      "label": "Top padding – mobile",
+      "min": 0,
+      "max": 40,
+      "step": 1,
+      "unit": "px",
+      "default": 10
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom_mobile",
+      "label": "Bottom padding – mobile",
+      "min": 0,
+      "max": 40,
+      "step": 1,
+      "unit": "px",
+      "default": 10
+    },
+    {
+      "type": "range",
+      "id": "padding_side",
+      "label": "Side padding – desktop",
+      "min": 0,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 32
+    },
+    {
+      "type": "range",
+      "id": "padding_side_mobile",
+      "label": "Side padding – mobile",
+      "min": 0,
+      "max": 40,
+      "step": 1,
+      "unit": "px",
+      "default": 12
+    },
+    {
+      "type": "range",
+      "id": "min_height",
+      "label": "Minimum height – desktop",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 0
+    },
+    {
+      "type": "range",
+      "id": "min_height_mobile",
+      "label": "Minimum height – mobile",
+      "min": 0,
+      "max": 100,
+      "step": 2,
+      "unit": "px",
+      "default": 0
+    },
+    {
+      "type": "header",
+      "content": "Typography"
+    },
+    {
+      "type": "checkbox",
+      "id": "use_custom_font",
+      "label": "Use a custom font",
+      "default": false,
+      "info": "Off = inherit the theme font."
+    },
+    {
+      "type": "font_picker",
+      "id": "custom_font",
+      "label": "Font",
+      "default": "assistant_n4"
+    },
+    {
+      "type": "range",
+      "id": "font_size",
+      "label": "Text size – desktop",
+      "min": 10,
+      "max": 24,
+      "step": 1,
+      "unit": "px",
+      "default": 14
+    },
+    {
+      "type": "range",
+      "id": "font_size_mobile",
+      "label": "Text size – mobile",
+      "min": 10,
+      "max": 20,
+      "step": 1,
+      "unit": "px",
+      "default": 12
+    },
+    {
+      "type": "select",
+      "id": "font_weight",
+      "label": "Text weight",
+      "options": [
+        { "value": "300", "label": "Light" },
+        { "value": "400", "label": "Regular" },
+        { "value": "500", "label": "Medium" },
+        { "value": "600", "label": "Semibold" },
+        { "value": "700", "label": "Bold" }
+      ],
+      "default": "500"
+    },
+    {
+      "type": "select",
+      "id": "letter_spacing",
+      "label": "Letter spacing",
+      "options": [
+        { "value": "0", "label": "None" },
+        { "value": "0.3", "label": "Small" },
+        { "value": "0.6", "label": "Medium" },
+        { "value": "1", "label": "Large" },
+        { "value": "2", "label": "Extra large" }
+      ],
+      "default": "0"
+    },
+    {
+      "type": "checkbox",
+      "id": "uppercase",
+      "label": "Uppercase main bar text",
+      "default": false
+    },
+    {
+      "type": "checkbox",
+      "id": "link_underline_hover",
+      "label": "Underline linked text on hover",
+      "default": true
+    },
+    {
+      "type": "header",
+      "content": "Icons"
+    },
+    {
+      "type": "range",
+      "id": "icon_size",
+      "label": "Icon size – desktop",
+      "min": 12,
+      "max": 40,
+      "step": 1,
+      "unit": "px",
+      "default": 20
+    },
+    {
+      "type": "range",
+      "id": "icon_size_mobile",
+      "label": "Icon size – mobile",
+      "min": 12,
+      "max": 32,
+      "step": 1,
+      "unit": "px",
+      "default": 18
+    },
+    {
+      "type": "select",
+      "id": "icon_stroke",
+      "label": "Library icon line weight",
+      "options": [
+        { "value": "1.5", "label": "Thin" },
+        { "value": "2", "label": "Regular" },
+        { "value": "2.5", "label": "Bold" }
+      ],
+      "default": "2"
+    },
+    {
+      "type": "color",
+      "id": "icon_color",
+      "label": "Icon color",
+      "info": "Leave empty to use the text color."
+    },
+    {
+      "type": "select",
+      "id": "custom_svg_color",
+      "label": "Pasted SVG icon color",
+      "options": [
+        { "value": "original", "label": "Keep the SVG's own colors" },
+        { "value": "text", "label": "Use icon / text color" }
+      ],
+      "default": "text"
+    },
+    {
+      "type": "header",
+      "content": "Main bar colors"
+    },
+    {
+      "type": "color",
+      "id": "color_bg",
+      "label": "Background",
+      "default": "#2e7d32"
+    },
+    {
+      "type": "color_background",
+      "id": "gradient_bg",
+      "label": "Background gradient",
+      "default": "linear-gradient(90deg, rgba(27, 94, 32, 1) 0%, rgba(67, 160, 71, 1) 100%)",
+      "info": "Overrides the solid background. Clear it to use the solid color."
+    },
+    {
+      "type": "color",
+      "id": "text_color",
+      "label": "Text",
+      "default": "#ffffff"
+    },
+    {
+      "type": "color",
+      "id": "divider_color",
+      "label": "Dividers",
+      "info": "Leave empty for a soft white line."
+    },
+    {
+      "type": "checkbox",
+      "id": "show_border",
+      "label": "Show bottom border",
+      "default": false
+    },
+    {
+      "type": "color",
+      "id": "border_color",
+      "label": "Bottom border",
+      "default": "#000000"
+    },
+    {
+      "type": "color",
+      "id": "star_color",
+      "label": "Reviews.io stars",
+      "default": "#ffc83d"
+    },
+    {
+      "type": "color",
+      "id": "reviews_logo_color",
+      "label": "Reviews.io logo",
+      "info": "Leave empty to use the text color."
+    },
+    {
+      "type": "header",
+      "content": "Main bar colors – mobile",
+      "info": "Optional. Leave empty to use the desktop colors."
+    },
+    {
+      "type": "color",
+      "id": "color_bg_mobile",
+      "label": "Background"
+    },
+    {
+      "type": "color_background",
+      "id": "gradient_bg_mobile",
+      "label": "Background gradient"
+    },
+    {
+      "type": "color",
+      "id": "text_color_mobile",
+      "label": "Text"
+    },
+    {
+      "type": "header",
+      "content": "Message buttons"
+    },
+    {
+      "type": "color",
+      "id": "btn_bg",
+      "label": "Background",
+      "default": "#ffffff"
+    },
+    {
+      "type": "color",
+      "id": "btn_text_color",
+      "label": "Text",
+      "default": "#1b5e20"
+    },
+    {
+      "type": "color",
+      "id": "btn_border_color",
+      "label": "Border",
+      "info": "Leave empty for no border."
+    },
+    {
+      "type": "range",
+      "id": "btn_radius",
+      "label": "Corner radius",
+      "min": 0,
+      "max": 30,
+      "step": 1,
+      "unit": "px",
+      "default": 20
+    },
+    {
+      "type": "range",
+      "id": "btn_font_size",
+      "label": "Text size",
+      "min": 10,
+      "max": 16,
+      "step": 1,
+      "unit": "px",
+      "default": 12
+    },
+    {
+      "type": "header",
+      "content": "Countdown bar"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_timer",
+      "label": "Show countdown bar",
+      "default": false
+    },
+    {
+      "type": "select",
+      "id": "timer_mode",
+      "label": "Countdown type",
+      "options": [
+        { "value": "date", "label": "Until a fixed date" },
+        { "value": "daily", "label": "Daily deadline (resets every day)" }
+      ],
+      "default": "daily"
+    },
+    {
+      "type": "text",
+      "id": "timer_end",
+      "label": "End date and time",
+      "default": "2026-12-31 23:59",
+      "info": "Format: YYYY-MM-DD HH:MM, for example 2026-12-31 23:59. Used for \"Until a fixed date\"."
+    },
+    {
+      "type": "text",
+      "id": "timer_daily_time",
+      "label": "Daily deadline",
+      "default": "23:59",
+      "info": "Format: HH:MM (24h). Used for \"Daily deadline\"."
+    },
+    {
+      "type": "select",
+      "id": "timer_timezone",
+      "label": "Time zone",
+      "options": [
+        { "value": "store", "label": "Store time zone" },
+        { "value": "visitor", "label": "Visitor's time zone" }
+      ],
+      "default": "store"
+    },
+    {
+      "type": "inline_richtext",
+      "id": "timer_text_before",
+      "label": "Text before timer",
+      "default": "Order today – offer ends in"
+    },
+    {
+      "type": "inline_richtext",
+      "id": "timer_text_after",
+      "label": "Text after timer"
+    },
+    {
+      "type": "url",
+      "id": "timer_link",
+      "label": "Link"
+    },
+    {
+      "type": "select",
+      "id": "timer_style",
+      "label": "Timer style",
+      "options": [
+        { "value": "inline", "label": "Inline (00:00:00:00)" },
+        { "value": "boxes", "label": "Boxes" }
+      ],
+      "default": "inline"
+    },
+    {
+      "type": "checkbox",
+      "id": "timer_show_labels",
+      "label": "Show unit labels",
+      "default": true
+    },
+    {
+      "type": "text",
+      "id": "label_days",
+      "label": "Days label",
+      "default": "d"
+    },
+    {
+      "type": "text",
+      "id": "label_hours",
+      "label": "Hours label",
+      "default": "h"
+    },
+    {
+      "type": "text",
+      "id": "label_minutes",
+      "label": "Minutes label",
+      "default": "m"
+    },
+    {
+      "type": "text",
+      "id": "label_seconds",
+      "label": "Seconds label",
+      "default": "s"
+    },
+    {
+      "type": "checkbox",
+      "id": "timer_hide_zero_days",
+      "label": "Hide days when 0",
+      "default": true
+    },
+    {
+      "type": "select",
+      "id": "timer_on_expire",
+      "label": "When the timer ends",
+      "options": [
+        { "value": "hide_bar", "label": "Hide the countdown bar" },
+        { "value": "hide_timer", "label": "Hide only the timer, keep the text" },
+        { "value": "text", "label": "Show the \"ended\" text" }
+      ],
+      "default": "hide_bar"
+    },
+    {
+      "type": "inline_richtext",
+      "id": "timer_expired_text",
+      "label": "Ended text"
+    },
+    {
+      "type": "color",
+      "id": "timer_bg",
+      "label": "Background",
+      "default": "#111111"
+    },
+    {
+      "type": "color_background",
+      "id": "timer_gradient",
+      "label": "Background gradient",
+      "info": "Optional. Overrides the solid background."
+    },
+    {
+      "type": "color",
+      "id": "timer_text_color",
+      "label": "Text",
+      "default": "#ffffff"
+    },
+    {
+      "type": "color",
+      "id": "timer_box_bg",
+      "label": "Timer box background",
+      "default": "#ffffff"
+    },
+    {
+      "type": "color",
+      "id": "timer_box_text",
+      "label": "Timer box text",
+      "default": "#111111"
+    },
+    {
+      "type": "range",
+      "id": "timer_font_size",
+      "label": "Text size – desktop",
+      "min": 10,
+      "max": 24,
+      "step": 1,
+      "unit": "px",
+      "default": 14
+    },
+    {
+      "type": "range",
+      "id": "timer_font_size_mobile",
+      "label": "Text size – mobile",
+      "min": 10,
+      "max": 20,
+      "step": 1,
+      "unit": "px",
+      "default": 12
+    },
+    {
+      "type": "range",
+      "id": "timer_number_size",
+      "label": "Number size – desktop",
+      "min": 10,
+      "max": 32,
+      "step": 1,
+      "unit": "px",
+      "default": 16
+    },
+    {
+      "type": "range",
+      "id": "timer_number_size_mobile",
+      "label": "Number size – mobile",
+      "min": 10,
+      "max": 24,
+      "step": 1,
+      "unit": "px",
+      "default": 14
+    },
+    {
+      "type": "range",
+      "id": "timer_padding",
+      "label": "Vertical padding – desktop",
+      "min": 0,
+      "max": 30,
+      "step": 1,
+      "unit": "px",
+      "default": 10
+    },
+    {
+      "type": "range",
+      "id": "timer_padding_mobile",
+      "label": "Vertical padding – mobile",
+      "min": 0,
+      "max": 30,
+      "step": 1,
+      "unit": "px",
+      "default": 8
+    },
+    {
+      "type": "header",
+      "content": "Promo bar"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_promo",
+      "label": "Show promo bar",
+      "default": false
+    },
+    {
+      "type": "inline_richtext",
+      "id": "promo_text",
+      "label": "Text",
+      "default": "Get our sets at a special price – also perfect as a gift"
+    },
+    {
+      "type": "url",
+      "id": "promo_link",
+      "label": "Link"
+    },
+    {
+      "type": "checkbox",
+      "id": "promo_dismissible",
+      "label": "Visitors can close it (X)",
+      "default": true
+    },
+    {
+      "type": "range",
+      "id": "promo_dismiss_days",
+      "label": "Keep hidden after closing for",
+      "min": 0,
+      "max": 30,
+      "step": 1,
+      "unit": "d",
+      "default": 7,
+      "info": "0 = until the browser is closed. Changing the text or link shows the bar again to everyone."
+    },
+    {
+      "type": "text",
+      "id": "promo_close_label",
+      "label": "Close button label",
+      "default": "Close announcement",
+      "info": "Read by screen readers."
+    },
+    {
+      "type": "color",
+      "id": "promo_bg",
+      "label": "Background",
+      "default": "#6b4fbb"
+    },
+    {
+      "type": "color_background",
+      "id": "promo_gradient",
+      "label": "Background gradient",
+      "info": "Optional. Overrides the solid background."
+    },
+    {
+      "type": "color",
+      "id": "promo_text_color",
+      "label": "Text",
+      "default": "#ffffff"
+    },
+    {
+      "type": "color",
+      "id": "promo_close_color",
+      "label": "Close icon",
+      "info": "Leave empty to use the text color."
+    },
+    {
+      "type": "range",
+      "id": "promo_font_size",
+      "label": "Text size – desktop",
+      "min": 10,
+      "max": 24,
+      "step": 1,
+      "unit": "px",
+      "default": 14
+    },
+    {
+      "type": "range",
+      "id": "promo_font_size_mobile",
+      "label": "Text size – mobile",
+      "min": 10,
+      "max": 20,
+      "step": 1,
+      "unit": "px",
+      "default": 12
+    },
+    {
+      "type": "range",
+      "id": "promo_padding",
+      "label": "Vertical padding – desktop",
+      "min": 0,
+      "max": 30,
+      "step": 1,
+      "unit": "px",
+      "default": 10
+    },
+    {
+      "type": "range",
+      "id": "promo_padding_mobile",
+      "label": "Vertical padding – mobile",
+      "min": 0,
+      "max": 30,
+      "step": 1,
+      "unit": "px",
+      "default": 8
+    },
+    {
+      "type": "header",
+      "content": "Accessibility labels"
+    },
+    {
+      "type": "text",
+      "id": "prev_label",
+      "label": "Previous message label",
+      "default": "Previous message"
+    },
+    {
+      "type": "text",
+      "id": "next_label",
+      "label": "Next message label",
+      "default": "Next message"
+    }
+  ],
+  "blocks": [
+    {
+      "type": "message",
+      "name": "Message",
+      "settings": [
+        {
+          "type": "inline_richtext",
+          "id": "text",
+          "label": "Text",
+          "default": "Free shipping on orders over €49"
+        },
+        {
+          "type": "url",
+          "id": "link",
+          "label": "Link",
+          "info": "Makes the whole message clickable."
+        },
+        {
+          "type": "checkbox",
+          "id": "new_tab",
+          "label": "Open links in a new tab",
+          "default": false
+        },
+        {
+          "type": "header",
+          "content": "Icon"
+        },
+        {
+          "type": "select",
+          "id": "icon_type",
+          "label": "Icon",
+          "options": [
+            { "value": "none", "label": "None (text only)" },
+            { "value": "library", "label": "Icon library" },
+            { "value": "svg", "label": "Paste SVG code" },
+            { "value": "image", "label": "Upload image" }
+          ],
+          "default": "library"
+        },
+        {
+          "type": "select",
+          "id": "icon",
+          "label": "Library icon",
+          "options": [
+            { "value": "truck", "label": "Delivery truck" },
+            { "value": "package", "label": "Package" },
+            { "value": "return", "label": "Returns" },
+            { "value": "shield", "label": "Guarantee shield" },
+            { "value": "check", "label": "Check mark" },
+            { "value": "star", "label": "Star" },
+            { "value": "heart", "label": "Heart" },
+            { "value": "gift", "label": "Gift" },
+            { "value": "tag", "label": "Price tag" },
+            { "value": "percent", "label": "Percent" },
+            { "value": "flash", "label": "Lightning" },
+            { "value": "clock", "label": "Clock" },
+            { "value": "lock", "label": "Secure lock" },
+            { "value": "card", "label": "Payment card" },
+            { "value": "chat", "label": "Support chat" },
+            { "value": "leaf", "label": "Leaf / eco" },
+            { "value": "globe", "label": "Globe / worldwide" }
+          ],
+          "default": "truck"
+        },
+        {
+          "type": "html",
+          "id": "icon_svg",
+          "label": "SVG code",
+          "info": "Paste inline <svg> code. Find icons at [Flaticon](https://www.flaticon.com/) and convert PNG to SVG with an online converter if needed."
+        },
+        {
+          "type": "image_picker",
+          "id": "icon_image",
+          "label": "Icon image"
+        },
+        {
+          "type": "header",
+          "content": "Button"
+        },
+        {
+          "type": "text",
+          "id": "btn_text",
+          "label": "Button text",
+          "info": "Leave empty to hide the button."
+        },
+        {
+          "type": "url",
+          "id": "btn_link",
+          "label": "Button link"
+        },
+        {
+          "type": "color",
+          "id": "btn_bg",
+          "label": "Button background",
+          "info": "Optional. Overrides the section button color."
+        },
+        {
+          "type": "color",
+          "id": "btn_text_color",
+          "label": "Button text",
+          "info": "Optional. Overrides the section button color."
+        },
+        {
+          "type": "header",
+          "content": "Display"
+        },
+        {
+          "type": "checkbox",
+          "id": "hide_on_desktop",
+          "label": "Hide on desktop",
+          "default": false
+        },
+        {
+          "type": "checkbox",
+          "id": "hide_on_mobile",
+          "label": "Hide on mobile",
+          "default": false
+        }
+      ]
+    },
+    {
+      "type": "reviews_io",
+      "name": "Reviews.io rating",
+      "limit": 1,
+      "settings": [
+        {
+          "type": "text",
+          "id": "store_key",
+          "label": "Reviews.io store key",
+          "info": "Your Reviews.io store ID (the URL key, e.g. \"my-store\"). Uses the public Reviews.io API – no app needed."
+        },
+        {
+          "type": "text",
+          "id": "rating_text",
+          "label": "Text",
+          "default": "[rating] / 5 positive reviews",
+          "info": "Use [rating] for the average score and [count] for the number of reviews."
+        },
+        {
+          "type": "checkbox",
+          "id": "show_count",
+          "label": "Show total review count",
+          "default": false
+        },
+        {
+          "type": "text",
+          "id": "count_text",
+          "label": "Review count text",
+          "default": "([count])",
+          "info": "Added after the text. Use [count]."
+        },
+        {
+          "type": "url",
+          "id": "link",
+          "label": "Link",
+          "info": "For example your Reviews.io company page."
+        },
+        {
+          "type": "checkbox",
+          "id": "new_tab",
+          "label": "Open link in a new tab",
+          "default": true
+        },
+        {
+          "type": "checkbox",
+          "id": "positive_only",
+          "label": "Only count 4 and 5 star reviews",
+          "default": true,
+          "info": "Matches the original setup (minRating=4). Turn off to use all reviews."
+        },
+        {
+          "type": "select",
+          "id": "decimals",
+          "label": "Decimals",
+          "options": [
+            { "value": "1", "label": "1 (4.7)" },
+            { "value": "2", "label": "2 (4.68)" }
+          ],
+          "default": "2"
+        },
+        {
+          "type": "select",
+          "id": "number_format",
+          "label": "Decimal separator",
+          "options": [
+            { "value": "dot", "label": "Dot (4.68)" },
+            { "value": "comma", "label": "Comma (4,68)" },
+            { "value": "auto", "label": "Automatic (store language)" }
+          ],
+          "default": "dot"
+        },
+        {
+          "type": "checkbox",
+          "id": "show_stars",
+          "label": "Show stars",
+          "default": false
+        },
+        {
+          "type": "checkbox",
+          "id": "show_logo",
+          "label": "Show Reviews.io logo",
+          "default": true
+        },
+        {
+          "type": "select",
+          "id": "logo_position",
+          "label": "Logo position",
+          "options": [
+            { "value": "before", "label": "Before text" },
+            { "value": "after", "label": "After text" }
+          ],
+          "default": "before"
+        },
+        {
+          "type": "text",
+          "id": "fallback_text",
+          "label": "Fallback text",
+          "info": "Shown if the rating can't be loaded. Leave empty to hide the block instead."
+        },
+        {
+          "type": "header",
+          "content": "Display"
+        },
+        {
+          "type": "checkbox",
+          "id": "full_width_mobile",
+          "label": "Full width on mobile",
+          "default": true
+        },
+        {
+          "type": "checkbox",
+          "id": "first_on_mobile",
+          "label": "Show first on mobile",
+          "default": true
+        },
+        {
+          "type": "checkbox",
+          "id": "hide_on_desktop",
+          "label": "Hide on desktop",
+          "default": false
+        },
+        {
+          "type": "checkbox",
+          "id": "hide_on_mobile",
+          "label": "Hide on mobile",
+          "default": false
+        }
+      ]
+    }
+  ],
+  "presets": [
+    {
+      "name": "SC – Announcement bar",
+      "settings": {
+        "show_promo": true
+      },
+      "blocks": [
+        {
+          "type": "reviews_io"
+        },
+        {
+          "type": "message",
+          "settings": {
+            "text": "Free shipping on orders over €49",
+            "icon_type": "library",
+            "icon": "truck"
+          }
+        },
+        {
+          "type": "message",
+          "settings": {
+            "text": "100-day money-back guarantee",
+            "icon_type": "library",
+            "icon": "shield"
+          }
+        }
+      ]
+    }
+  ]
+}
+{% endschema %}
