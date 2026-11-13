@@ -526,10 +526,14 @@
             {%- endif -%}
           </div>
 
-          <div class="totals" role="status">
-            <h2 class="totals__total">{{ 'sections.cart.estimated_total' | t }}</h2>
-            <p class="totals__total-value">{{ cart.total_price | money_with_currency }}</p>
-          </div>
+          {%- if settings.sc_csb_enable and settings.sc_csb_show_drawer -%}
+            {% render 'sc-cart-shipping-breakdown', sc_context: 'drawer' %}
+          {%- else -%}
+            <div class="totals" role="status">
+              <h2 class="totals__total">{{ 'sections.cart.estimated_total' | t }}</h2>
+              <p class="totals__total-value">{{ cart.total_price | money_with_currency }}</p>
+            </div>
+          {%- endif -%}
 
           <small class="tax-note caption-large rte">
             {%- if cart.duties_included and cart.taxes_included -%}

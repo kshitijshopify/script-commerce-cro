@@ -1,0 +1,33 @@
+{%- comment -%}
+  SC – Currency amount parser
+  ----------------------------------------------------------------------------
+  Outputs an amount in cents (subunits) for the cart's current currency, or nothing if not set.
+
+  Accepts:
+  - value: {String} plain amount ("4.95" / "4,95") or CODE:amount pairs ("USD:50,EUR:60,JPY:9000").
+    Plain amounts apply as-is to every currency.
+
+  Usage:
+    {%- capture fee -%}{% render 'sc-currency-amount', value: settings.sc_csb_fee %}{%- endcapture -%}
+    {%- assign fee = fee | strip -%}  (blank = not set, otherwise `| plus: 0` for a number)
+{%- endcomment -%}
+{%- liquid
+  assign sc_raw = value | strip
+  assign sc_cents = ''
+  if sc_raw != blank
+    if sc_raw contains ':'
+      assign sc_pairs = sc_raw | split: ','
+      for sc_pair in sc_pairs
+        assign sc_parts = sc_pair | split: ':'
+        assign sc_code = sc_parts[0] | strip | upcase
+        if sc_code == cart.currency.iso_code and sc_parts[1] != blank
+          assign sc_cents = sc_parts[1] | strip | replace: ' ', '' | times: 100 | round
+          break
+        endif
+      endfor
+    else
+      assign sc_cents = sc_raw | replace: ',', '.' | replace: ' ', '' | times: 100 | round
+    endif
+  endif
+  echo sc_cents
+-%}
