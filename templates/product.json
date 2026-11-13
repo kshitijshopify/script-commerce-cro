@@ -38,6 +38,10 @@
           "type": "quantity_selector",
           "settings": {}
         },
+        "sc_quantity_selector": {
+          "type": "sc_quantity_selector",
+          "settings": {}
+        },
         "sc_inventory_status": {
           "type": "sc_inventory_status",
           "settings": {
@@ -337,6 +341,7 @@
         "title",
         "price",
         "variant_picker",
+        "sc_quantity_selector",
         "quantity_selector",
         "sc_inventory_status",
         "buy_buttons",

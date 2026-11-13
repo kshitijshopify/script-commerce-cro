@@ -1,0 +1,480 @@
+{%- comment -%}
+  SC – Quantity selector (pack sizes as buttons or image cards)
+  ----------------------------------------------------------------------------
+  Self-contained PDP block: Liquid + scoped CSS + assets/sc-quantity-selector.js.
+  Layouts: Text only / Text + badge / Visual. Exactly one option is active.
+  Modes:
+  - quantity: writes the option quantity into the product form's quantity input
+    (creates a hidden one if the theme has none) and re-applies it right before
+    the form is submitted, so the cart always receives the chosen quantity.
+  - variant:  selects the theme variant input (radio / select) whose value matches
+    "Variant option value". The theme's variant picker must stay on the page.
+  Discount badges are labels – pair them with an automatic discount in Shopify.
+
+  Usage (inside a product section's block loop):
+    {%- when 'sc_quantity_selector' -%}
+      {% render 'sc-quantity-selector', block: block, product: product, product_form_id: product_form_id, section: section %}
+
+  Accepts:
+  - block:           {Object} block with the "sc_quantity_selector" settings
+  - product:         {Object} current product
+  - product_form_id: {String} id of the theme's add-to-cart <form>
+  - section:         {Object} optional; used to hide the theme quantity/variant UI without a flash
+
+  Fires a bubbling `sc:quantity-selector:change` event: detail { index, quantity, value, label }.
+{%- endcomment -%}
+
+{%- liquid
+  assign s = block.settings
+  assign uid = 'sc-qs-' | append: block.id
+  assign layout = s.layout | default: 'text_badge'
+  assign mode = s.mode | default: 'quantity'
+
+  assign visible = ''
+  for i in (1..5)
+    assign k = 'o' | append: i | append: '_text'
+    assign v = s[k] | strip
+    if v != blank
+      assign visible = visible | append: i | append: ','
+    endif
+  endfor
+  assign idx = visible | split: ','
+  assign count = idx.size
+
+  comment
+    Active option: preselected slot, or – in variant mode – the slot matching the current variant.
+  endcomment
+  assign active = s.default_option | append: ''
+  unless idx contains active
+    assign active = idx.first
+  endunless
+  if mode == 'variant'
+    assign current_values = product.selected_or_first_available_variant.options | join: '|' | downcase | split: '|'
+    for i in idx
+      assign k = 'o' | append: i | append: '_value'
+      assign v = s[k] | strip | downcase
+      if v != blank and current_values contains v
+        assign active = i
+        break
+      endif
+    endfor
+  endif
+
+  comment
+    Tags on the top edge of an option: highlight label (all layouts with badges)
+    and the discount badge (text layouts; Visual shows it as a round corner badge).
+  endcomment
+  assign has_tags = false
+  assign has_bottom_tags = false
+  if layout != 'text'
+    for i in idx
+      assign k = 'o' | append: i | append: '_bestseller'
+      assign v = s[k] | strip
+      assign k = 'o' | append: i | append: '_badge'
+      assign b = s[k] | strip
+      if v != blank
+        assign has_tags = true
+      elsif b != blank and layout == 'text_badge'
+        assign has_tags = true
+      endif
+      if v != blank and b != blank and layout == 'text_badge'
+        assign has_bottom_tags = true
+      endif
+    endfor
+  endif
+
+  assign mobile = s.mobile_layout | default: 'auto'
+  if mobile == 'auto'
+    if layout == 'visual'
+      assign mobile = 'scroll'
+    else
+      assign mobile = 'grid'
+    endif
+  endif
+
+  assign bg = s.background_color
+  if bg == blank or bg.alpha == 0
+    assign bg = 'transparent'
+  endif
+-%}
+
+{%- if count > 0 -%}
+  <script src="{{ 'sc-quantity-selector.js' | asset_url }}" defer="defer"></script>
+
+  <sc-quantity-selector
+    id="{{ uid }}"
+    class="sc-qs sc-qs--{{ layout }} sc-qs--active-{{ s.active_style }} sc-qs--m-{{ mobile }}"
+    data-mode="{{ mode }}"
+    data-form-id="{{ product_form_id }}"
+    {% if mode == 'quantity' and s.hide_theme_quantity %}
+      data-hide-quantity
+    {% endif %}
+    {% if mode == 'variant' and s.hide_theme_variant_picker %}
+      data-hide-variant-picker
+    {% endif %}
+    style="
+      --sc-qs-count: {{ count }};
+      --sc-qs-active: {{ s.active_color }};
+      --sc-qs-active-text: {{ s.active_text_color }};
+      --sc-qs-text: {{ s.text_color }};
+      --sc-qs-border: {{ s.border_color }};
+      --sc-qs-bg: {{ bg }};
+      --sc-qs-badge-text: {{ s.badge_text_color }};
+      --sc-qs-radius: {{ s.radius }}px;
+      --sc-qs-height: {{ s.option_height }}px;
+      --sc-qs-fs: {{ s.font_size }}px;
+      --sc-qs-fs-m: {{ s.font_size_mobile }}px;
+      --sc-qs-mt: {{ s.margin_top }}px;
+      --sc-qs-mb: {{ s.margin_bottom }}px;
+    "
+    {{ block.shopify_attributes }}
+  >
+    {%- liquid
+      assign heading = s.heading | strip
+      assign k = 'o' | append: active | append: '_text'
+      assign active_label = s[k]
+    -%}
+    {%- if heading != blank or s.show_selected -%}
+      <p class="sc-qs__heading" id="{{ uid }}-label">
+        {%- if heading != blank -%}<span>{{ heading | escape }}</span>{%- endif -%}
+        {%- if s.show_selected %}
+          <span class="sc-qs__selected" data-sc-qs-selected>{{ active_label | escape }}</span>
+        {%- endif -%}
+      </p>
+    {%- endif -%}
+
+    <div
+      class="sc-qs__options{% if has_tags %} sc-qs__options--tags{% endif %}{% if has_bottom_tags %} sc-qs__options--bottom-tags{% endif %}"
+      role="radiogroup"
+      {% if heading != blank or s.show_selected %}
+        aria-labelledby="{{ uid }}-label"
+      {% else %}
+        aria-label="{{ 'products.product.quantity.label' | t | escape }}"
+      {% endif %}
+    >
+      {%- for i in idx -%}
+        {%- liquid
+          assign p = 'o' | append: i | append: '_'
+          assign k = p | append: 'text'
+          assign o_text = s[k] | strip
+          assign k = p | append: 'quantity'
+          assign o_qty = s[k] | default: 1 | at_least: 1
+          assign k = p | append: 'value'
+          assign o_value = s[k] | strip
+          assign k = p | append: 'badge'
+          assign o_badge = s[k] | strip
+          assign k = p | append: 'badge_color'
+          assign o_badge_color = s[k]
+          assign k = p | append: 'bestseller'
+          assign o_pill = s[k] | strip
+          assign k = p | append: 'bestseller_color'
+          assign o_pill_color = s[k]
+          assign k = p | append: 'image'
+          assign o_image = s[k]
+          assign is_active = false
+          if i == active
+            assign is_active = true
+          endif
+        -%}
+        {%- liquid
+          assign show_pill = false
+          assign show_edge_badge = false
+          assign show_round_badge = false
+          if layout != 'text'
+            if o_pill != blank
+              assign show_pill = true
+            endif
+            if o_badge != blank
+              if layout == 'visual'
+                assign show_round_badge = true
+              else
+                assign show_edge_badge = true
+              endif
+            endif
+          endif
+        -%}
+        <div class="sc-qs__cell">
+          <button
+            type="button"
+            class="sc-qs__option{% if is_active %} is-active{% endif %}"
+            role="radio"
+            aria-checked="{{ is_active }}"
+            tabindex="{% if is_active %}0{% else %}-1{% endif %}"
+            data-sc-qs-option
+            data-index="{{ i }}"
+            data-quantity="{{ o_qty }}"
+            data-value="{{ o_value | escape }}"
+            data-label="{{ o_text | escape }}"
+          >
+            {%- if layout == 'visual' -%}
+              <span class="sc-qs__media" aria-hidden="true">
+                {%- if o_image != blank -%}
+                  {{- o_image | image_url: width: 400 | image_tag: loading: 'lazy', alt: '', class: 'sc-qs__img', sizes: '(min-width: 750px) 160px, 40vw' -}}
+                {%- elsif product.featured_image != blank -%}
+                  {%- assign stack = o_qty | at_most: 3 -%}
+                  <span class="sc-qs__stack sc-qs__stack--{{ stack }}">
+                    {%- for n in (1..stack) -%}
+                      {%- assign stack_style = '--n: ' | append: forloop.index0 -%}
+                      {{- product.featured_image | image_url: width: 300 | image_tag: loading: 'lazy', alt: '', class: 'sc-qs__img', style: stack_style -}}
+                    {%- endfor -%}
+                  </span>
+                {%- endif -%}
+              </span>
+            {%- endif -%}
+            <span class="sc-qs__text">{{ o_text | escape }}</span>
+            {%- comment -%}
+              One tag: top edge. Discount + label: discount on top, label on the bottom edge.
+            {%- endcomment -%}
+            {%- if show_edge_badge -%}
+              <span class="sc-qs__tags">
+                <span class="sc-qs__tag" style="--sc-qs-tag: {{ o_badge_color }};">{{ o_badge | escape }}</span>
+              </span>
+            {%- endif -%}
+            {%- if show_pill -%}
+              <span class="sc-qs__tags{% if show_edge_badge %} sc-qs__tags--bottom{% endif %}">
+                <span class="sc-qs__tag sc-qs__tag--label" style="--sc-qs-tag: {{ o_pill_color }};">
+                  {{- o_pill | escape -}}
+                </span>
+              </span>
+            {%- endif -%}
+            {%- if show_round_badge -%}
+              <span class="sc-qs__badge" style="--sc-qs-badge: {{ o_badge_color }};">{{ o_badge | escape }}</span>
+            {%- endif -%}
+          </button>
+        </div>
+      {%- endfor -%}
+    </div>
+  </sc-quantity-selector>
+
+  {%- if section != blank -%}
+    <style>
+      {%- if mode == 'quantity' and s.hide_theme_quantity %}
+        #Quantity-Form-{{ section.id }} { display: none !important; }
+      {%- endif -%}
+      {%- if mode == 'variant' and s.hide_theme_variant_picker %}
+        #shopify-section-{{ section.id }} variant-selects { display: none !important; }
+      {%- endif %}
+    </style>
+  {%- endif -%}
+
+  <style>
+    #{{ uid }} {
+      display: block;
+      box-sizing: border-box;
+      margin: var(--sc-qs-mt) 0 var(--sc-qs-mb);
+      color: var(--sc-qs-text);
+      font-size: var(--sc-qs-fs);
+      line-height: 1.3;
+    }
+    #{{ uid }} *, #{{ uid }} *::before, #{{ uid }} *::after { box-sizing: border-box; }
+    #{{ uid }} .sc-qs__heading {
+      margin: 0 0 14px;
+      font-size: calc(var(--sc-qs-fs) + 1px);
+    }
+    #{{ uid }} .sc-qs__selected { margin-left: 0.35em; font-weight: 600; }
+
+    #{{ uid }} .sc-qs__options {
+      display: grid;
+      grid-template-columns: repeat(var(--sc-qs-count), minmax(0, 1fr));
+      gap: 12px;
+    }
+    #{{ uid }} .sc-qs__options--tags { padding-top: 11px; }
+    #{{ uid }} .sc-qs__cell { position: relative; min-width: 0; }
+
+    #{{ uid }} .sc-qs__option {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      min-height: var(--sc-qs-height);
+      margin: 0;
+      padding: 8px 10px;
+      font: inherit;
+      color: inherit;
+      text-align: center;
+      background: var(--sc-qs-bg);
+      border: 1px solid var(--sc-qs-border);
+      border-radius: var(--sc-qs-radius);
+      cursor: pointer;
+      -webkit-appearance: none;
+      appearance: none;
+      transition: background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+    }
+    #{{ uid }} .sc-qs__option:focus-visible {
+      outline: 2px solid var(--sc-qs-active);
+      outline-offset: 3px;
+    }
+    #{{ uid }} .sc-qs__text { display: block; overflow-wrap: anywhere; }
+
+    /* Active states */
+    #{{ uid }}.sc-qs--active-filled .sc-qs__option.is-active {
+      color: var(--sc-qs-active-text);
+      background: var(--sc-qs-active);
+      border-color: var(--sc-qs-active);
+    }
+    #{{ uid }}.sc-qs--active-border .sc-qs__option.is-active,
+    #{{ uid }}.sc-qs--active-shadow .sc-qs__option.is-active {
+      border-color: var(--sc-qs-active);
+      box-shadow: inset 0 0 0 2px var(--sc-qs-active);
+    }
+    #{{ uid }}.sc-qs--active-shadow .sc-qs__option.is-active {
+      box-shadow: inset 0 0 0 2px var(--sc-qs-active), 0 6px 18px rgba(0, 0, 0, 0.16);
+    }
+
+    /* Tags centred on the top edge (highlight label + discount on text layouts) */
+    #{{ uid }} .sc-qs__tags {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      display: flex;
+      gap: 4px;
+      max-width: calc(100% - 8px);
+      transform: translate(-50%, -50%);
+      z-index: 2;
+    }
+    #{{ uid }} .sc-qs__tag {
+      min-width: 0;
+      padding: 2px 10px;
+      overflow: hidden;
+      font-size: 13px;
+      font-weight: 500;
+      line-height: 1.35;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      color: var(--sc-qs-badge-text);
+      background: var(--sc-qs-tag);
+      border-radius: min(var(--sc-qs-radius), 3px);
+    }
+    #{{ uid }} .sc-qs__tags--bottom {
+      top: auto;
+      bottom: 0;
+      transform: translate(-50%, 50%);
+    }
+    #{{ uid }} .sc-qs__options--bottom-tags { padding-bottom: 11px; }
+
+    /* Round discount badge (Visual layout, top-right corner) */
+    #{{ uid }} .sc-qs__badge {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 44px;
+      height: 44px;
+      font-size: 14px;
+      font-weight: 700;
+      line-height: 1;
+      color: var(--sc-qs-badge-text);
+      background: var(--sc-qs-badge);
+      border-radius: 50%;
+      z-index: 20;
+    }
+
+    /* ---- Visual layout ---- */
+    #{{ uid }}.sc-qs--visual .sc-qs__option {
+      justify-content: flex-start;
+      min-height: 0;
+      padding: 0;
+      overflow: hidden;
+      background: var(--sc-qs-bg);
+      border-width: 2px;
+      border-color: color-mix(in srgb, var(--sc-qs-border) 25%, transparent);
+    }
+    #{{ uid }}.sc-qs--visual .sc-qs__media {
+      position: relative;
+      display: block;
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      padding: 12px;
+    }
+    #{{ uid }}.sc-qs--visual .sc-qs__media > .sc-qs__img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+    #{{ uid }} .sc-qs__stack {
+      position: relative;
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+    #{{ uid }} .sc-qs__stack .sc-qs__img {
+      position: absolute;
+      top: calc(var(--n) * 6%);
+      left: calc(var(--n) * 9%);
+      width: 76%;
+      height: 76%;
+      object-fit: contain;
+      z-index: calc(10 - var(--n));
+    }
+    #{{ uid }} .sc-qs__stack--1 .sc-qs__img { top: 0; left: 0; width: 100%; height: 100%; }
+    #{{ uid }} .sc-qs__stack--2 .sc-qs__img { top: calc(var(--n) * 10%); left: calc(var(--n) * 18%); width: 82%; height: 82%; }
+    #{{ uid }}.sc-qs--visual .sc-qs__text {
+      width: 100%;
+      padding: 12px 8px;
+      border-top: 1px solid color-mix(in srgb, var(--sc-qs-border) 25%, transparent);
+    }
+    #{{ uid }}.sc-qs--visual .sc-qs__option { overflow: visible; }
+    #{{ uid }}.sc-qs--visual .sc-qs__text {
+      border-radius: 0 0 max(calc(var(--sc-qs-radius) - 2px), 0px) max(calc(var(--sc-qs-radius) - 2px), 0px);
+    }
+    #{{ uid }}.sc-qs--visual .sc-qs__media { border-radius: var(--sc-qs-radius) var(--sc-qs-radius) 0 0; overflow: hidden; }
+    #{{ uid }}.sc-qs--visual.sc-qs--active-filled .sc-qs__option.is-active {
+      color: inherit;
+      background: var(--sc-qs-bg);
+      border-color: var(--sc-qs-active);
+    }
+    #{{ uid }}.sc-qs--visual.sc-qs--active-filled .sc-qs__option.is-active .sc-qs__text {
+      color: var(--sc-qs-active-text);
+      background: var(--sc-qs-active);
+      border-top-color: var(--sc-qs-active);
+    }
+    #{{ uid }}.sc-qs--visual.sc-qs--active-border .sc-qs__option.is-active,
+    #{{ uid }}.sc-qs--visual.sc-qs--active-shadow .sc-qs__option.is-active {
+      box-shadow: none;
+    }
+    #{{ uid }}.sc-qs--visual.sc-qs--active-shadow .sc-qs__option.is-active {
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.16);
+    }
+
+    @media screen and (max-width: 749px) {
+      #{{ uid }} { font-size: var(--sc-qs-fs-m); }
+      #{{ uid }} .sc-qs__heading { font-size: calc(var(--sc-qs-fs-m) + 1px); }
+      #{{ uid }}.sc-qs--m-grid .sc-qs__options { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 14px; }
+      #{{ uid }}.sc-qs--m-grid .sc-qs__options--tags { row-gap: 22px; }
+      #{{ uid }}.sc-qs--m-grid .sc-qs__options--bottom-tags,
+      #{{ uid }}.sc-qs--m-stack .sc-qs__options--bottom-tags { row-gap: 32px; }
+      #{{ uid }}.sc-qs--m-stack .sc-qs__options { grid-template-columns: minmax(0, 1fr); row-gap: 12px; }
+      #{{ uid }}.sc-qs--m-stack .sc-qs__options--tags { row-gap: 22px; }
+      #{{ uid }}.sc-qs--m-scroll .sc-qs__options--tags { padding-top: 11px; }
+      #{{ uid }}.sc-qs--m-scroll .sc-qs__options {
+        display: flex;
+        gap: 10px;
+        margin: 0 -1.5rem;
+        padding-right: 1.5rem;
+        padding-left: 1.5rem;
+        padding-bottom: 6px;
+        overflow-x: auto;
+        scroll-snap-type: x mandatory;
+        scrollbar-width: none;
+      }
+      #{{ uid }}.sc-qs--m-scroll .sc-qs__options::-webkit-scrollbar { display: none; }
+      #{{ uid }}.sc-qs--m-scroll .sc-qs__cell { flex: 0 0 38%; scroll-snap-align: start; }
+      #{{ uid }}.sc-qs--text.sc-qs--m-scroll .sc-qs__cell,
+      #{{ uid }}.sc-qs--text_badge.sc-qs--m-scroll .sc-qs__cell { flex-basis: 30%; }
+      #{{ uid }}.sc-qs--visual .sc-qs__badge { width: 38px; height: 38px; font-size: 12px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      #{{ uid }} .sc-qs__option { transition: none; }
+    }
+  </style>
+{%- elsif request.design_mode -%}
+  <p {{ block.shopify_attributes }} style="margin:8px 0;padding:8px 10px;font-size:12px;font-style:italic;opacity:.7;border:1px dashed currentColor;">
+    SC – Quantity selector: add a display text to at least one option.
+  </p>
+{%- endif -%}

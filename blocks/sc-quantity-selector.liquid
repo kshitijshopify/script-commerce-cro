@@ -1,0 +1,498 @@
+{%- comment -%}
+  Theme block entry point (Horizon and other themes whose sections accept @theme blocks).
+  Settings mirror the "sc_quantity_selector" block in sections/main-product.liquid – keep them in sync.
+  Pass the product form id your theme uses; Horizon/Dawn style ids are detected in JS as a fallback.
+{%- endcomment -%}
+{%- liquid
+  assign sc_product = closest.product
+  if sc_product == blank
+    assign sc_product = product
+  endif
+  assign sc_form_id = 'product-form-' | append: section.id
+-%}
+{% render 'sc-quantity-selector', block: block, product: sc_product, product_form_id: sc_form_id, section: section %}
+
+{% schema %}
+{
+  "name": "SC – Quantity selector",
+  "settings": [
+    {
+      "type": "paragraph",
+      "content": "Pack sizes as buttons or cards. Discount badges are labels only – create a matching automatic discount in Shopify (Discounts) so the cart price follows."
+    },
+    {
+      "type": "header",
+      "content": "General"
+    },
+    {
+      "type": "select",
+      "id": "layout",
+      "label": "Layout",
+      "options": [
+        {
+          "value": "text",
+          "label": "Text only"
+        },
+        {
+          "value": "text_badge",
+          "label": "Text + badge"
+        },
+        {
+          "value": "visual",
+          "label": "Visual (image cards)"
+        }
+      ],
+      "default": "text_badge"
+    },
+    {
+      "type": "select",
+      "id": "mode",
+      "label": "Selection sets",
+      "options": [
+        {
+          "value": "quantity",
+          "label": "Cart quantity"
+        },
+        {
+          "value": "variant",
+          "label": "Variant (option value)"
+        }
+      ],
+      "default": "quantity",
+      "info": "Cart quantity: the option quantity is added to the cart. Variant: selects the variant whose option value matches \"Variant option value\" – the theme variant picker must stay on the page."
+    },
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "Heading",
+      "default": "Choose your quantity:"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_selected",
+      "label": "Show selected option in heading",
+      "default": true
+    },
+    {
+      "type": "range",
+      "id": "default_option",
+      "label": "Preselected option",
+      "min": 1,
+      "max": 5,
+      "step": 1,
+      "default": 1,
+      "info": "In Variant mode the option matching the current variant is preselected."
+    },
+    {
+      "type": "checkbox",
+      "id": "hide_theme_quantity",
+      "label": "Hide theme quantity selector",
+      "default": true,
+      "info": "Cart quantity mode only."
+    },
+    {
+      "type": "checkbox",
+      "id": "hide_theme_variant_picker",
+      "label": "Hide theme variant picker",
+      "default": false,
+      "info": "Variant mode only. Use for products with a single option."
+    },
+    {
+      "type": "header",
+      "content": "Option 1"
+    },
+    {
+      "type": "text",
+      "id": "o1_text",
+      "label": "Display text",
+      "default": "1 x",
+      "info": "eg. 1 x, 2 x 300g, 6x400g. Leave empty to hide this option."
+    },
+    {
+      "type": "number",
+      "id": "o1_quantity",
+      "label": "Cart quantity",
+      "default": 1
+    },
+    {
+      "type": "text",
+      "id": "o1_value",
+      "label": "Variant option value",
+      "info": "Variant mode only. Must match the option value exactly, eg. 6x200g."
+    },
+    {
+      "type": "text",
+      "id": "o1_badge",
+      "label": "Discount badge"
+    },
+    {
+      "type": "color",
+      "id": "o1_badge_color",
+      "label": "Badge color",
+      "default": "#9B3B4A"
+    },
+    {
+      "type": "text",
+      "id": "o1_bestseller",
+      "label": "Highlight label",
+      "info": "Pill above the option, eg. Bestseller."
+    },
+    {
+      "type": "color",
+      "id": "o1_bestseller_color",
+      "label": "Highlight label color",
+      "default": "#1A1A1A"
+    },
+    {
+      "type": "image_picker",
+      "id": "o1_image",
+      "label": "Image (Visual layout)",
+      "info": "Empty: the product image is used, stacked by quantity."
+    },
+    {
+      "type": "header",
+      "content": "Option 2"
+    },
+    {
+      "type": "text",
+      "id": "o2_text",
+      "label": "Display text",
+      "default": "2 x"
+    },
+    {
+      "type": "number",
+      "id": "o2_quantity",
+      "label": "Cart quantity",
+      "default": 2
+    },
+    {
+      "type": "text",
+      "id": "o2_value",
+      "label": "Variant option value"
+    },
+    {
+      "type": "text",
+      "id": "o2_badge",
+      "label": "Discount badge",
+      "default": "10%"
+    },
+    {
+      "type": "color",
+      "id": "o2_badge_color",
+      "label": "Badge color",
+      "default": "#9B3B4A"
+    },
+    {
+      "type": "text",
+      "id": "o2_bestseller",
+      "label": "Highlight label",
+      "default": "Bestseller"
+    },
+    {
+      "type": "color",
+      "id": "o2_bestseller_color",
+      "label": "Highlight label color",
+      "default": "#1A1A1A"
+    },
+    {
+      "type": "image_picker",
+      "id": "o2_image",
+      "label": "Image (Visual layout)"
+    },
+    {
+      "type": "header",
+      "content": "Option 3"
+    },
+    {
+      "type": "text",
+      "id": "o3_text",
+      "label": "Display text",
+      "default": "3 x"
+    },
+    {
+      "type": "number",
+      "id": "o3_quantity",
+      "label": "Cart quantity",
+      "default": 3
+    },
+    {
+      "type": "text",
+      "id": "o3_value",
+      "label": "Variant option value"
+    },
+    {
+      "type": "text",
+      "id": "o3_badge",
+      "label": "Discount badge",
+      "default": "15%"
+    },
+    {
+      "type": "color",
+      "id": "o3_badge_color",
+      "label": "Badge color",
+      "default": "#9B3B4A"
+    },
+    {
+      "type": "text",
+      "id": "o3_bestseller",
+      "label": "Highlight label"
+    },
+    {
+      "type": "color",
+      "id": "o3_bestseller_color",
+      "label": "Highlight label color",
+      "default": "#1A1A1A"
+    },
+    {
+      "type": "image_picker",
+      "id": "o3_image",
+      "label": "Image (Visual layout)"
+    },
+    {
+      "type": "header",
+      "content": "Option 4"
+    },
+    {
+      "type": "text",
+      "id": "o4_text",
+      "label": "Display text",
+      "default": "4 x"
+    },
+    {
+      "type": "number",
+      "id": "o4_quantity",
+      "label": "Cart quantity",
+      "default": 4
+    },
+    {
+      "type": "text",
+      "id": "o4_value",
+      "label": "Variant option value"
+    },
+    {
+      "type": "text",
+      "id": "o4_badge",
+      "label": "Discount badge",
+      "default": "20%"
+    },
+    {
+      "type": "color",
+      "id": "o4_badge_color",
+      "label": "Badge color",
+      "default": "#9B3B4A"
+    },
+    {
+      "type": "text",
+      "id": "o4_bestseller",
+      "label": "Highlight label"
+    },
+    {
+      "type": "color",
+      "id": "o4_bestseller_color",
+      "label": "Highlight label color",
+      "default": "#1A1A1A"
+    },
+    {
+      "type": "image_picker",
+      "id": "o4_image",
+      "label": "Image (Visual layout)"
+    },
+    {
+      "type": "header",
+      "content": "Option 5"
+    },
+    {
+      "type": "text",
+      "id": "o5_text",
+      "label": "Display text"
+    },
+    {
+      "type": "number",
+      "id": "o5_quantity",
+      "label": "Cart quantity",
+      "default": 5
+    },
+    {
+      "type": "text",
+      "id": "o5_value",
+      "label": "Variant option value"
+    },
+    {
+      "type": "text",
+      "id": "o5_badge",
+      "label": "Discount badge"
+    },
+    {
+      "type": "color",
+      "id": "o5_badge_color",
+      "label": "Badge color",
+      "default": "#9B3B4A"
+    },
+    {
+      "type": "text",
+      "id": "o5_bestseller",
+      "label": "Highlight label"
+    },
+    {
+      "type": "color",
+      "id": "o5_bestseller_color",
+      "label": "Highlight label color",
+      "default": "#1A1A1A"
+    },
+    {
+      "type": "image_picker",
+      "id": "o5_image",
+      "label": "Image (Visual layout)"
+    },
+    {
+      "type": "header",
+      "content": "Style"
+    },
+    {
+      "type": "select",
+      "id": "active_style",
+      "label": "Active option style",
+      "options": [
+        {
+          "value": "filled",
+          "label": "Filled background"
+        },
+        {
+          "value": "border",
+          "label": "Thick border"
+        },
+        {
+          "value": "shadow",
+          "label": "Border + shadow"
+        }
+      ],
+      "default": "border"
+    },
+    {
+      "type": "color",
+      "id": "active_color",
+      "label": "Active color",
+      "default": "#000000"
+    },
+    {
+      "type": "color",
+      "id": "active_text_color",
+      "label": "Active text",
+      "default": "#FFFFFF"
+    },
+    {
+      "type": "color",
+      "id": "text_color",
+      "label": "Text",
+      "default": "#000000"
+    },
+    {
+      "type": "color",
+      "id": "border_color",
+      "label": "Border",
+      "default": "#E5E5E5"
+    },
+    {
+      "type": "color",
+      "id": "background_color",
+      "label": "Option background",
+      "info": "Leave empty for transparent."
+    },
+    {
+      "type": "color",
+      "id": "badge_text_color",
+      "label": "Badge and label text",
+      "default": "#FFFFFF"
+    },
+    {
+      "type": "range",
+      "id": "radius",
+      "label": "Corner radius",
+      "min": 0,
+      "max": 24,
+      "step": 1,
+      "unit": "px",
+      "default": 0
+    },
+    {
+      "type": "range",
+      "id": "option_height",
+      "label": "Button height (text layouts)",
+      "min": 36,
+      "max": 80,
+      "step": 2,
+      "unit": "px",
+      "default": 60
+    },
+    {
+      "type": "range",
+      "id": "font_size",
+      "label": "Font size – desktop",
+      "min": 12,
+      "max": 24,
+      "step": 1,
+      "unit": "px",
+      "default": 17
+    },
+    {
+      "type": "range",
+      "id": "font_size_mobile",
+      "label": "Font size – mobile",
+      "min": 12,
+      "max": 22,
+      "step": 1,
+      "unit": "px",
+      "default": 15
+    },
+    {
+      "type": "select",
+      "id": "mobile_layout",
+      "label": "Mobile layout",
+      "options": [
+        {
+          "value": "auto",
+          "label": "Automatic (2 columns / scroll for Visual)"
+        },
+        {
+          "value": "grid",
+          "label": "2 columns"
+        },
+        {
+          "value": "stack",
+          "label": "Stacked"
+        },
+        {
+          "value": "scroll",
+          "label": "Horizontal scroll"
+        }
+      ],
+      "default": "auto"
+    },
+    {
+      "type": "range",
+      "id": "margin_top",
+      "label": "Top margin",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 10
+    },
+    {
+      "type": "range",
+      "id": "margin_bottom",
+      "label": "Bottom margin",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 16
+    }
+  ],
+  "presets": [
+    {
+      "name": "SC – Quantity selector"
+    }
+  ]
+}
+{% endschema %}
