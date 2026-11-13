@@ -1,0 +1,901 @@
+{%- comment -%}
+  SC – Collection card color swatches  (old catalogue: CRO | Artikel Farben)
+  ScriptCommerce CRO feature. All markup, CSS and JS for the feature live in this one snippet.
+
+  Rendered in two modes:
+
+  1. Assets (CSS + JS), once per section, OUTSIDE the AJAX-replaced product grid:
+     {% render 'sc-card-swatches', mode: 'assets', sc_settings: section.settings, section_id: section.id %}
+
+  2. Swatches, inside the product card, below the product image:
+     {% render 'sc-card-swatches', card_product: card_product, sc_settings: sc_settings, section_id: section_id %}
+
+  Settings (all prefixed `sc_swatch_`) live in the section that renders the grid, under "CRO | Product Colors".
+  If `sc_settings` is not passed, or the feature is disabled, nothing is output.
+
+  Behaviour
+  - Only products with more than one variant. Swatches can be grouped by an option (e.g. Color) so a
+    Color x Size product shows one swatch per color.
+  - Swatch = variant image, Shopify option swatch, color map entry or CSS color name, else initials.
+  - Click swaps the card image (src, srcset, <picture> sources, hover image) and points the card's links
+    to ?variant=<id>. Optional: navigate straight to the variant.
+  - JS uses document-level event delegation + MutationObserver, so it keeps working after AJAX
+    filtering, sorting, pagination and theme editor reloads.
+  - Fires a bubbling `sc:card-swatch-change` event ({ handle, variantId, value }) for analytics.
+{%- endcomment -%}
+
+{%- liquid
+  assign s = sc_settings
+  assign sc_on = false
+  if s != blank and s.sc_swatch_enable
+    assign sc_on = true
+  endif
+-%}
+
+{%- if sc_on and mode == 'assets' -%}
+  {%- liquid
+    assign sc_scope = '.sc-ccs--' | append: section_id
+
+    case s.sc_swatch_size
+      when 'small'
+        assign sc_size = 24
+      when 'large'
+        assign sc_size = 45
+      else
+        assign sc_size = 30
+    endcase
+    case s.sc_swatch_size_mobile
+      when 'small'
+        assign sc_size_m = 24
+      when 'medium'
+        assign sc_size_m = 30
+      when 'large'
+        assign sc_size_m = 45
+      else
+        assign sc_size_m = sc_size
+    endcase
+
+    if s.sc_swatch_shape == 'square'
+      assign sc_radius = s.sc_swatch_square_radius | append: 'px'
+    else
+      assign sc_radius = '50%'
+    endif
+
+    case s.sc_swatch_alignment
+      when 'left'
+        assign sc_align = 'left'
+        assign sc_justify = 'flex-start'
+      when 'center'
+        assign sc_align = 'center'
+        assign sc_justify = 'center'
+      when 'right'
+        assign sc_align = 'right'
+        assign sc_justify = 'flex-end'
+      else
+        assign sc_align = 'inherit'
+        assign sc_justify = 'flex-start'
+    endcase
+
+    assign sc_ring = s.sc_swatch_ring_color
+    assign sc_ring_rgb = sc_ring.red | append: ', ' | append: sc_ring.green | append: ', ' | append: sc_ring.blue
+  -%}
+  <style>
+    {{ sc_scope }} {
+      --sc-ccs-size: {{ sc_size }}px;
+      --sc-ccs-radius: {{ sc_radius }};
+      --sc-ccs-gap: {{ s.sc_swatch_gap }}px;
+      --sc-ccs-pad: 4px;
+      --sc-ccs-ring: {{ sc_ring }};
+      --sc-ccs-ring-hover: rgba({{ sc_ring_rgb }}, 0.35);
+      --sc-ccs-border: {{ s.sc_swatch_border_color }};
+      --sc-ccs-bg: {{ s.sc_swatch_bg }};
+      --sc-ccs-tip-bg: {{ s.sc_swatch_tooltip_bg }};
+      --sc-ccs-tip-text: {{ s.sc_swatch_tooltip_text }};
+      --sc-ccs-text: {{ s.sc_swatch_text_color }};
+      --sc-ccs-justify: {{ sc_justify }};
+
+      display: block;
+      position: relative;
+      z-index: 3;
+      box-sizing: border-box;
+      width: 100%;
+      max-width: 100%;
+      margin: {{ s.sc_swatch_margin_top }}px 0 {{ s.sc_swatch_margin_bottom }}px;
+      padding: 0;
+      text-align: {{ sc_align }};
+      line-height: 1;
+    }
+    {{ sc_scope }} *,
+    {{ sc_scope }} *::before,
+    {{ sc_scope }} *::after {
+      box-sizing: border-box;
+    }
+    {{ sc_scope }} .sc-ccs__row {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--sc-ccs-gap);
+      max-width: 100%;
+      margin: 0;
+      padding: 0;
+      vertical-align: top;
+    }
+    {{ sc_scope }} .sc-ccs__group {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: var(--sc-ccs-justify);
+      align-items: center;
+      gap: var(--sc-ccs-gap);
+      min-width: 0;
+      max-width: 100%;
+      margin: 0;
+      padding: var(--sc-ccs-pad);
+    }
+    {{ sc_scope }} .sc-ccs__swatch {
+      all: unset;
+      box-sizing: border-box;
+      position: relative;
+      display: inline-flex;
+      flex: 0 0 auto;
+      width: var(--sc-ccs-size);
+      height: var(--sc-ccs-size);
+      border-radius: var(--sc-ccs-radius);
+      cursor: pointer;
+      outline: 2px solid transparent;
+      outline-offset: 2px;
+      transition: outline-color 0.2s ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+    {{ sc_scope }} .sc-ccs__swatch:hover {
+      outline-color: var(--sc-ccs-ring-hover);
+    }
+    {{ sc_scope }} .sc-ccs__swatch[aria-checked='true'],
+    {{ sc_scope }} .sc-ccs__swatch:focus-visible {
+      outline-color: var(--sc-ccs-ring);
+    }
+    {{ sc_scope }} .sc-ccs__swatch:focus-visible:not([aria-checked='true']) {
+      outline-style: dashed;
+    }
+    {{ sc_scope }} .sc-ccs__media {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      border-radius: inherit;
+      background: var(--sc-ccs-bg);
+      color: var(--sc-ccs-text);
+      font-size: calc(var(--sc-ccs-size) * 0.34);
+      font-weight: 600;
+      line-height: 1;
+      text-transform: uppercase;
+      pointer-events: none;
+    }
+    {{ sc_scope }} .sc-ccs__media img {
+      all: unset;
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center;
+    }
+    {{ sc_scope }} .sc-ccs__media::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      box-shadow: inset 0 0 0 1px var(--sc-ccs-border);
+      pointer-events: none;
+    }
+    {{ sc_scope }} .sc-ccs__swatch.is-soldout .sc-ccs__media {
+      opacity: 0.55;
+    }
+    {{ sc_scope }} .sc-ccs__swatch.is-soldout .sc-ccs__media::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+      background: linear-gradient(
+        to top right,
+        transparent calc(50% - 0.75px),
+        var(--sc-ccs-text) calc(50% - 0.75px),
+        var(--sc-ccs-text) calc(50% + 0.75px),
+        transparent calc(50% + 0.75px)
+      );
+    }
+    {{ sc_scope }} .sc-ccs__tip {
+      position: absolute;
+      left: 50%;
+      bottom: calc(100% + 10px);
+      z-index: 5;
+      display: block;
+      max-width: 180px;
+      padding: 4px 9px;
+      overflow: hidden;
+      border-radius: 35px;
+      background: var(--sc-ccs-tip-bg);
+      color: var(--sc-ccs-tip-text);
+      font-size: {{ s.sc_swatch_tooltip_size }}px;
+      font-weight: 400;
+      line-height: 1.25;
+      letter-spacing: 0;
+      text-transform: none;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      filter: drop-shadow(0 4px 5px rgba(0, 0, 0, 0.12));
+      opacity: 0;
+      visibility: hidden;
+      transform: translate(-50%, 4px);
+      transition: opacity 0.12s ease, transform 0.12s ease, visibility 0.12s;
+      pointer-events: none;
+    }
+    @media (hover: hover) {
+      {{ sc_scope }} .sc-ccs__swatch:hover .sc-ccs__tip {
+        opacity: 1;
+        visibility: visible;
+        transform: translate(-50%, 0);
+      }
+    }
+    {{ sc_scope }} .sc-ccs__swatch:focus-visible .sc-ccs__tip {
+      opacity: 1;
+      visibility: visible;
+      transform: translate(-50%, 0);
+    }
+    {{ sc_scope }} .sc-ccs__more {
+      all: unset;
+      flex: 0 0 auto;
+      cursor: pointer;
+      color: var(--sc-ccs-text);
+      font-size: max(12px, calc(var(--sc-ccs-size) * 0.42));
+      font-weight: 500;
+      line-height: 1;
+      white-space: nowrap;
+    }
+    {{ sc_scope }} .sc-ccs__more:hover {
+      text-decoration: underline;
+    }
+    {{ sc_scope }} .sc-ccs__more:focus-visible {
+      outline: 2px solid var(--sc-ccs-ring);
+      outline-offset: 2px;
+    }
+    {{ sc_scope }} .sc-ccs__label {
+      display: block;
+      margin: 2px 0 0;
+      padding: 0;
+      color: var(--sc-ccs-text);
+      font-size: {{ s.sc_swatch_label_size }}px;
+      font-weight: 400;
+      line-height: 1.3;
+      letter-spacing: 0;
+      text-transform: none;
+      overflow-wrap: anywhere;
+    }
+    @media screen and (max-width: 749px) {
+      {{ sc_scope }} {
+        --sc-ccs-size: {{ sc_size_m }}px;
+        margin: {{ s.sc_swatch_margin_top_mobile }}px 0 {{ s.sc_swatch_margin_bottom_mobile }}px;
+      }
+      {{ sc_scope }}.sc-ccs--scroll .sc-ccs__group {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        overscroll-behavior-x: contain;
+        scrollbar-width: none;
+      }
+      {{ sc_scope }}.sc-ccs--scroll .sc-ccs__group::-webkit-scrollbar {
+        display: none;
+      }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      {{ sc_scope }} .sc-ccs__swatch,
+      {{ sc_scope }} .sc-ccs__tip {
+        transition: none;
+      }
+    }
+  </style>
+
+  <script>
+    (function () {
+      'use strict';
+      if (window.__scCardSwatches) {
+        window.__scCardSwatches.initAll();
+        return;
+      }
+
+      var SRC_WIDTHS = [180, 360, 540, 720, 900, 1080, 1296, 1512, 1728, 2048];
+      var BAD = ['inherit', 'initial', 'unset', 'revert', 'currentcolor', 'transparent', 'default', 'none'];
+      var states = new WeakMap();
+
+      function norm(v) {
+        return String(v || '').replace(/\s+/g, ' ').trim().toLowerCase();
+      }
+      function withWidth(url, w) {
+        try {
+          var u = new URL(url, location.href);
+          u.searchParams.set('width', w);
+          return u.href;
+        } catch (e) {
+          return url + (url.indexOf('?') > -1 ? '&' : '?') + 'width=' + w;
+        }
+      }
+      function basePath(url) {
+        try {
+          return new URL(url, location.href).pathname.replace(/_(\d+x\d*|\d*x\d+)(?=\.[a-z]+$)/i, '');
+        } catch (e) {
+          return url;
+        }
+      }
+      function buildSrcset(url, maxW) {
+        var list = SRC_WIDTHS.filter(function (w) {
+          return !maxW || w <= maxW;
+        });
+        if (!list.length) list = [maxW || 720];
+        return list
+          .map(function (w) {
+            return withWidth(url, w) + ' ' + w + 'w';
+          })
+          .join(', ');
+      }
+      function cssColor(label) {
+        if (!window.CSS || !CSS.supports) return '';
+        var parts = String(label).split('/');
+        for (var p = 0; p < parts.length; p++) {
+          var words = norm(parts[p]).split(/[\s-]+/).filter(Boolean);
+          var tries = [words.join('')].concat(words.slice().reverse());
+          for (var i = 0; i < tries.length; i++) {
+            var c = tries[i];
+            if (c && BAD.indexOf(c) === -1 && !/^\d/.test(c) && CSS.supports('color', c)) return c;
+          }
+        }
+        return '';
+      }
+      function variantHref(href, id) {
+        try {
+          var u = new URL(href, location.href);
+          u.searchParams.set('variant', id);
+          return u.origin === location.origin ? u.pathname + u.search + u.hash : u.href;
+        } catch (e) {
+          return href;
+        }
+      }
+
+      /* Card root = nearest ancestor that also holds the product image. */
+      function cardOf(wrap) {
+        var el = wrap.parentElement;
+        while (el && el !== document.body) {
+          var imgs = el.querySelectorAll('img');
+          for (var i = 0; i < imgs.length; i++) {
+            if (!imgs[i].closest('.sc-ccs')) return el;
+          }
+          el = el.parentElement;
+        }
+        return null;
+      }
+      function primaryImage(card) {
+        var imgs = Array.prototype.filter.call(card.querySelectorAll('img'), function (i) {
+          return !i.closest('.sc-ccs');
+        });
+        return (
+          imgs.filter(function (i) {
+            return i.getBoundingClientRect().width >= 60;
+          })[0] ||
+          imgs[0] ||
+          null
+        );
+      }
+      function snap(img) {
+        var pic = img.parentElement && img.parentElement.tagName === 'PICTURE' ? img.parentElement : null;
+        return {
+          el: img,
+          src: img.getAttribute('src'),
+          srcset: img.getAttribute('srcset'),
+          dsrc: img.getAttribute('data-src'),
+          dsrcset: img.getAttribute('data-srcset'),
+          sources: pic
+            ? Array.prototype.map.call(pic.querySelectorAll('source'), function (x) {
+                return [x, x.getAttribute('srcset')];
+              })
+            : [],
+        };
+      }
+      function setAttr(el, name, val) {
+        if (val == null) el.removeAttribute(name);
+        else el.setAttribute(name, val);
+      }
+      function restore(sn) {
+        setAttr(sn.el, 'srcset', sn.srcset);
+        setAttr(sn.el, 'src', sn.src);
+        if (sn.dsrc != null) sn.el.setAttribute('data-src', sn.dsrc);
+        if (sn.dsrcset != null) sn.el.setAttribute('data-srcset', sn.dsrcset);
+        sn.sources.forEach(function (p) {
+          setAttr(p[0], 'srcset', p[1]);
+        });
+      }
+      function apply(sn, srcset, src) {
+        sn.el.setAttribute('srcset', srcset);
+        sn.el.setAttribute('src', src);
+        if (sn.dsrc != null) sn.el.setAttribute('data-src', src);
+        if (sn.dsrcset != null) sn.el.setAttribute('data-srcset', srcset);
+        sn.sources.forEach(function (p) {
+          p[0].setAttribute('srcset', srcset);
+        });
+      }
+
+      function stateOf(wrap) {
+        var st = states.get(wrap);
+        if (st && st.card && st.card.isConnected) return st;
+        var card = cardOf(wrap);
+        var img = card ? primaryImage(card) : null;
+        var hovers = [];
+        if (img && wrap.getAttribute('data-hover-sync') === 'true' && img.parentElement) {
+          Array.prototype.forEach.call(img.parentElement.children, function (c) {
+            if (c !== img && c.tagName === 'IMG') hovers.push(snap(c));
+          });
+        }
+        var url = wrap.getAttribute('data-product-url') || '';
+        var handle = (url.match(/\/products\/([^\/?#]+)/) || [])[1] || '';
+        var links = card
+          ? Array.prototype.filter
+              .call(card.querySelectorAll('a[href*="/products/' + handle + '"]'), function (a) {
+                return handle && !a.closest('.sc-ccs');
+              })
+              .map(function (a) {
+                return { a: a, href: a.getAttribute('href') };
+              })
+          : [];
+        st = {
+          card: card,
+          handle: handle,
+          snaps: img ? [snap(img)].concat(hovers) : [],
+          links: links,
+          shown: null,
+          committed: null,
+        };
+        states.set(wrap, st);
+        return st;
+      }
+
+      function showImage(wrap, btn) {
+        var st = stateOf(wrap);
+        if (!st.snaps.length) return;
+        var url = btn ? btn.getAttribute('data-image') : '';
+        if (!url) {
+          if (st.shown) st.snaps.forEach(restore);
+          st.shown = null;
+          return;
+        }
+        if (st.shown === url) return;
+        var main = st.snaps[0];
+        if (!st.shown && basePath(main.el.currentSrc || main.src || '') === basePath(url)) return;
+        var w = parseInt(btn.getAttribute('data-image-width'), 10) || 0;
+        var srcset = buildSrcset(url, w);
+        var src = withWidth(url, w && w < 720 ? w : 720);
+        st.snaps.forEach(function (sn) {
+          apply(sn, srcset, src);
+        });
+        st.shown = url;
+      }
+
+      function buttonsOf(wrap) {
+        return Array.prototype.slice.call(wrap.querySelectorAll('.sc-ccs__swatch'));
+      }
+
+      function select(wrap, btn, opts) {
+        var st = stateOf(wrap);
+        buttonsOf(wrap).forEach(function (b) {
+          var on = b === btn;
+          b.setAttribute('aria-checked', on ? 'true' : 'false');
+          b.tabIndex = on ? 0 : -1;
+        });
+        var label = wrap.querySelector('.sc-ccs__label-value');
+        if (label) label.textContent = btn.getAttribute('data-label') || '';
+        if (opts.image) {
+          st.committed = btn;
+          showImage(wrap, btn);
+        }
+        var id = btn.getAttribute('data-variant-id');
+        if (opts.links) {
+          st.links.forEach(function (l) {
+            l.a.setAttribute('href', variantHref(l.href, id));
+          });
+        }
+        if (opts.emit) {
+          wrap.dispatchEvent(
+            new CustomEvent('sc:card-swatch-change', {
+              bubbles: true,
+              detail: { handle: st.handle, variantId: Number(id), value: btn.getAttribute('data-label') },
+            })
+          );
+        }
+      }
+
+      function choose(wrap, btn) {
+        if (wrap.getAttribute('data-click') === 'navigate') {
+          select(wrap, btn, { image: true, links: true, emit: true });
+          window.location.href = variantHref(wrap.getAttribute('data-product-url'), btn.getAttribute('data-variant-id'));
+          return;
+        }
+        select(wrap, btn, { image: true, links: wrap.getAttribute('data-links') === 'true', emit: true });
+      }
+
+      function initWrap(wrap) {
+        if (wrap.hasAttribute('data-sc-ready')) return;
+        wrap.setAttribute('data-sc-ready', '');
+
+        /* Color-name fallback: "Navy" -> navy, otherwise keep the initials. */
+        Array.prototype.forEach.call(wrap.querySelectorAll('[data-sc-try-color]'), function (media) {
+          var c = cssColor(media.getAttribute('data-sc-try-color'));
+          if (!c) return;
+          media.style.background = c;
+          Array.prototype.forEach.call(media.querySelectorAll('img, .sc-ccs__initials'), function (n) {
+            n.parentNode.removeChild(n);
+          });
+        });
+
+        var buttons = buttonsOf(wrap);
+        if (!buttons.length) return;
+        var selected = wrap.querySelector('.sc-ccs__swatch[aria-checked="true"]') || buttons[0];
+        select(wrap, selected, { image: wrap.getAttribute('data-sync-load') === 'true', links: false, emit: false });
+      }
+
+      function initAll(root) {
+        Array.prototype.forEach.call((root || document).querySelectorAll('.sc-ccs:not([data-sc-ready])'), initWrap);
+      }
+
+      /* ---------- delegated events (survive AJAX re-renders) ---------- */
+      document.addEventListener(
+        'click',
+        function (e) {
+          var wrap = e.target.closest && e.target.closest('.sc-ccs');
+          if (!wrap) return;
+          e.stopPropagation();
+          var btn = e.target.closest('.sc-ccs__swatch');
+          if (!btn) return;
+          e.preventDefault();
+          choose(wrap, btn);
+        },
+        true
+      );
+      document.addEventListener('keydown', function (e) {
+        var btn = e.target.closest && e.target.closest('.sc-ccs__swatch');
+        if (!btn) return;
+        var wrap = btn.closest('.sc-ccs');
+        var buttons = buttonsOf(wrap);
+        var cur = buttons.indexOf(btn);
+        var last = buttons.length - 1;
+        var next = -1;
+        switch (e.key) {
+          case 'ArrowRight':
+          case 'ArrowDown':
+            next = cur === last ? 0 : cur + 1;
+            break;
+          case 'ArrowLeft':
+          case 'ArrowUp':
+            next = cur === 0 ? last : cur - 1;
+            break;
+          case 'Home':
+            next = 0;
+            break;
+          case 'End':
+            next = last;
+            break;
+          default:
+            return;
+        }
+        e.preventDefault();
+        e.stopPropagation();
+        if (wrap.getAttribute('data-click') === 'navigate') {
+          buttons.forEach(function (b, n) {
+            b.tabIndex = n === next ? 0 : -1;
+          });
+        } else {
+          select(wrap, buttons[next], { image: true, links: wrap.getAttribute('data-links') === 'true', emit: true });
+        }
+        buttons[next].focus();
+      });
+      document.addEventListener('pointerover', function (e) {
+        if (e.pointerType !== 'mouse') return;
+        var btn = e.target.closest && e.target.closest('.sc-ccs__swatch');
+        if (!btn) return;
+        var wrap = btn.closest('.sc-ccs');
+        if (wrap.getAttribute('data-hover-preview') === 'true') showImage(wrap, btn);
+      });
+      document.addEventListener('pointerout', function (e) {
+        if (e.pointerType !== 'mouse') return;
+        var group = e.target.closest && e.target.closest('.sc-ccs__group');
+        if (!group || (e.relatedTarget && group.contains(e.relatedTarget))) return;
+        var wrap = group.closest('.sc-ccs');
+        if (wrap.getAttribute('data-hover-preview') !== 'true') return;
+        showImage(wrap, stateOf(wrap).committed);
+      });
+
+      /* ---------- init: now, after AJAX inserts, and on theme editor reloads ---------- */
+      var timer = null;
+      new MutationObserver(function (muts) {
+        for (var i = 0; i < muts.length; i++) {
+          if (muts[i].addedNodes.length) {
+            clearTimeout(timer);
+            timer = setTimeout(initAll, 50);
+            return;
+          }
+        }
+      }).observe(document.documentElement, { childList: true, subtree: true });
+      document.addEventListener('shopify:section:load', function (e) {
+        initAll(e.target);
+      });
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function () {
+          initAll();
+        });
+      } else {
+        initAll();
+      }
+
+      window.__scCardSwatches = { initAll: initAll };
+    })();
+  </script>
+{%- endif -%}
+
+{%- if sc_on and mode != 'assets' and card_product != blank and card_product.variants.size > 1 -%}
+  {%- liquid
+    assign sc_p = card_product
+
+    comment
+      Find the option to group by (e.g. Color). Without it: one swatch per variant, or nothing.
+    endcomment
+    assign sc_names = s.sc_swatch_option_names | downcase | split: ','
+    assign sc_opt = nil
+    for opt in sc_p.options_with_values
+      assign sc_n = opt.name | downcase | strip
+      for name in sc_names
+        assign sc_nm = name | strip
+        if sc_opt == nil and sc_nm != blank and sc_nm == sc_n
+          assign sc_opt = opt
+        endif
+      endfor
+    endfor
+
+    assign sc_render = true
+    if sc_opt == nil and s.sc_swatch_no_option == 'hide'
+      assign sc_render = false
+    endif
+
+    if sc_opt
+      assign sc_idx = sc_opt.position | minus: 1
+      assign sc_iter = sc_opt.values
+    else
+      assign sc_iter = sc_p.variants
+    endif
+
+    assign sc_map_lines = s.sc_swatch_color_map | newline_to_br | split: '<br />'
+    assign sc_max = s.sc_swatch_max_visible
+    assign sc_total = 0
+    assign sc_shown = 0
+    assign sc_selected = false
+    assign sc_first_value = ''
+  -%}
+
+  {%- if sc_render -%}
+    {%- capture sc_buttons -%}
+      {%- for it in sc_iter -%}
+        {%- liquid
+          if sc_opt
+            assign sc_label = it.name
+            assign sc_avail_img = nil
+            assign sc_avail = nil
+            assign sc_any_img = nil
+            assign sc_first = nil
+            for v in sc_p.variants
+              if v.options[sc_idx] == sc_label
+                if sc_first == nil
+                  assign sc_first = v
+                endif
+                if v.available and v.featured_image and sc_avail_img == nil
+                  assign sc_avail_img = v
+                endif
+                if v.available and sc_avail == nil
+                  assign sc_avail = v
+                endif
+                if v.featured_image and sc_any_img == nil
+                  assign sc_any_img = v
+                endif
+              endif
+            endfor
+            assign sc_rep = sc_avail_img | default: sc_avail | default: sc_any_img | default: sc_first
+            assign sc_is_avail = false
+            if sc_avail
+              assign sc_is_avail = true
+            endif
+            if sc_rep.featured_image
+              assign sc_img = sc_rep.featured_image
+            elsif sc_any_img
+              assign sc_img = sc_any_img.featured_image
+            else
+              assign sc_img = nil
+            endif
+            assign sc_sw_img = it.swatch.image
+            assign sc_sw_color = ''
+            if it.swatch.color
+              assign sc_sw_color = it.swatch.color | append: ''
+            endif
+          else
+            assign sc_label = it.title
+            assign sc_rep = it
+            assign sc_is_avail = it.available
+            assign sc_img = it.featured_image
+            assign sc_sw_img = nil
+            assign sc_sw_color = ''
+          endif
+
+          if sc_rep == nil
+            continue
+          endif
+          if sc_is_avail == false and s.sc_swatch_sold_out == 'hide'
+            continue
+          endif
+
+          assign sc_total = sc_total | plus: 1
+          if sc_max > 0 and sc_total > sc_max
+            continue
+          endif
+          assign sc_shown = sc_shown | plus: 1
+
+          comment
+            Color map lookup ("Value: #hex" or "Value: https://image").
+          endcomment
+          assign sc_map_val = ''
+          assign sc_label_key = sc_label | downcase | strip
+          for line in sc_map_lines
+            assign sc_parts = line | split: ':'
+            assign sc_key = sc_parts.first | strip | downcase
+            if sc_key != blank and sc_key == sc_label_key
+              assign sc_map_val = line | remove_first: sc_parts.first | remove_first: ':' | strip
+              break
+            endif
+          endfor
+          assign sc_map_img = ''
+          assign sc_map_color = ''
+          if sc_map_val contains '//'
+            assign sc_map_img = sc_map_val
+          elsif sc_map_val != blank
+            assign sc_map_color = sc_map_val
+          endif
+
+          comment
+            Decide what the swatch shows.
+          endcomment
+          assign sc_v_img = ''
+          assign sc_v_color = ''
+          assign sc_try_color = false
+          if s.sc_swatch_content == 'color'
+            if sc_sw_img
+              assign sc_v_img = sc_sw_img | image_url: width: 120
+            elsif sc_sw_color != blank
+              assign sc_v_color = sc_sw_color
+            elsif sc_map_img != blank
+              assign sc_v_img = sc_map_img
+            elsif sc_map_color != blank
+              assign sc_v_color = sc_map_color
+            else
+              assign sc_try_color = true
+              if sc_img
+                assign sc_v_img = sc_img | image_url: width: 120
+              endif
+            endif
+          else
+            if sc_img
+              assign sc_v_img = sc_img | image_url: width: 120
+            elsif sc_sw_img
+              assign sc_v_img = sc_sw_img | image_url: width: 120
+            elsif sc_sw_color != blank
+              assign sc_v_color = sc_sw_color
+            elsif sc_map_img != blank
+              assign sc_v_img = sc_map_img
+            elsif sc_map_color != blank
+              assign sc_v_color = sc_map_color
+            else
+              assign sc_try_color = true
+            endif
+          endif
+
+          assign sc_is_sel = false
+          if sc_selected == false
+            if s.sc_swatch_default_selection == 'first_available'
+              if sc_is_avail
+                assign sc_is_sel = true
+              endif
+            else
+              assign sc_is_sel = true
+            endif
+          endif
+          if sc_is_sel
+            assign sc_selected = true
+            assign sc_first_value = sc_label
+          endif
+
+          assign sc_initials = sc_label | strip
+          if sc_initials.size > 3
+            assign sc_words = sc_initials | split: ' '
+            if sc_words.size > 1
+              assign sc_w0 = sc_words[0] | slice: 0
+              assign sc_w1 = sc_words[1] | slice: 0
+              assign sc_initials = sc_w0 | append: sc_w1
+            else
+              assign sc_initials = sc_initials | slice: 0, 2
+            endif
+          endif
+        -%}
+        <button
+          type="button"
+          class="sc-ccs__swatch{% if sc_is_avail == false and s.sc_swatch_sold_out == 'strike' %} is-soldout{% endif %}"
+          role="radio"
+          aria-checked="{{ sc_is_sel }}"
+          tabindex="{% if sc_is_sel %}0{% else %}-1{% endif %}"
+          aria-label="{{ sc_label | escape }}{% if sc_is_avail == false and s.sc_swatch_text_sold_out != blank %} – {{ s.sc_swatch_text_sold_out | escape }}{% endif %}"
+          data-label="{{ sc_label | escape }}"
+          data-variant-id="{{ sc_rep.id }}"
+          {% if sc_img %}
+            data-image="{{ sc_img | image_url }}"
+            data-image-width="{{ sc_img.width }}"
+          {% endif %}
+        >
+          <span
+            class="sc-ccs__media"
+            {% if sc_v_color != blank %}
+              style="background: {{ sc_v_color | escape }};"
+            {% endif %}
+            {% if sc_try_color %}
+              data-sc-try-color="{{ sc_label | escape }}"
+            {% endif %}
+          >
+            {%- if sc_v_img != blank -%}
+              <img src="{{ sc_v_img }}" alt="" width="60" height="60" loading="lazy" decoding="async" draggable="false">
+            {%- elsif sc_v_color == blank -%}
+              <span class="sc-ccs__initials" aria-hidden="true">{{ sc_initials | escape }}</span>
+            {%- endif -%}
+          </span>
+          {%- if s.sc_swatch_show_tooltip -%}
+            <span class="sc-ccs__tip" aria-hidden="true">{{ sc_label | escape }}</span>
+          {%- endif -%}
+        </button>
+      {%- endfor -%}
+    {%- endcapture -%}
+
+    {%- if sc_total >= s.sc_swatch_min and sc_shown > 0 -%}
+      <div
+        class="sc-ccs sc-ccs--{{ section_id }}{% if s.sc_swatch_mobile_layout == 'scroll' %} sc-ccs--scroll{% endif %}"
+        data-product-url="{{ sc_p.url }}"
+        data-click="{{ s.sc_swatch_click_action }}"
+        data-links="{{ s.sc_swatch_update_links }}"
+        data-hover-sync="{{ s.sc_swatch_sync_hover_image }}"
+        data-hover-preview="{{ s.sc_swatch_hover_preview }}"
+        data-sync-load="{{ s.sc_swatch_sync_on_load }}"
+      >
+        <div class="sc-ccs__row">
+          <div
+            class="sc-ccs__group"
+            role="radiogroup"
+            aria-label="{% if s.sc_swatch_text_group != blank %}{{ s.sc_swatch_text_group | escape }}: {% endif %}{{ sc_p.title | escape }}"
+          >
+            {{ sc_buttons }}
+          </div>
+          {%- if sc_total > sc_shown -%}
+            {%- assign sc_more = sc_total | minus: sc_shown -%}
+            <a
+              class="sc-ccs__more"
+              href="{{ sc_p.url }}"
+              aria-label="{{ s.sc_swatch_text_more | default: 'View all options' | escape }} ({{ sc_total }})"
+              >+{{ sc_more }}</a
+            >
+          {%- endif -%}
+        </div>
+        {%- if s.sc_swatch_show_label -%}
+          <p class="sc-ccs__label">
+            {%- if sc_opt -%}{{ sc_opt.name | escape }}: {% endif -%}
+            <span class="sc-ccs__label-value">{{ sc_first_value | escape }}</span>
+          </p>
+        {%- endif -%}
+      </div>
+    {%- endif -%}
+  {%- endif -%}
+{%- endif -%}
+ 
