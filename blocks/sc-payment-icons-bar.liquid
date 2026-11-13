@@ -1,0 +1,38 @@
+{%- comment -%}
+  Theme block entry point (Horizon and other themes whose sections accept @theme blocks).
+  Mirrors the "sc_payment_icons_bar" block in sections/main-product.liquid.
+  All options are global (Theme settings → SC – Payment icons bar).
+  Context is detected automatically: inside a product → PDP, on the cart template → cart.
+{%- endcomment -%}
+{%- liquid
+  assign sc_product = closest.product
+  if sc_product == blank
+    assign sc_product = product
+  endif
+
+  if sc_product != blank
+    assign sc_placement = 'pdp'
+  elsif template.name == 'cart'
+    assign sc_placement = 'cart'
+  else
+    assign sc_placement = 'global'
+  endif
+-%}
+{% render 'sc-payment-icons-bar', placement: sc_placement, product: sc_product, block: block %}
+
+{% schema %}
+{
+  "name": "SC – Payment icons bar",
+  "settings": [
+    {
+      "type": "paragraph",
+      "content": "Shows accepted payment methods. Icons, styling, heading and instalment message are global – edit them in Theme settings → SC – Payment icons bar, so the product page and cart always match."
+    }
+  ],
+  "presets": [
+    {
+      "name": "SC – Payment icons bar"
+    }
+  ]
+}
+{% endschema %}
