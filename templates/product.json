@@ -45,6 +45,41 @@
             "show_gift_card_recipient": true
           }
         },
+        "sc_social_proof_banner": {
+          "type": "sc_social_proof_banner",
+          "settings": {
+            "banner_type": "social",
+            "name": "emma.style",
+            "show_verified": true,
+            "social_text": "<p>&nbsp;and 63,000 others are thrilled with us</p>",
+            "bold_text": false,
+            "avatar_shape": "round",
+            "avatar_size": 32,
+            "avatar_size_mobile": 28,
+            "avatar_overlap": 8,
+            "rating_text": "<p><strong>18,386+ customers</strong> rated us 5 stars (rating)</p>",
+            "append_stars": true,
+            "star_size": 14,
+            "stars_label": "Rated 5 out of 5 stars",
+            "corner_style": "rounded",
+            "corner_radius": 14,
+            "text_alignment": "center",
+            "font_size": 15,
+            "font_size_mobile": 14,
+            "background_color": "#f8f6f3",
+            "text_color": "#000000",
+            "name_color": "",
+            "check_color": "#4c8ae7",
+            "star_color": "#ffc107",
+            "avatar_ring_color": "#ffffff",
+            "show_border": true,
+            "border_color": "#e2ded8",
+            "margin_top": 10,
+            "margin_bottom": 10,
+            "padding_y": 12,
+            "padding_x": 16
+          }
+        },
         "description": {
           "type": "description",
           "settings": {}
@@ -63,6 +98,7 @@
         "variant_picker",
         "quantity_selector",
         "buy_buttons",
+        "sc_social_proof_banner",
         "description",
         "share"
       ],
@@ -85,6 +121,10 @@
     "disclosures": {
       "type": "disclosures",
       "settings": {
+        "heading": "Disclosures",
+        "heading_size": "h2",
+        "open_by_default": false,
+        "color_scheme": "",
         "padding_top": 36,
         "padding_bottom": 0
       }
