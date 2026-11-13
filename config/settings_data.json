@@ -127,6 +127,7 @@
     "cart_drawer_collection": "",
     "cart_color_scheme": "scheme-1",
     "customer_account_menu": "customer-account-main-menu",
+    "sc_fg_enable": false,
     "sc_fg_gift_product": "free-gift",
     "sc_fg_show_gift": false,
     "sc_fg_container_style": "plain",
