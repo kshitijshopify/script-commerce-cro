@@ -1,0 +1,1450 @@
+{%- comment -%}
+  SC – Up-/Cross-selling (PDP add-on products: Slides / Stack / Normal)
+  ----------------------------------------------------------------------------
+  Self-contained PDP block: Liquid + scoped CSS + scoped JS. No theme classes, theme CSS
+  variables, theme snippets or external libraries (the old Swiper CDN is replaced by a
+  native scroll-snap carousel). Usually placed directly below the Add to cart button.
+
+  Usage (inside any product section's block loop):
+    {%- when 'sc_pdp_cross_sell' -%}
+      {% render 'sc-pdp-cross-sell', block: block, product: product %}
+
+  Accepts:
+  - block:   {Object} block whose settings match the "sc_pdp_cross_sell" schema
+             (sections/main-product.liquid or blocks/sc-pdp-cross-sell.liquid)
+  - product: {Object} the main product of the page
+
+  Data source: product metafield standard.cro_up_cross_selling (list of products).
+  Namespace / key are editable in the block settings; an optional fallback collection is
+  used when a product has no picks.
+
+  Add to cart: POST /cart/add.js (one variant, qty 1), never the main product form. Then:
+  - Dawn-like themes: re-renders <cart-drawer> / <cart-notification> via their own
+    getSectionsToRender() + renderContents(), and publishes PUB_SUB_EVENTS.cartUpdate.
+  - Horizon-like themes: dispatches the `cart:update` event (cart icon + drawer refresh)
+    and opens <cart-drawer-component>.
+  - Other themes: dispatches `cart:refresh` and refreshes #cart-icon-bubble if present.
+  Analytics events (bubble from the block): sc:cross-sell:added, sc:cross-sell:error,
+  sc:cross-sell:arrow, sc:cross-sell:toggle.
+{%- endcomment -%}
+
+{%- liquid
+  assign s = block.settings
+  assign uid = 'sc-pcs-' | append: block.id
+  assign bp = s.mobile_breakpoint | default: 750
+  assign layout = s.cro_up_cross_selling_layout | default: 'slides'
+  assign atc_text = s.cro_up_cross_atc_title | default: '+ Add'
+  assign sold_out_text = s.sold_out_text | default: 'Sold out'
+  assign choose_text = s.choose_text | default: 'Choose'
+  assign heading_plain = s.cro_up_cross_title | strip_html | strip | escape
+  assign track_label = heading_plain
+  if track_label == blank
+    assign track_label = 'Recommended products'
+  endif
+
+  assign ns = s.metafield_namespace | strip
+  if ns == blank
+    assign ns = 'standard'
+  endif
+  assign mkey = s.metafield_key | strip
+  if mkey == blank
+    assign mkey = 'cro_up_cross_selling'
+  endif
+
+  comment
+    Product source order: metafield → Search & Discovery (loaded by JS from the
+    Product Recommendations API) → fallback collection.
+  endcomment
+  assign product_source = s.product_source | default: 'metafield_then_discovery'
+  assign source = nil
+  if product != blank and product_source != 'discovery'
+    assign source = product.metafields[ns][mkey].value
+  endif
+  assign data_source = 'metafield'
+  assign use_remote = false
+  if source == blank and product != blank and product_source != 'metafield'
+    assign use_remote = true
+  endif
+  if source == blank and s.fallback_collection != blank
+    assign source = s.fallback_collection.products
+    assign data_source = 'collection'
+  endif
+
+  assign cart_ids = ''
+  if s.hide_in_cart and cart.item_count > 0
+    assign cart_ids = cart.items | map: 'product_id' | join: ','
+    assign cart_ids = ',' | append: cart_ids | append: ','
+  endif
+
+  assign img_sizes = '(min-width: ' | append: bp | append: 'px) ' | append: s.image_size | append: 'px, ' | append: s.image_size_mobile | append: 'px'
+-%}
+
+{%- capture sc_rows -%}
+  {%- assign count = 0 -%}
+  {%- if source != blank -%}
+    {%- for p in source -%}
+      {%- if count >= s.max_products -%}{%- break -%}{%- endif -%}
+      {%- if p == blank or p.id == blank -%}{%- continue -%}{%- endif -%}
+      {%- if product != blank and p.id == product.id -%}{%- continue -%}{%- endif -%}
+      {%- if cart_ids != '' -%}
+        {%- assign token = ',' | append: p.id | append: ',' -%}
+        {%- if cart_ids contains token -%}{%- continue -%}{%- endif -%}
+      {%- endif -%}
+      {%- if p.available == false and s.sold_out_behavior == 'hide' -%}{%- continue -%}{%- endif -%}
+
+      {%- liquid
+        assign count = count | plus: 1
+        assign v = p.selected_or_first_available_variant
+        assign multi = true
+        if p.has_only_default_variant
+          assign multi = false
+        endif
+        assign mode = 'single'
+        if multi
+          assign mode = s.variant_mode | default: 'dropdown'
+        endif
+
+        assign on_sale = false
+        if v.compare_at_price > v.price
+          assign on_sale = true
+          assign pct = v.compare_at_price | minus: v.price | times: 100 | divided_by: v.compare_at_price
+        endif
+
+        assign img = v.featured_image
+        if img == blank
+          assign img = p.featured_image
+        endif
+        assign alt = img.alt | default: p.title
+        assign hover_img = nil
+        if s.image_hover and p.media.size > 1
+          assign hover_img = p.media[1].preview_image
+        endif
+
+        assign rating = nil
+        if s.show_rating
+          assign rating = p.metafields.reviews.rating.value
+        endif
+      -%}
+
+      <li
+        class="sc-pcs__item{% if p.available == false %} is-sold-out{% endif %}"
+        data-sc-item
+        data-product-id="{{ p.id }}"
+        {% if layout == 'slides' %}
+          role="group" aria-roledescription="slide"
+        {% endif %}
+      >
+        <div class="sc-pcs__media{% if hover_img != blank %} has-hover{% endif %}">
+          {%- if s.link_to_product -%}
+            <a href="{{ p.url }}" class="sc-pcs__media-link" tabindex="-1" aria-hidden="true">
+          {%- endif -%}
+          {%- if img != blank -%}
+            {{
+              img
+              | image_url: width: 320
+              | image_tag:
+                loading: 'lazy',
+                widths: '80, 120, 160, 240, 320',
+                sizes: img_sizes,
+                alt: alt,
+                class: 'sc-pcs__img sc-pcs__img--main'
+            }}
+            {%- if hover_img != blank -%}
+              {{
+                hover_img
+                | image_url: width: 320
+                | image_tag:
+                  loading: 'lazy',
+                  widths: '80, 120, 160, 240, 320',
+                  sizes: img_sizes,
+                  alt: '',
+                  class: 'sc-pcs__img sc-pcs__img--hover'
+              }}
+            {%- endif -%}
+          {%- else -%}
+            {{ 'product-1' | placeholder_svg_tag: 'sc-pcs__placeholder' }}
+          {%- endif -%}
+          {%- if s.link_to_product -%}</a>{%- endif -%}
+        </div>
+
+        <div class="sc-pcs__info">
+          {%- if s.show_vendor and p.vendor != blank -%}
+            <p class="sc-pcs__vendor">{{ p.vendor | escape }}</p>
+          {%- endif -%}
+
+          {%- if s.link_to_product -%}
+            <a href="{{ p.url }}" class="sc-pcs__title">{{ p.title | escape }}</a>
+          {%- else -%}
+            <p class="sc-pcs__title">{{ p.title | escape }}</p>
+          {%- endif -%}
+
+          {%- if mode == 'first' -%}
+            <p class="sc-pcs__variant">{{ v.title | escape }}</p>
+          {%- elsif mode != 'dropdown' and multi and s.show_variant_title -%}
+            <p class="sc-pcs__variant">{{ v.title | escape }}</p>
+          {%- endif -%}
+
+          {%- if rating != blank -%}
+            {%- liquid
+              assign r_max = rating.scale_max | default: 5
+              assign r_val = rating.rating | default: 0
+              assign r_pct = 0
+              if r_max > 0
+                assign r_pct = r_val | times: 100.0 | divided_by: r_max | round: 1
+              endif
+              assign r_count = p.metafields.reviews.rating_count.value | default: 0
+            -%}
+            <div class="sc-pcs__rating" role="img" aria-label="{{ r_val | round: 1 }} / {{ r_max | round }}">
+              <span class="sc-pcs__stars" style="--sc-pcs-rating: {{ r_pct }}%;" aria-hidden="true"></span>
+              {%- if r_count > 0 -%}
+                <span class="sc-pcs__rating-count" aria-hidden="true">({{ r_count }})</span>
+              {%- endif -%}
+            </div>
+          {%- endif -%}
+
+          <div class="sc-pcs__price">
+            <span class="sc-pcs__price-now{% if on_sale %} is-sale{% endif %}" data-sc-price>
+              {{- v.price | money -}}
+            </span>
+            {%- if s.show_compare_price -%}
+              <s class="sc-pcs__price-was" data-sc-compare {% unless on_sale %}hidden{% endunless %}>
+                {%- if on_sale -%}{{ v.compare_at_price | money }}{%- endif -%}
+              </s>
+            {%- endif -%}
+            {%- if s.show_sale_badge -%}
+              <span class="sc-pcs__badge" data-sc-badge {% unless on_sale %}hidden{% endunless %}>
+                {%- if on_sale -%}-{{ pct }}%{%- endif -%}
+              </span>
+            {%- endif -%}
+          </div>
+
+          {%- if mode == 'dropdown' -%}
+            {%- assign select_id = uid | append: '-v-' | append: p.id -%}
+            <label class="sc-pcs__vh" for="{{ select_id }}">{{ p.title | escape }}</label>
+            <select id="{{ select_id }}" class="sc-pcs__select" data-sc-variant>
+              {%- for variant in p.variants limit: 100 -%}
+                {%- liquid
+                  assign o_sale = false
+                  if variant.compare_at_price > variant.price
+                    assign o_sale = true
+                    assign o_pct = variant.compare_at_price | minus: variant.price | times: 100 | divided_by: variant.compare_at_price
+                  endif
+                -%}
+                <option
+                  value="{{ variant.id }}"
+                  data-price="{{ variant.price | money | escape }}"
+                  data-compare="{% if o_sale %}{{ variant.compare_at_price | money | escape }}{% endif %}"
+                  data-pct="{% if o_sale %}{{ o_pct }}{% endif %}"
+                  data-available="{{ variant.available }}"
+                  {% if variant.featured_image != blank %}
+                    data-image="{{ variant.featured_image | image_url: width: 320 }}"
+                  {% endif %}
+                  {% if variant.id == v.id %}
+                    selected
+                  {% endif %}
+                  {% unless variant.available %}
+                    disabled
+                  {% endunless %}
+                >
+                  {{- variant.title | escape -}}
+                  {%- unless variant.available %} – {{ sold_out_text | escape }}{% endunless -%}
+                </option>
+              {%- endfor -%}
+            </select>
+          {%- endif -%}
+
+          <p class="sc-pcs__error" data-sc-error hidden></p>
+        </div>
+
+        <div class="sc-pcs__cta">
+          {%- if mode == 'link' -%}
+            <a
+              href="{{ p.url }}"
+              class="sc-pcs__btn"
+              aria-label="{{ choose_text | escape }}: {{ p.title | escape }}"
+            >
+              <span class="sc-pcs__btn-label">{{ choose_text | escape }}</span>
+            </a>
+          {%- else -%}
+            <button
+              type="button"
+              class="sc-pcs__btn"
+              data-sc-add
+              data-variant-id="{{ v.id }}"
+              data-title="{{ p.title | escape }}"
+              aria-label="{% if v.available %}{{ atc_text | escape }}{% else %}{{ sold_out_text | escape }}{% endif %}: {{ p.title | escape }}"
+              {% unless v.available %}
+                disabled
+              {% endunless %}
+            >
+              <span class="sc-pcs__btn-label" data-sc-label>
+                {%- if v.available -%}{{ atc_text | escape }}{%- else -%}{{ sold_out_text | escape }}{%- endif -%}
+              </span>
+              <span class="sc-pcs__btn-spinner" aria-hidden="true"></span>
+            </button>
+          {%- endif -%}
+        </div>
+      </li>
+    {%- endfor -%}
+  {%- endif -%}
+{%- endcapture -%}
+
+{%- liquid
+  assign show = true
+  if s.enable == false
+    assign show = false
+  endif
+  if count == 0 and request.design_mode == false and use_remote == false
+    assign show = false
+  endif
+
+  comment
+    While Search & Discovery products load, the block stays hidden for shoppers (no empty box).
+  endcomment
+  assign pending = false
+  if use_remote and request.design_mode == false
+    assign pending = true
+  endif
+
+  assign awaiting = false
+  if s.reveal_mode == 'after_add' and request.design_mode == false
+    assign awaiting = true
+    if product != blank and cart.item_count > 0
+      assign in_cart = cart.items | map: 'product_id' | join: ','
+      assign in_cart = ',' | append: in_cart | append: ','
+      assign main_token = ',' | append: product.id | append: ','
+      if in_cart contains main_token
+        assign awaiting = false
+      endif
+    endif
+  endif
+
+  assign is_demo = false
+  if count == 0 and request.design_mode
+    assign is_demo = true
+  endif
+
+  assign spv = s.slides_per_view | default: 1
+  assign spv_m = s.slides_per_view_mobile | default: 1
+  assign show_arrows = false
+  if s.show_arrows and count > 1
+    assign show_arrows = true
+  endif
+  if s.show_arrows and use_remote
+    assign show_arrows = true
+  endif
+-%}
+
+{%- if show -%}
+  <style>
+    .{{ uid }} {
+      --sc-pcs-heading: {{ s.heading_color }};
+      --sc-pcs-heading-fs: {{ s.heading_size_mobile }}px;
+      --sc-pcs-text: {{ s.text_color }};
+      --sc-pcs-muted: {{ s.muted_color }};
+      --sc-pcs-price: {{ s.price_color }};
+      --sc-pcs-sale: {{ s.sale_price_color }};
+      --sc-pcs-compare: {{ s.compare_color }};
+      --sc-pcs-badge-bg: {{ s.badge_bg }};
+      --sc-pcs-badge: {{ s.badge_color }};
+      --sc-pcs-star: {{ s.rating_color }};
+      --sc-pcs-title-fs: {{ s.title_size }}px;
+      --sc-pcs-price-fs: {{ s.price_size }}px;
+      --sc-pcs-img: {{ s.image_size_mobile }}px;
+      --sc-pcs-img-bg: {{ s.image_bg }};
+      --sc-pcs-img-r: {{ s.image_radius }}px;
+      --sc-pcs-btn-bg: {{ s.button_bg }};
+      --sc-pcs-btn-fg: {{ s.button_text }};
+      --sc-pcs-btn-r: {{ s.button_radius }}px;
+      --sc-pcs-btn-h: {{ s.button_height }}px;
+      --sc-pcs-btn-fs: {{ s.button_font_size }}px;
+      --sc-pcs-bg: {{ s.container_bg }};
+      --sc-pcs-border: {{ s.border_color }};
+      --sc-pcs-border-w: {{ s.border_width }}px;
+      --sc-pcs-radius: {{ s.container_radius }}px;
+      --sc-pcs-pad: {{ s.container_padding_mobile }}px;
+      --sc-pcs-gap: {{ s.row_gap }}px;
+      --sc-pcs-divider: {{ s.divider_color }};
+      --sc-pcs-arrow-bg: {{ s.arrow_bg }};
+      --sc-pcs-arrow-fg: {{ s.arrow_color }};
+      --sc-pcs-arrow-size: {{ s.arrow_size }}px;
+      --sc-pcs-arrow-r: {{ s.arrow_radius }}px;
+      --sc-pcs-toggle-bg: {{ s.toggle_bg }};
+      --sc-pcs-spv: {{ spv_m }};
+      display: block;
+      box-sizing: border-box;
+      width: 100%;
+      max-width: 100%;
+      min-width: 0;
+      margin: {{ s.cross_selling_space_top_mobile }}px 0 {{ s.cross_selling_space_bottom_mobile }}px;
+      color: var(--sc-pcs-text);
+      font-family: inherit;
+      line-height: 1.4;
+      text-align: left;
+    }
+    .{{ uid }} *, .{{ uid }} *::before, .{{ uid }} *::after { box-sizing: border-box; }
+    .{{ uid }} [hidden] { display: none !important; }
+    .{{ uid }}.sc-pcs--await { display: none; }
+    .{{ uid }}.sc-pcs--pending { display: none !important; }
+    .{{ uid }}.sc-pcs--await.is-revealed { display: block; animation: sc-pcs-in .35s ease both; }
+    @keyframes sc-pcs-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+    .{{ uid }} .sc-pcs__vh {
+      position: absolute !important; width: 1px; height: 1px; margin: -1px; padding: 0;
+      overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+    }
+
+    /* Header + heading */
+    .{{ uid }} .sc-pcs__header {
+      display: flex; align-items: center; gap: 12px; margin: 0 0 12px;
+    }
+    .{{ uid }} .sc-pcs__heading {
+      flex: 1 1 auto; min-width: 0; margin: 0; padding: 0;
+      font-family: inherit; font-size: var(--sc-pcs-heading-fs); font-weight: {{ s.heading_weight }};
+      line-height: 1.3; letter-spacing: normal; text-transform: none;
+      color: var(--sc-pcs-heading); text-align: {{ s.heading_align }};
+    }
+    .{{ uid }} .sc-pcs__heading p { margin: 0; }
+    .{{ uid }} .sc-pcs__heading a { color: inherit; }
+
+    /* Arrows */
+    .{{ uid }} .sc-pcs__arrows { display: flex; gap: 8px; flex: 0 0 auto; }
+    .{{ uid }} .sc-pcs__arrow {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: var(--sc-pcs-arrow-size); height: var(--sc-pcs-arrow-size);
+      min-width: 0; margin: 0; padding: 0; cursor: pointer;
+      border-radius: var(--sc-pcs-arrow-r); color: var(--sc-pcs-arrow-fg);
+      {%- if s.arrow_style == 'outline' %}
+      background: transparent; border: 1px solid var(--sc-pcs-arrow-fg);
+      {%- else %}
+      background: var(--sc-pcs-arrow-bg); border: 1px solid var(--sc-pcs-arrow-bg);
+      {%- endif %}
+      box-shadow: none; transition: opacity .2s ease, background-color .2s ease, color .2s ease;
+      touch-action: manipulation;
+    }
+    .{{ uid }} .sc-pcs__arrow svg { width: 40%; height: 40%; display: block; }
+    .{{ uid }} .sc-pcs__arrow[aria-disabled="true"] { opacity: .4; cursor: default; }
+    @media (hover: hover) {
+      .{{ uid }} .sc-pcs__arrow:not([aria-disabled="true"]):hover {
+        background: var(--sc-pcs-arrow-fg); color: var(--sc-pcs-arrow-bg); border-color: var(--sc-pcs-arrow-fg);
+      }
+    }
+
+    /* Product area */
+    .{{ uid }} .sc-pcs__box {
+      {%- if s.container_style == 'boxed' %}
+      background: var(--sc-pcs-bg);
+      border: var(--sc-pcs-border-w) solid var(--sc-pcs-border);
+      border-radius: var(--sc-pcs-radius);
+      padding: var(--sc-pcs-pad);
+      {%- else %}
+      padding: 0;
+      {%- endif %}
+      min-width: 0;
+    }
+    .{{ uid }} .sc-pcs__list {
+      list-style: none; margin: 0; padding: 0;
+      display: flex; flex-direction: column; gap: var(--sc-pcs-gap);
+    }
+    {%- if s.show_dividers %}
+    .{{ uid }} .sc-pcs__list > .sc-pcs__item + .sc-pcs__item {
+      border-top: 1px solid var(--sc-pcs-divider); padding-top: var(--sc-pcs-gap);
+    }
+    {%- endif %}
+
+    /* Carousel track (native scroll-snap, no library) */
+    .{{ uid }} .sc-pcs__track {
+      list-style: none; margin: 0; padding: 0;
+      display: grid; grid-auto-flow: column;
+      grid-auto-columns: calc((100% - (var(--sc-pcs-spv) - 1) * var(--sc-pcs-gap)) / var(--sc-pcs-spv));
+      column-gap: var(--sc-pcs-gap);
+      overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain;
+      scroll-snap-type: x mandatory; scrollbar-width: none; -webkit-overflow-scrolling: touch;
+    }
+    .{{ uid }} .sc-pcs__track::-webkit-scrollbar { display: none; }
+    .{{ uid }} .sc-pcs__track > .sc-pcs__item { scroll-snap-align: start; min-width: 0; }
+    .{{ uid }} .sc-pcs__track:focus-visible { outline: 2px solid var(--sc-pcs-text); outline-offset: 2px; }
+
+    .{{ uid }} .sc-pcs__dots { display: flex; justify-content: center; flex-wrap: wrap; gap: 4px; margin-top: 10px; }
+    .{{ uid }} .sc-pcs__dot {
+      position: relative; width: 24px; height: 24px; margin: 0; padding: 0; border: 0;
+      background: transparent; cursor: pointer; min-width: 0;
+    }
+    .{{ uid }} .sc-pcs__dot::before {
+      content: ''; position: absolute; inset: 0; margin: auto; width: 8px; height: 8px; border-radius: 50%;
+      background: var(--sc-pcs-text); opacity: .2; transition: opacity .2s ease, transform .2s ease;
+    }
+    .{{ uid }} .sc-pcs__dot[aria-current="true"]::before { opacity: .75; transform: scale(1.15); }
+
+    /* Stack (collapsible) */
+    .{{ uid }} .sc-pcs__stack {
+      {%- if s.container_style == 'boxed' %}
+      background: var(--sc-pcs-bg);
+      border: var(--sc-pcs-border-w) solid var(--sc-pcs-border);
+      border-radius: var(--sc-pcs-radius);
+      overflow: hidden;
+      {%- endif %}
+    }
+    .{{ uid }} .sc-pcs__stack .sc-pcs__heading { font-size: inherit; }
+    .{{ uid }} .sc-pcs__toggle {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      width: 100%; margin: 0; padding: 14px var(--sc-pcs-pad);
+      background: var(--sc-pcs-toggle-bg); color: var(--sc-pcs-heading);
+      border: 0; border-radius: 0; box-shadow: none; cursor: pointer; text-align: inherit;
+      font-family: inherit; font-size: var(--sc-pcs-heading-fs); font-weight: {{ s.heading_weight }};
+      line-height: 1.3; letter-spacing: normal; text-transform: none; touch-action: manipulation;
+      {%- if s.container_style != 'boxed' %}
+      border-bottom: 1px solid var(--sc-pcs-divider);
+      {%- endif %}
+    }
+    .{{ uid }} .sc-pcs__toggle-text { flex: 1 1 auto; min-width: 0; text-align: {{ s.heading_align }}; }
+    .{{ uid }} .sc-pcs__toggle-text p { margin: 0; }
+    .{{ uid }} .sc-pcs__toggle:focus-visible { outline: 2px solid var(--sc-pcs-heading); outline-offset: -2px; }
+    .{{ uid }} .sc-pcs__chev {
+      flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
+      width: 24px; height: 24px; border-radius: 50%; background: rgba(0, 0, 0, .06);
+    }
+    .{{ uid }} .sc-pcs__chev svg { width: 10px; height: 10px; transition: transform .3s ease; transform: rotate(180deg); }
+    .{{ uid }} .sc-pcs__toggle[aria-expanded="true"] .sc-pcs__chev svg { transform: none; }
+    .{{ uid }} .sc-pcs__panel {
+      display: grid; grid-template-rows: 0fr; visibility: hidden;
+      transition: grid-template-rows .35s ease, visibility 0s linear .35s;
+    }
+    .{{ uid }} .sc-pcs__panel[data-open] {
+      grid-template-rows: 1fr; visibility: visible;
+      transition: grid-template-rows .35s ease, visibility 0s linear 0s;
+    }
+    .{{ uid }} .sc-pcs__panel-inner { min-height: 0; overflow: hidden; }
+    .{{ uid }} .sc-pcs__panel-pad { padding: var(--sc-pcs-pad); }
+    {%- if s.container_style != 'boxed' %}
+    .{{ uid }} .sc-pcs__panel-pad { padding: var(--sc-pcs-gap) 0 0; }
+    {%- endif %}
+
+    /* Product row */
+    .{{ uid }} .sc-pcs__item {
+      display: grid; align-items: center; gap: 8px 14px; min-width: 0; margin: 0;
+      grid-template-columns: var(--sc-pcs-img) minmax(0, 1fr) auto;
+      grid-template-areas: "media info cta";
+    }
+    .{{ uid }} .sc-pcs__media {
+      grid-area: media; position: relative; width: var(--sc-pcs-img); aspect-ratio: 1 / 1;
+      overflow: hidden; border-radius: var(--sc-pcs-img-r); background: var(--sc-pcs-img-bg);
+      {%- if s.image_border %}
+      border: 1px solid var(--sc-pcs-divider);
+      {%- endif %}
+    }
+    .{{ uid }} .sc-pcs__media-link { display: block; width: 100%; height: 100%; }
+    .{{ uid }} .sc-pcs__img,
+    .{{ uid }} .sc-pcs__placeholder {
+      position: absolute; inset: 0; display: block; width: 100%; height: 100%; max-width: none;
+      object-fit: {{ s.image_fit }}; transition: opacity .3s ease;
+    }
+    .{{ uid }} .sc-pcs__placeholder { fill: var(--sc-pcs-muted); background: rgba(0, 0, 0, .04); }
+    .{{ uid }} .sc-pcs__img--hover { opacity: 0; }
+    @media (hover: hover) {
+      .{{ uid }} .sc-pcs__media.has-hover:hover .sc-pcs__img--hover { opacity: 1; }
+      .{{ uid }} .sc-pcs__media.has-hover:hover .sc-pcs__img:not(.sc-pcs__img--hover) { opacity: 0; }
+    }
+
+    .{{ uid }} .sc-pcs__info { grid-area: info; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+    .{{ uid }} .sc-pcs__vendor,
+    .{{ uid }} .sc-pcs__variant {
+      margin: 0; font-size: calc(var(--sc-pcs-title-fs) - 2px); color: var(--sc-pcs-muted);
+      overflow-wrap: anywhere; line-height: 1.35;
+    }
+    .{{ uid }} .sc-pcs__vendor { text-transform: uppercase; letter-spacing: .04em; }
+    .{{ uid }} .sc-pcs__title {
+      margin: 0; color: var(--sc-pcs-text); text-decoration: none;
+      font-size: var(--sc-pcs-title-fs); font-weight: {{ s.title_weight }}; line-height: 1.35;
+      overflow-wrap: anywhere;
+      {%- if s.title_lines != 'none' %}
+      display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: {{ s.title_lines }}; overflow: hidden;
+      {%- endif %}
+    }
+    .{{ uid }} a.sc-pcs__title:hover { text-decoration: underline; text-underline-offset: 2px; }
+    .{{ uid }} a.sc-pcs__title:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+
+    .{{ uid }} .sc-pcs__rating { display: flex; align-items: center; gap: 4px; font-size: 12px; line-height: 1; }
+    .{{ uid }} .sc-pcs__stars {
+      display: inline-block; font-size: 13px; letter-spacing: 1px; line-height: 1;
+      background: linear-gradient(90deg, var(--sc-pcs-star) var(--sc-pcs-rating), #d4d4d4 var(--sc-pcs-rating));
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    .{{ uid }} .sc-pcs__stars::before { content: '\2605\2605\2605\2605\2605'; }
+    .{{ uid }} .sc-pcs__rating-count { color: var(--sc-pcs-muted); }
+
+    .{{ uid }} .sc-pcs__price {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px;
+      font-size: var(--sc-pcs-price-fs); line-height: 1.3;
+    }
+    .{{ uid }} .sc-pcs__price-now { color: var(--sc-pcs-price); white-space: nowrap; }
+    .{{ uid }} .sc-pcs__price-now.is-sale { color: var(--sc-pcs-sale); }
+    .{{ uid }} .sc-pcs__price-was { color: var(--sc-pcs-compare); font-size: .9em; white-space: nowrap; }
+    .{{ uid }} .sc-pcs__badge {
+      display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600; line-height: 1.4;
+      background: var(--sc-pcs-badge-bg); color: var(--sc-pcs-badge);
+    }
+
+    .{{ uid }} .sc-pcs__select {
+      -webkit-appearance: auto; appearance: auto;
+      width: auto; max-width: 100%; min-height: 32px; margin: 4px 0 0; padding: 4px 8px;
+      font: inherit; font-size: calc(var(--sc-pcs-title-fs) - 1px); color: var(--sc-pcs-text);
+      background: #fff; border: 1px solid var(--sc-pcs-border); border-radius: 6px;
+      box-shadow: none; cursor: pointer;
+    }
+    .{{ uid }} .sc-pcs__select:focus-visible { outline: 2px solid var(--sc-pcs-text); outline-offset: 1px; }
+    .{{ uid }} .sc-pcs__error { margin: 2px 0 0; font-size: 12px; line-height: 1.35; color: #c4231a; }
+
+    /* Add button */
+    .{{ uid }} .sc-pcs__cta { grid-area: cta; min-width: 0; }
+    .{{ uid }} .sc-pcs__btn {
+      position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+      min-width: var(--sc-pcs-btn-h); height: var(--sc-pcs-btn-h); margin: 0; padding: 0 18px;
+      font-family: inherit; font-size: var(--sc-pcs-btn-fs); font-weight: 600; line-height: 1;
+      letter-spacing: normal; text-transform: none; text-decoration: none; white-space: nowrap;
+      border-radius: var(--sc-pcs-btn-r); border: 1px solid var(--sc-pcs-btn-bg);
+      {%- if s.button_style == 'outline' %}
+      background: transparent; color: var(--sc-pcs-btn-bg);
+      {%- else %}
+      background: var(--sc-pcs-btn-bg); color: var(--sc-pcs-btn-fg);
+      {%- endif %}
+      box-shadow: none; cursor: pointer; touch-action: manipulation;
+      transition: background-color .2s ease, color .2s ease, opacity .2s ease;
+    }
+    @media (hover: hover) {
+      .{{ uid }} .sc-pcs__btn:not([disabled]):not([aria-busy="true"]):hover {
+        {%- if s.button_style == 'outline' %}
+        background: var(--sc-pcs-btn-bg); color: var(--sc-pcs-btn-fg);
+        {%- else %}
+        opacity: .85;
+        {%- endif %}
+      }
+    }
+    .{{ uid }} .sc-pcs__btn:focus-visible { outline: 2px solid var(--sc-pcs-btn-bg); outline-offset: 2px; }
+    .{{ uid }} .sc-pcs__btn[disabled] { opacity: .45; cursor: not-allowed; }
+    .{{ uid }} .sc-pcs__btn[aria-busy="true"] { cursor: progress; }
+    .{{ uid }} .sc-pcs__btn[aria-busy="true"] .sc-pcs__btn-label { visibility: hidden; }
+    .{{ uid }} .sc-pcs__btn-spinner {
+      display: none; position: absolute; top: 50%; left: 50%; width: 16px; height: 16px; margin: -8px 0 0 -8px;
+      border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%;
+      animation: sc-pcs-spin .7s linear infinite;
+    }
+    .{{ uid }} .sc-pcs__btn[aria-busy="true"] .sc-pcs__btn-spinner { display: block; }
+    .{{ uid }} .sc-pcs__btn.is-added .sc-pcs__btn-label::before { content: '\2713'; margin-right: 6px; }
+    @keyframes sc-pcs-spin { to { transform: rotate(360deg); } }
+
+    /* Mobile button position */
+    {%- if s.button_position_mobile == 'below' %}
+    .{{ uid }} .sc-pcs__item {
+      grid-template-columns: var(--sc-pcs-img) minmax(0, 1fr);
+      grid-template-areas: "media info" "media cta";
+      align-items: start;
+    }
+    {%- if s.button_full_width %}
+    .{{ uid }} .sc-pcs__btn { width: 100%; }
+    {%- endif %}
+    {%- endif %}
+    .{{ uid }} .sc-pcs__btn { min-height: max(var(--sc-pcs-btn-h), 40px); }
+
+    /* Editor-only notice */
+    .{{ uid }} .sc-pcs__notice {
+      margin: 0 0 10px; padding: 10px 12px; border: 1px dashed #b5b5b5; border-radius: 6px;
+      background: #fafafa; color: #444; font-size: 12px; line-height: 1.45;
+    }
+
+    @media screen and (min-width: {{ bp }}px) {
+      .{{ uid }} {
+        --sc-pcs-heading-fs: {{ s.heading_size }}px;
+        --sc-pcs-img: {{ s.image_size }}px;
+        --sc-pcs-pad: {{ s.container_padding }}px;
+        --sc-pcs-spv: {{ spv }};
+        margin: {{ s.cross_selling_space_top }}px 0 {{ s.cross_selling_space_bottom }}px;
+      }
+      .{{ uid }} .sc-pcs__btn { min-height: var(--sc-pcs-btn-h); }
+      {%- if s.button_position == 'below' %}
+      .{{ uid }} .sc-pcs__item {
+        grid-template-columns: var(--sc-pcs-img) minmax(0, 1fr);
+        grid-template-areas: "media info" "media cta";
+        align-items: start;
+      }
+      .{{ uid }} .sc-pcs__btn { width: {% if s.button_full_width %}100%{% else %}auto{% endif %}; }
+      {%- else %}
+      .{{ uid }} .sc-pcs__item {
+        grid-template-columns: var(--sc-pcs-img) minmax(0, 1fr) auto;
+        grid-template-areas: "media info cta";
+        align-items: center;
+      }
+      .{{ uid }} .sc-pcs__btn { width: auto; }
+      {%- endif %}
+    }
+    @media screen and (max-width: 359px) {
+      .{{ uid }} .sc-pcs__btn { padding: 0 12px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .{{ uid }} *, .{{ uid }}.sc-pcs--await.is-revealed { transition: none !important; animation: none !important; }
+      .{{ uid }} .sc-pcs__track { scroll-behavior: auto; }
+      .{{ uid }} .sc-pcs__btn-spinner { animation: sc-pcs-spin 1.4s linear infinite !important; }
+    }
+  </style>
+
+  {%- capture sc_heading_html -%}
+    {%- if s.cro_up_cross_title != blank -%}{{ s.cro_up_cross_title }}{%- endif -%}
+  {%- endcapture -%}
+
+  {%- if is_demo -%}
+    {%- capture sc_rows -%}
+      {%- for i in (1..2) -%}
+        <li class="sc-pcs__item" data-sc-item {% if layout == 'slides' %}role="group" aria-roledescription="slide"{% endif %}>
+          <div class="sc-pcs__media">{{ 'product-1' | placeholder_svg_tag: 'sc-pcs__placeholder' }}</div>
+          <div class="sc-pcs__info">
+            <p class="sc-pcs__title">Example product {{ i }}</p>
+            {%- if s.show_variant_title -%}<p class="sc-pcs__variant">Default variant</p>{%- endif -%}
+            <div class="sc-pcs__price">
+              <span class="sc-pcs__price-now{% if i == 1 and s.show_compare_price %} is-sale{% endif %}">{{ 2900 | money }}</span>
+              {%- if i == 1 and s.show_compare_price -%}<s class="sc-pcs__price-was">{{ 3900 | money }}</s>{%- endif -%}
+              {%- if i == 1 and s.show_sale_badge -%}<span class="sc-pcs__badge">-25%</span>{%- endif -%}
+            </div>
+          </div>
+          <div class="sc-pcs__cta">
+            <button type="button" class="sc-pcs__btn" disabled>
+              <span class="sc-pcs__btn-label">{{ atc_text | escape }}</span>
+            </button>
+          </div>
+        </li>
+      {%- endfor -%}
+    {%- endcapture -%}
+    {%- assign count = 2 -%}
+    {%- if s.show_arrows -%}{%- assign show_arrows = true -%}{%- endif -%}
+  {%- endif -%}
+
+  <sc-pdp-cross-sell
+    id="{{ uid }}"
+    class="sc-pcs {{ uid }}{% if awaiting %} sc-pcs--await{% endif %}{% if pending %} sc-pcs--pending{% endif %}"
+    data-block-id="{{ block.id }}"
+    data-layout="{{ layout }}"
+    data-reveal="{% if awaiting %}after_add{% else %}always{% endif %}"
+    data-after-add="{{ s.after_add | default: 'drawer' }}"
+    data-loop="{{ s.loop }}"
+    data-cart-add-url="{{ routes.cart_add_url }}.js"
+    data-cart-url="{{ routes.cart_url }}"
+    data-added="{% if s.show_added_state %}{{ s.added_text | default: 'Added' | escape }}{% endif %}"
+    data-atc="{{ atc_text | escape }}"
+    data-sold-out="{{ sold_out_text | escape }}"
+    data-error="{{ s.error_text | default: "Couldn't add to cart. Please try again." | escape }}"
+    data-main-product-id="{{ product.id }}"
+    data-source="{{ data_source }}"
+    data-has-rows="{% if count > 0 and is_demo == false %}true{% else %}false{% endif %}"
+    {% if use_remote %}
+      data-remote="{{ s.discovery_intent | default: 'complementary_then_related' }}"
+      data-rec-url="{{ routes.product_recommendations_url }}.json"
+    {% endif %}
+  >
+    {%- if use_remote -%}
+      {%- liquid
+        assign remote_limit = s.max_products | plus: 4
+        if remote_limit > 10
+          assign remote_limit = 10
+        endif
+      -%}
+      <script type="application/json" data-sc-config>
+        {
+          "productId": {{ product.id | json }},
+          "limit": {{ remote_limit | json }},
+          "max": {{ s.max_products | json }},
+          "moneyFormat": {{ shop.money_format | json }},
+          "cartIds": {{ cart_ids | json }},
+          "uid": {{ uid | json }},
+          "slides": {% if layout == 'slides' %}true{% else %}false{% endif %},
+          "link": {{ s.link_to_product | json }},
+          "vendor": {{ s.show_vendor | json }},
+          "variantTitle": {{ s.show_variant_title | json }},
+          "variantMode": {{ s.variant_mode | default: 'dropdown' | json }},
+          "compare": {{ s.show_compare_price | json }},
+          "badge": {{ s.show_sale_badge | json }},
+          "soldOut": {{ s.sold_out_behavior | default: 'hide' | json }},
+          "hover": {{ s.image_hover | json }},
+          "sizes": {{ img_sizes | json }},
+          "choose": {{ choose_text | json }}
+        }
+      </script>
+    {%- endif -%}
+    {%- if is_demo -%}
+      <p class="sc-pcs__notice" data-sc-notice>
+        <strong>Editor preview only.</strong>
+        {%- if use_remote %}
+          This product has no metafield picks, so the block loads Search &amp; Discovery recommendations. If none
+          appear, shoppers won't see this block.
+        {%- else %}
+          This product has no add-on products yet, so shoppers won't see this block.
+        {%- endif %}
+        Pick products in the metafield <code>{{ ns }}.{{ mkey }}</code> (Products → this product → Metafields),
+        set complementary products in the Search &amp; Discovery app, or choose a fallback collection.
+      </p>
+    {%- endif -%}
+
+    {%- if layout == 'stack' -%}
+      {%- assign panel_id = uid | append: '-panel' -%}
+      <div class="sc-pcs__stack">
+        <h2 class="sc-pcs__heading">
+          <button
+            type="button"
+            class="sc-pcs__toggle"
+            data-sc-toggle
+            aria-expanded="{% if s.cro_up_cross_open_stack %}true{% else %}false{% endif %}"
+            aria-controls="{{ panel_id }}"
+          >
+            <span class="sc-pcs__toggle-text">
+              {%- if sc_heading_html != blank -%}{{ sc_heading_html }}{%- else -%}{{ track_label }}{%- endif -%}
+            </span>
+            <span class="sc-pcs__chev" aria-hidden="true">
+              <svg viewBox="0 0 10 7" fill="none" focusable="false"><path d="M9 5.5 5 1.5l-4 4" stroke="currentColor" stroke-width="1.6"/></svg>
+            </span>
+          </button>
+        </h2>
+        <div
+          id="{{ panel_id }}"
+          class="sc-pcs__panel"
+          role="region"
+          aria-label="{{ track_label }}"
+          {% if s.cro_up_cross_open_stack %}
+            data-open
+          {% endif %}
+        >
+          <div class="sc-pcs__panel-inner">
+            <div class="sc-pcs__panel-pad">
+              <ul class="sc-pcs__list" role="list" data-sc-list>{{ sc_rows }}</ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    {%- else -%}
+      {%- if sc_heading_html != blank or show_arrows and layout == 'slides' -%}
+        <div class="sc-pcs__header">
+          {%- if sc_heading_html != blank -%}
+            <h2 class="sc-pcs__heading">{{ sc_heading_html }}</h2>
+          {%- endif -%}
+          {%- if layout == 'slides' and show_arrows -%}
+            <div class="sc-pcs__arrows" data-sc-arrows>
+              <button type="button" class="sc-pcs__arrow" data-sc-prev aria-controls="{{ uid }}-track" aria-label="Previous products">
+                <svg viewBox="0 0 10 16" fill="none" aria-hidden="true" focusable="false"><path d="M8.5 1.5 2 8l6.5 6.5" stroke="currentColor" stroke-width="2"/></svg>
+              </button>
+              <button type="button" class="sc-pcs__arrow" data-sc-next aria-controls="{{ uid }}-track" aria-label="Next products">
+                <svg viewBox="0 0 10 16" fill="none" aria-hidden="true" focusable="false"><path d="M1.5 1.5 8 8l-6.5 6.5" stroke="currentColor" stroke-width="2"/></svg>
+              </button>
+            </div>
+          {%- endif -%}
+        </div>
+      {%- endif -%}
+
+      <div class="sc-pcs__box">
+        {%- if layout == 'slides' -%}
+          <ul
+            id="{{ uid }}-track"
+            class="sc-pcs__track"
+            role="list"
+            data-sc-track
+            data-sc-list
+            tabindex="0"
+            aria-roledescription="carousel"
+            aria-label="{{ track_label }}"
+          >
+            {{- sc_rows -}}
+          </ul>
+        {%- else -%}
+          <ul class="sc-pcs__list" role="list" aria-label="{{ track_label }}" data-sc-list>{{ sc_rows }}</ul>
+        {%- endif -%}
+      </div>
+
+      {%- if layout == 'slides' and s.show_dots and count > 1 or layout == 'slides' and s.show_dots and use_remote -%}
+        <div class="sc-pcs__dots" data-sc-dots hidden></div>
+      {%- endif -%}
+    {%- endif -%}
+
+    <p class="sc-pcs__vh" role="status" aria-live="polite" data-sc-status></p>
+  </sc-pdp-cross-sell>
+
+  <script>
+    (function () {
+      if (!window.customElements || window.customElements.get('sc-pdp-cross-sell')) return;
+
+      var SOURCE = 'sc-pdp-cross-sell';
+      var reduceMotion = function () {
+        return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      };
+
+      class ScPdpCrossSell extends HTMLElement {
+        connectedCallback() {
+          this.ac = typeof AbortController === 'function' ? new AbortController() : null;
+          this.timers = [];
+          var opts = this.ac ? { signal: this.ac.signal } : undefined;
+          this._onClick = this.onClick.bind(this);
+          this._onChange = this.onChange.bind(this);
+          this.addEventListener('click', this._onClick);
+          this.addEventListener('change', this._onChange);
+          this.status = this.querySelector('[data-sc-status]');
+
+          if (this.dataset.layout === 'slides') this.initSlider(opts);
+          if (this.dataset.reveal === 'after_add') this.initReveal(opts);
+          if (this.dataset.remote) this.loadRemote();
+
+          var self = this;
+          document.addEventListener('shopify:block:select', function (e) {
+            if (!e.detail || e.detail.blockId !== self.dataset.blockId) return;
+            self.classList.add('is-revealed');
+            var toggle = self.querySelector('[data-sc-toggle]');
+            if (toggle && toggle.getAttribute('aria-expanded') !== 'true') self.toggle(toggle);
+          }, opts);
+        }
+
+        disconnectedCallback() {
+          this.removeEventListener('click', this._onClick);
+          this.removeEventListener('change', this._onChange);
+          if (this.ac) this.ac.abort();
+          if (this.ro) this.ro.disconnect();
+          if (typeof this.unsubscribe === 'function') this.unsubscribe();
+          (this.timers || []).forEach(clearTimeout);
+        }
+
+        emit(name, detail) {
+          this.dispatchEvent(new CustomEvent(name, { bubbles: true, detail: detail || {} }));
+        }
+
+        announce(msg) {
+          if (!this.status) return;
+          var status = this.status;
+          status.textContent = '';
+          this.timers.push(setTimeout(function () { status.textContent = msg; }, 60));
+        }
+
+        onClick(e) {
+          var t = e.target.closest('[data-sc-add], [data-sc-prev], [data-sc-next], [data-sc-dot], [data-sc-toggle]');
+          if (!t || !this.contains(t)) return;
+          if (t.hasAttribute('data-sc-add')) return this.add(t);
+          if (t.hasAttribute('data-sc-prev')) return this.go(-1, t);
+          if (t.hasAttribute('data-sc-next')) return this.go(1, t);
+          if (t.hasAttribute('data-sc-dot')) return this.goTo(parseInt(t.getAttribute('data-sc-dot'), 10));
+          if (t.hasAttribute('data-sc-toggle')) return this.toggle(t);
+        }
+
+        /* ---------- Variant dropdown ---------- */
+        onChange(e) {
+          var select = e.target.closest('[data-sc-variant]');
+          if (!select) return;
+          var item = select.closest('[data-sc-item]');
+          var opt = select.options[select.selectedIndex];
+          if (!item || !opt) return;
+
+          var btn = item.querySelector('[data-sc-add]');
+          var price = item.querySelector('[data-sc-price]');
+          var compare = item.querySelector('[data-sc-compare]');
+          var badge = item.querySelector('[data-sc-badge]');
+          var img = item.querySelector('.sc-pcs__img--main');
+          var onSale = !!opt.dataset.compare;
+          var available = opt.dataset.available === 'true';
+
+          if (price) {
+            price.textContent = opt.dataset.price || '';
+            price.classList.toggle('is-sale', onSale);
+          }
+          if (compare) {
+            compare.textContent = opt.dataset.compare || '';
+            compare.hidden = !onSale;
+          }
+          if (badge) {
+            badge.textContent = onSale && opt.dataset.pct ? '-' + opt.dataset.pct + '%' : '';
+            badge.hidden = !onSale;
+          }
+          if (img && opt.dataset.image) {
+            img.removeAttribute('srcset');
+            img.src = opt.dataset.image;
+          }
+          this.clearError(item);
+          if (btn) {
+            btn.dataset.variantId = opt.value;
+            this.setButton(btn, available ? 'ready' : 'soldout');
+          }
+        }
+
+        setButton(btn, state) {
+          var label = btn.querySelector('[data-sc-label]');
+          var title = btn.dataset.title || '';
+          var text = this.dataset.atc;
+          btn.classList.remove('is-added');
+          btn.removeAttribute('aria-busy');
+          btn.disabled = false;
+          if (state === 'soldout') {
+            text = this.dataset.soldOut;
+            btn.disabled = true;
+          } else if (state === 'added') {
+            text = this.dataset.added;
+            btn.classList.add('is-added');
+          } else if (state === 'loading') {
+            btn.setAttribute('aria-busy', 'true');
+          }
+          if (state !== 'loading' && label) label.textContent = text;
+          btn.setAttribute('aria-label', (state === 'loading' ? this.dataset.atc : text) + ': ' + title);
+        }
+
+        clearError(item) {
+          var err = item && item.querySelector('[data-sc-error]');
+          if (err) { err.hidden = true; err.textContent = ''; }
+        }
+
+        /* ---------- Add to cart ---------- */
+        dawnCart() {
+          var el = document.querySelector('cart-drawer') || document.querySelector('cart-notification');
+          if (el && typeof el.renderContents === 'function' && typeof el.getSectionsToRender === 'function') return el;
+          return null;
+        }
+
+        add(btn) {
+          if (btn.disabled || btn.getAttribute('aria-busy') === 'true') return;
+          var self = this;
+          var item = btn.closest('[data-sc-item]');
+          var variantId = parseInt(btn.dataset.variantId, 10);
+          if (!variantId) return;
+          var mode = this.dataset.afterAdd || 'drawer';
+          var dawn = mode === 'cart' ? null : this.dawnCart();
+          var sections = [];
+          if (dawn) {
+            sections = dawn.getSectionsToRender().map(function (sec) { return sec.id; });
+          } else if (mode !== 'cart' && document.getElementById('cart-icon-bubble')) {
+            sections = ['cart-icon-bubble'];
+          }
+
+          this.clearError(item);
+          this.setButton(btn, 'loading');
+
+          var body = { id: variantId, quantity: 1 };
+          if (sections.length) {
+            body.sections = sections.join(',');
+            body.sections_url = window.location.pathname;
+          }
+
+          fetch(this.dataset.cartAddUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Accept: 'application/json',
+              'X-Requested-With': 'XMLHttpRequest',
+            },
+            body: JSON.stringify(body),
+          })
+            .then(function (res) {
+              return res.json().catch(function () { return {}; }).then(function (data) {
+                if (!res.ok || data.status) {
+                  var err = new Error(data.description || data.message || '');
+                  err.userMessage = data.description || data.message;
+                  throw err;
+                }
+                return data;
+              });
+            })
+            .then(function (data) {
+              if (mode === 'cart') {
+                window.location.href = self.dataset.cartUrl;
+                return;
+              }
+              self.syncTheme(data, dawn, mode, btn, variantId);
+              if (self.dataset.added) {
+                self.setButton(btn, 'added');
+                self.timers.push(setTimeout(function () {
+                  if (btn.isConnected) self.setButton(btn, 'ready');
+                }, 2500));
+              } else {
+                self.setButton(btn, 'ready');
+              }
+              self.announce((btn.dataset.title || '') + ': ' + (self.dataset.added || 'added to cart'));
+            })
+            .catch(function (err) {
+              var msg = (err && err.userMessage) || self.dataset.error;
+              self.setButton(btn, 'ready');
+              var box = item && item.querySelector('[data-sc-error]');
+              if (box) { box.textContent = msg; box.hidden = false; }
+              self.announce(msg);
+              self.emit('sc:cross-sell:error', { variantId: variantId, message: msg });
+            });
+        }
+
+        syncTheme(data, dawn, mode, btn, variantId) {
+          var self = this;
+
+          /* Dawn-like: <cart-drawer> / <cart-notification> */
+          if (dawn) {
+            try {
+              if (typeof dawn.setActiveElement === 'function') dawn.setActiveElement(btn);
+              dawn.classList.remove('is-empty');
+              if (mode === 'drawer') {
+                dawn.renderContents(data);
+              } else if (data.sections) {
+                if (data.key) dawn.cartItemKey = data.key;
+                dawn.getSectionsToRender().forEach(function (sec) {
+                  try {
+                    var html = data.sections[sec.id];
+                    if (html == null) return;
+                    var el = sec.selector ? document.querySelector(sec.selector) : document.getElementById(sec.id);
+                    if (el) el.innerHTML = dawn.getSectionInnerHTML(html, sec.selector);
+                  } catch (e) {}
+                });
+                var overlay = dawn.querySelector('#CartDrawer-Overlay');
+                if (overlay && typeof dawn.close === 'function') overlay.addEventListener('click', dawn.close.bind(dawn));
+              }
+            } catch (e) { console.warn('[sc-pdp-cross-sell] cart drawer refresh failed', e); }
+          } else if (data.sections && data.sections['cart-icon-bubble']) {
+            var bubble = document.getElementById('cart-icon-bubble');
+            var doc = new DOMParser().parseFromString(data.sections['cart-icon-bubble'], 'text/html');
+            var src = doc.querySelector('.shopify-section') || doc.body;
+            if (bubble && src) bubble.innerHTML = src.innerHTML;
+          }
+
+          /* Dawn pub/sub (cart page, quick order list, etc.) */
+          try {
+            if (typeof publish === 'function' && typeof PUB_SUB_EVENTS !== 'undefined' && PUB_SUB_EVENTS.cartUpdate) {
+              publish(PUB_SUB_EVENTS.cartUpdate, { source: SOURCE, productVariantId: variantId, cartData: data });
+            }
+          } catch (e) {}
+
+          /* Horizon-like + generic themes need the full cart (item count) */
+          var cartJs = this.dataset.cartUrl.replace(/\/$/, '') + '.js';
+          fetch(cartJs, { headers: { Accept: 'application/json' } })
+            .then(function (r) { return r.json(); })
+            .catch(function () { return null; })
+            .then(function (cart) {
+              var count = cart && typeof cart.item_count === 'number' ? cart.item_count : null;
+              if (count !== null) document.dispatchEvent(new CustomEvent('cart:update', {
+                bubbles: true,
+                detail: {
+                  resource: cart,
+                  sourceId: self.id,
+                  data: { source: SOURCE, itemCount: count, productId: String(data.product_id || ''), didError: false },
+                },
+              }));
+              if (mode === 'drawer' && !dawn) {
+                var hd = document.querySelector('cart-drawer-component');
+                if (hd && !hd.hasAttribute('auto-open')) {
+                  try {
+                    if (typeof hd.open === 'function') hd.open();
+                    else if (typeof hd.showDialog === 'function') hd.showDialog();
+                  } catch (e) {}
+                }
+              }
+              document.documentElement.dispatchEvent(new CustomEvent('cart:refresh', { bubbles: true }));
+              self.emit('sc:cross-sell:added', {
+                variantId: variantId,
+                productId: data.product_id,
+                source: self.dataset.source,
+                mainProductId: self.dataset.mainProductId,
+                item: data,
+                cart: cart,
+              });
+            });
+        }
+
+        /* ---------- Search & Discovery (Product Recommendations API) ---------- */
+        loadRemote() {
+          var self = this;
+          var cfgEl = this.querySelector('[data-sc-config]');
+          var cfg;
+          try { cfg = JSON.parse(cfgEl.textContent); } catch (e) { return this.finishRemote(false); }
+          this.cfg = cfg;
+          var mode = this.dataset.remote;
+          var intents = mode === 'complementary_then_related' ? ['complementary', 'related'] : [mode];
+          var url = this.dataset.recUrl;
+
+          var tryIntent = function (i) {
+            if (i >= intents.length) return Promise.resolve(false);
+            var q = url + '?product_id=' + encodeURIComponent(cfg.productId) + '&limit=' + cfg.limit + '&intent=' + intents[i];
+            return fetch(q, { headers: { Accept: 'application/json' } })
+              .then(function (r) { return r.ok ? r.json() : { products: [] }; })
+              .catch(function () { return { products: [] }; })
+              .then(function (json) {
+                var html = self.renderRemote((json && json.products) || [], cfg);
+                if (!html) return tryIntent(i + 1);
+                var list = self.querySelector('[data-sc-list]');
+                if (!list) return false;
+                list.innerHTML = html;
+                self.dataset.source = intents[i];
+                var notice = self.querySelector('[data-sc-notice]');
+                if (notice) notice.remove();
+                return true;
+              });
+          };
+          tryIntent(0).then(function (ok) { self.finishRemote(ok); });
+        }
+
+        finishRemote(ok) {
+          var hasRows = ok || this.dataset.hasRows === 'true';
+          if (hasRows) this.classList.remove('sc-pcs--pending');
+          if (this.dataset.layout === 'slides' && this.track) {
+            this.labelSlides();
+            this.build();
+          }
+          this.emit('sc:cross-sell:loaded', { source: this.dataset.source, found: ok });
+        }
+
+        labelSlides() {
+          if (!this.track) return;
+          var items = this.track.querySelectorAll('[data-sc-item]');
+          items.forEach(function (it, i) { it.setAttribute('aria-label', (i + 1) + ' / ' + items.length); });
+        }
+
+        money(cents) {
+          var fmt = (this.cfg && this.cfg.moneyFormat) || '${' + '{amount}}';
+          var value = (Number(cents) || 0) / 100;
+          var group = function (n, dec, ts, ds) {
+            var parts = n.toFixed(dec).split('.');
+            parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ts);
+            return parts.join(dec ? ds : '');
+          };
+          var out = fmt.replace(/\{\{\s*(\w+)\s*\}\}/, function (m, key) {
+            switch (key) {
+              case 'amount_no_decimals': return group(value, 0, ',', '.');
+              case 'amount_with_comma_separator': return group(value, 2, '.', ',');
+              case 'amount_no_decimals_with_comma_separator': return group(value, 0, '.', ',');
+              case 'amount_with_apostrophe_separator': return group(value, 2, '\'', '.');
+              case 'amount_no_decimals_with_space_separator': return group(value, 0, ' ', ',');
+              case 'amount_with_space_separator': return group(value, 2, ' ', ',');
+              case 'amount_with_period_and_space_separator': return group(value, 2, ' ', '.');
+              default: return group(value, 2, ',', '.');
+            }
+          });
+          return out.replace(/<[^>]*>/g, '');
+        }
+
+        renderRemote(products, cfg) {
+          var self = this;
+          var map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', '\'': '&#39;' };
+          var esc = function (v) {
+            return String(v == null ? '' : v).replace(/[&<>"']/g, function (c) { return map[c]; });
+          };
+          var imgUrl = function (src, w) {
+            if (!src) return '';
+            if (src.indexOf('//') === 0) src = 'https:' + src;
+            return src + (src.indexOf('?') > -1 ? '&' : '?') + 'width=' + w;
+          };
+          var imgTag = function (src, alt, cls) {
+            var set = [80, 120, 160, 240, 320].map(function (w) { return esc(imgUrl(src, w)) + ' ' + w + 'w'; }).join(', ');
+            return '<img class="' + cls + '" src="' + esc(imgUrl(src, 320)) + '" srcset="' + set + '" sizes="' + esc(cfg.sizes) +
+              '" alt="' + esc(alt) + '" loading="lazy" width="320" height="320">';
+          };
+          var d = this.dataset;
+          var html = '';
+          var count = 0;
+
+          products.forEach(function (p) {
+            if (count >= cfg.max || !p || !p.id || !p.variants || !p.variants.length) return;
+            if (String(p.id) === String(cfg.productId)) return;
+            if (cfg.cartIds && cfg.cartIds.indexOf(',' + p.id + ',') > -1) return;
+            if (!p.available && cfg.soldOut === 'hide') return;
+
+            var v = p.variants.filter(function (x) { return x.available; })[0] || p.variants[0];
+            var multi = p.variants.length > 1 || v.title !== 'Default Title';
+            var mode = multi ? cfg.variantMode : 'single';
+            var onSale = v.compare_at_price && v.compare_at_price > v.price;
+            var pct = onSale ? Math.floor((v.compare_at_price - v.price) * 100 / v.compare_at_price) : 0;
+            var img = (v.featured_image && v.featured_image.src) || p.featured_image || (p.images && p.images[0]);
+            var hover = cfg.hover && p.images && p.images[1];
+            var alt = (v.featured_image && v.featured_image.alt) || p.title;
+            var title = esc(p.title);
+            count++;
+
+            var r = '<li class="sc-pcs__item' + (p.available ? '' : ' is-sold-out') + '" data-sc-item data-product-id="' + p.id + '"' +
+              (cfg.slides ? ' role="group" aria-roledescription="slide"' : '') + '>';
+
+            r += '<div class="sc-pcs__media' + (hover ? ' has-hover' : '') + '">';
+            if (cfg.link) r += '<a href="' + esc(p.url) + '" class="sc-pcs__media-link" tabindex="-1" aria-hidden="true">';
+            if (img) {
+              r += imgTag(img, alt, 'sc-pcs__img sc-pcs__img--main');
+              if (hover) r += imgTag(hover, '', 'sc-pcs__img sc-pcs__img--hover');
+            } else {
+              r += '<span class="sc-pcs__placeholder"></span>';
+            }
+            if (cfg.link) r += '</a>';
+            r += '</div>';
+
+            r += '<div class="sc-pcs__info">';
+            if (cfg.vendor && p.vendor) r += '<p class="sc-pcs__vendor">' + esc(p.vendor) + '</p>';
+            r += cfg.link
+              ? '<a href="' + esc(p.url) + '" class="sc-pcs__title">' + title + '</a>'
+              : '<p class="sc-pcs__title">' + title + '</p>';
+            if (mode === 'first' || (mode !== 'dropdown' && multi && cfg.variantTitle)) {
+              r += '<p class="sc-pcs__variant">' + esc(v.title) + '</p>';
+            }
+            r += '<div class="sc-pcs__price"><span class="sc-pcs__price-now' + (onSale ? ' is-sale' : '') + '" data-sc-price>' +
+              esc(self.money(v.price)) + '</span>';
+            if (cfg.compare) {
+              r += '<s class="sc-pcs__price-was" data-sc-compare' + (onSale ? '' : ' hidden') + '>' +
+                (onSale ? esc(self.money(v.compare_at_price)) : '') + '</s>';
+            }
+            if (cfg.badge) {
+              r += '<span class="sc-pcs__badge" data-sc-badge' + (onSale ? '' : ' hidden') + '>' + (onSale ? '-' + pct + '%' : '') + '</span>';
+            }
+            r += '</div>';
+
+            if (mode === 'dropdown') {
+              var sid = cfg.uid + '-v-' + p.id;
+              r += '<label class="sc-pcs__vh" for="' + sid + '">' + title + '</label>' +
+                '<select id="' + sid + '" class="sc-pcs__select" data-sc-variant>';
+              p.variants.slice(0, 100).forEach(function (x) {
+                var xs = x.compare_at_price && x.compare_at_price > x.price;
+                r += '<option value="' + x.id + '"' +
+                  ' data-price="' + esc(self.money(x.price)) + '"' +
+                  ' data-compare="' + (xs ? esc(self.money(x.compare_at_price)) : '') + '"' +
+                  ' data-pct="' + (xs ? Math.floor((x.compare_at_price - x.price) * 100 / x.compare_at_price) : '') + '"' +
+                  ' data-available="' + (x.available ? 'true' : 'false') + '"' +
+                  (x.featured_image && x.featured_image.src ? ' data-image="' + esc(imgUrl(x.featured_image.src, 320)) + '"' : '') +
+                  (x.id === v.id ? ' selected' : '') + (x.available ? '' : ' disabled') + '>' +
+                  esc(x.title) + (x.available ? '' : ' – ' + esc(d.soldOut)) + '</option>';
+              });
+              r += '</select>';
+            }
+            r += '<p class="sc-pcs__error" data-sc-error hidden></p></div>';
+
+            r += '<div class="sc-pcs__cta">';
+            if (mode === 'link') {
+              r += '<a href="' + esc(p.url) + '" class="sc-pcs__btn" aria-label="' + esc(cfg.choose) + ': ' + title + '">' +
+                '<span class="sc-pcs__btn-label">' + esc(cfg.choose) + '</span></a>';
+            } else {
+              var label = v.available ? d.atc : d.soldOut;
+              r += '<button type="button" class="sc-pcs__btn" data-sc-add data-variant-id="' + v.id + '" data-title="' + title + '"' +
+                ' aria-label="' + esc(label) + ': ' + title + '"' + (v.available ? '' : ' disabled') + '>' +
+                '<span class="sc-pcs__btn-label" data-sc-label>' + esc(label) + '</span>' +
+                '<span class="sc-pcs__btn-spinner" aria-hidden="true"></span></button>';
+            }
+            r += '</div></li>';
+            html += r;
+          });
+          return html;
+        }
+
+        /* ---------- Reveal after main product add ---------- */
+        initReveal(opts) {
+          var self = this;
+          var reveal = function () {
+            if (self.classList.contains('is-revealed')) return;
+            self.classList.add('is-revealed');
+            if (typeof self.unsubscribe === 'function') self.unsubscribe();
+            if (self.dataset.layout === 'slides') self.build();
+          };
+          var ignore = [SOURCE, 'cart-items', 'cart-items-component'];
+          document.addEventListener('cart:update', function (e) {
+            var src = e.detail && e.detail.data && e.detail.data.source;
+            if (ignore.indexOf(src) === -1) reveal();
+          }, opts);
+          ['cart:updated', 'variant:added', 'product:added', 'cart:item-added', 'theme:cart:add'].forEach(function (name) {
+            document.addEventListener(name, reveal, opts);
+          });
+          try {
+            if (typeof subscribe === 'function' && typeof PUB_SUB_EVENTS !== 'undefined' && PUB_SUB_EVENTS.cartUpdate) {
+              this.unsubscribe = subscribe(PUB_SUB_EVENTS.cartUpdate, function (ev) {
+                if (ev && ignore.indexOf(ev.source) !== -1) return;
+                reveal();
+              });
+            }
+          } catch (e) {}
+        }
+
+        /* ---------- Stack toggle ---------- */
+        toggle(btn) {
+          var panel = document.getElementById(btn.getAttribute('aria-controls'));
+          if (!panel) return;
+          var open = btn.getAttribute('aria-expanded') !== 'true';
+          btn.setAttribute('aria-expanded', String(open));
+          panel.toggleAttribute('data-open', open);
+          this.emit('sc:cross-sell:toggle', { open: open });
+        }
+
+        /* ---------- Carousel (native scroll-snap) ---------- */
+        initSlider(opts) {
+          var self = this;
+          this.track = this.querySelector('[data-sc-track]');
+          if (!this.track) return;
+          this.prev = this.querySelector('[data-sc-prev]');
+          this.next = this.querySelector('[data-sc-next]');
+          this.arrowsWrap = this.querySelector('[data-sc-arrows]');
+          this.dotsWrap = this.querySelector('[data-sc-dots]');
+          this.loop = this.dataset.loop === 'true';
+
+          this.labelSlides();
+
+          var raf = 0;
+          this.track.addEventListener('scroll', function () {
+            if (raf) return;
+            raf = requestAnimationFrame(function () { raf = 0; self.update(); });
+          }, Object.assign({ passive: true }, opts || {}));
+
+          if (window.ResizeObserver) {
+            this.ro = new ResizeObserver(function () { self.build(); });
+            this.ro.observe(this.track);
+          } else {
+            window.addEventListener('resize', function () { self.build(); }, opts);
+          }
+          this.build();
+        }
+
+        metrics() {
+          var t = this.track;
+          var gap = parseFloat(getComputedStyle(t).columnGap) || 0;
+          var page = t.clientWidth + gap;
+          var max = Math.max(0, t.scrollWidth - t.clientWidth);
+          var pages = page > 0 ? Math.max(1, Math.ceil((t.scrollWidth + gap) / page - 0.01)) : 1;
+          var rtl = getComputedStyle(t).direction === 'rtl' ? -1 : 1;
+          return { page: page, max: max, pages: pages, pos: Math.abs(t.scrollLeft), rtl: rtl };
+        }
+
+        build() {
+          if (!this.track || !this.track.clientWidth) return;
+          var m = this.metrics();
+          var multi = m.pages > 1;
+          if (this.arrowsWrap) this.arrowsWrap.hidden = !multi;
+          if (this.dotsWrap) {
+            this.dotsWrap.hidden = !multi;
+            if (multi && this.dotsWrap.childElementCount !== m.pages) {
+              var html = '';
+              for (var i = 0; i < m.pages; i++) {
+                html += '<button type="button" class="sc-pcs__dot" data-sc-dot="' + i + '" aria-controls="' +
+                  this.track.id + '" aria-label="Go to slide ' + (i + 1) + ' of ' + m.pages + '"></button>';
+              }
+              this.dotsWrap.innerHTML = html;
+            }
+          }
+          this.update();
+        }
+
+        update() {
+          if (!this.track) return;
+          var m = this.metrics();
+          var atStart = m.pos <= 2;
+          var atEnd = m.pos >= m.max - 2;
+          var idx = atEnd ? m.pages - 1 : Math.round(m.pos / (m.page || 1));
+          if (this.prev) this.prev.setAttribute('aria-disabled', String(!this.loop && atStart));
+          if (this.next) this.next.setAttribute('aria-disabled', String(!this.loop && atEnd));
+          if (this.dotsWrap) {
+            Array.prototype.forEach.call(this.dotsWrap.children, function (d, i) {
+              d.setAttribute('aria-current', String(i === idx));
+            });
+          }
+        }
+
+        go(dir, btn) {
+          if (!this.track) return;
+          if (btn && btn.getAttribute('aria-disabled') === 'true') return;
+          var m = this.metrics();
+          this.emit('sc:cross-sell:arrow', { direction: dir > 0 ? 'next' : 'prev' });
+          if (this.loop && dir > 0 && m.pos >= m.max - 2) return this.goTo(0);
+          if (this.loop && dir < 0 && m.pos <= 2) return this.goTo(m.pages - 1);
+          this.track.scrollBy({ left: dir * m.page * m.rtl, behavior: reduceMotion() ? 'auto' : 'smooth' });
+        }
+
+        goTo(i) {
+          if (!this.track || isNaN(i)) return;
+          var m = this.metrics();
+          var left = Math.min(i * m.page, m.max) * m.rtl;
+          this.track.scrollTo({ left: left, behavior: reduceMotion() ? 'auto' : 'smooth' });
+        }
+      }
+
+      window.customElements.define('sc-pdp-cross-sell', ScPdpCrossSell);
+    })();
+  </script>
+{%- endif -%}

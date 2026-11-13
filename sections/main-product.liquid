@@ -689,6 +689,8 @@
                   {% render 'sc-store-benefits', block: block %}
                 {%- when 'sc_inventory_status' -%}
                   {% render 'sc-inventory-status', block: block, product: product, section: section %}
+                {%- when 'sc_pdp_cross_sell' -%}
+                  {% render 'sc-pdp-cross-sell', block: block, product: product %}
                 {%- when 'sc_payment_icons_bar' -%}
                   {% render 'sc-payment-icons-bar', placement: 'pdp', product: product, block: block %}
                 {%- when 'icon-with-text' -%}
@@ -3326,6 +3328,917 @@
           "step": 2,
           "unit": "px",
           "default": 24
+        }
+      ]
+    },
+    {
+      "type": "sc_pdp_cross_sell",
+      "name": "SC – Up-/Cross-selling",
+      "limit": 1,
+      "settings": [
+        {
+          "type": "paragraph",
+          "content": "Products come from the product metafield standard.cro_up_cross_selling (Product – List of products). If a product has none, the block can show Search & Discovery app recommendations (complementary, then related) and finally the fallback collection. The block hides itself when nothing is found."
+        },
+        {
+          "type": "header",
+          "content": "General"
+        },
+        {
+          "type": "checkbox",
+          "id": "enable",
+          "label": "Show up-/cross-selling",
+          "default": true
+        },
+        {
+          "type": "inline_richtext",
+          "id": "cro_up_cross_title",
+          "label": "Heading",
+          "default": "Buy it with"
+        },
+        {
+          "type": "select",
+          "id": "cro_up_cross_selling_layout",
+          "label": "Layout",
+          "options": [
+            {
+              "value": "slides",
+              "label": "Slides (carousel)"
+            },
+            {
+              "value": "stack",
+              "label": "Stack (collapsible)"
+            },
+            {
+              "value": "normal",
+              "label": "Normal (always open list)"
+            }
+          ],
+          "default": "slides"
+        },
+        {
+          "type": "checkbox",
+          "id": "cro_up_cross_open_stack",
+          "label": "Open stack by default",
+          "default": true,
+          "visible_if": "{{ block.settings.cro_up_cross_selling_layout == 'stack' }}"
+        },
+        {
+          "type": "select",
+          "id": "reveal_mode",
+          "label": "When to show",
+          "options": [
+            {
+              "value": "always",
+              "label": "Always"
+            },
+            {
+              "value": "after_add",
+              "label": "After main product is added to cart"
+            }
+          ],
+          "default": "always",
+          "info": "\"After add\" keeps focus on the main Add to cart first. Always visible in the theme editor."
+        },
+        {
+          "type": "header",
+          "content": "Products"
+        },
+        {
+          "type": "select",
+          "id": "product_source",
+          "label": "Product source",
+          "options": [
+            {
+              "value": "metafield_then_discovery",
+              "label": "Metafield, then Search & Discovery"
+            },
+            {
+              "value": "metafield",
+              "label": "Metafield only"
+            },
+            {
+              "value": "discovery",
+              "label": "Search & Discovery only"
+            }
+          ],
+          "default": "metafield_then_discovery",
+          "info": "Search & Discovery: set complementary products per product in the free Shopify Search & Discovery app."
+        },
+        {
+          "type": "select",
+          "id": "discovery_intent",
+          "label": "Search & Discovery recommendations",
+          "options": [
+            {
+              "value": "complementary_then_related",
+              "label": "Complementary, then related"
+            },
+            {
+              "value": "complementary",
+              "label": "Complementary only"
+            },
+            {
+              "value": "related",
+              "label": "Related only (automatic)"
+            }
+          ],
+          "default": "complementary_then_related",
+          "info": "Complementary = products you pick in the app. Related = Shopify's automatic suggestions.",
+          "visible_if": "{{ block.settings.product_source != 'metafield' }}"
+        },
+        {
+          "type": "text",
+          "id": "metafield_namespace",
+          "label": "Metafield namespace",
+          "default": "standard",
+          "visible_if": "{{ block.settings.product_source != 'discovery' }}"
+        },
+        {
+          "type": "text",
+          "id": "metafield_key",
+          "label": "Metafield key",
+          "default": "cro_up_cross_selling",
+          "info": "Only change these if your store uses a different product list metafield.",
+          "visible_if": "{{ block.settings.product_source != 'discovery' }}"
+        },
+        {
+          "type": "collection",
+          "id": "fallback_collection",
+          "label": "Fallback collection",
+          "info": "Optional. Used when the metafield and Search & Discovery have no products."
+        },
+        {
+          "type": "range",
+          "id": "max_products",
+          "label": "Maximum products",
+          "min": 1,
+          "max": 12,
+          "step": 1,
+          "default": 6
+        },
+        {
+          "type": "select",
+          "id": "sold_out_behavior",
+          "label": "Sold-out products",
+          "options": [
+            {
+              "value": "hide",
+              "label": "Hide"
+            },
+            {
+              "value": "show",
+              "label": "Show with disabled button"
+            }
+          ],
+          "default": "hide"
+        },
+        {
+          "type": "checkbox",
+          "id": "hide_in_cart",
+          "label": "Hide products already in cart",
+          "default": false
+        },
+        {
+          "type": "select",
+          "id": "variant_mode",
+          "label": "Products with several variants",
+          "options": [
+            {
+              "value": "dropdown",
+              "label": "Show variant dropdown"
+            },
+            {
+              "value": "first",
+              "label": "Add first available variant"
+            },
+            {
+              "value": "link",
+              "label": "Link to product page"
+            }
+          ],
+          "default": "dropdown",
+          "info": "With \"first available\" the variant name is always shown, so shoppers see what they add."
+        },
+        {
+          "type": "checkbox",
+          "id": "show_variant_title",
+          "label": "Show variant name",
+          "default": true
+        },
+        {
+          "type": "checkbox",
+          "id": "show_vendor",
+          "label": "Show vendor",
+          "default": false
+        },
+        {
+          "type": "checkbox",
+          "id": "show_rating",
+          "label": "Show star rating",
+          "default": false,
+          "info": "Uses the standard reviews.rating metafield filled by most review apps."
+        },
+        {
+          "type": "checkbox",
+          "id": "show_compare_price",
+          "label": "Show compare-at price",
+          "default": true
+        },
+        {
+          "type": "checkbox",
+          "id": "show_sale_badge",
+          "label": "Show discount badge",
+          "default": false
+        },
+        {
+          "type": "checkbox",
+          "id": "link_to_product",
+          "label": "Link image and title to product",
+          "default": true
+        },
+        {
+          "type": "header",
+          "content": "Image"
+        },
+        {
+          "type": "range",
+          "id": "image_size",
+          "label": "Image size (desktop)",
+          "min": 40,
+          "max": 160,
+          "step": 4,
+          "unit": "px",
+          "default": 72
+        },
+        {
+          "type": "range",
+          "id": "image_size_mobile",
+          "label": "Image size (mobile)",
+          "min": 40,
+          "max": 120,
+          "step": 4,
+          "unit": "px",
+          "default": 64
+        },
+        {
+          "type": "select",
+          "id": "image_fit",
+          "label": "Image fit",
+          "options": [
+            {
+              "value": "contain",
+              "label": "Fit"
+            },
+            {
+              "value": "cover",
+              "label": "Fill"
+            }
+          ],
+          "default": "contain"
+        },
+        {
+          "type": "range",
+          "id": "image_radius",
+          "label": "Image corner radius",
+          "min": 0,
+          "max": 24,
+          "step": 1,
+          "unit": "px",
+          "default": 6
+        },
+        {
+          "type": "checkbox",
+          "id": "image_border",
+          "label": "Image border",
+          "default": true
+        },
+        {
+          "type": "color",
+          "id": "image_bg",
+          "label": "Image background",
+          "default": "#ffffff"
+        },
+        {
+          "type": "checkbox",
+          "id": "image_hover",
+          "label": "Show second image on hover",
+          "default": false
+        },
+        {
+          "type": "header",
+          "content": "Add button"
+        },
+        {
+          "type": "text",
+          "id": "cro_up_cross_atc_title",
+          "label": "Button text",
+          "default": "+ Add"
+        },
+        {
+          "type": "checkbox",
+          "id": "show_added_state",
+          "label": "Show success state",
+          "default": true
+        },
+        {
+          "type": "text",
+          "id": "added_text",
+          "label": "Success text",
+          "default": "Added",
+          "visible_if": "{{ block.settings.show_added_state }}"
+        },
+        {
+          "type": "text",
+          "id": "sold_out_text",
+          "label": "Sold out text",
+          "default": "Sold out"
+        },
+        {
+          "type": "text",
+          "id": "choose_text",
+          "label": "Choose options text",
+          "default": "Choose",
+          "visible_if": "{{ block.settings.variant_mode == 'link' }}"
+        },
+        {
+          "type": "text",
+          "id": "error_text",
+          "label": "Error message",
+          "default": "Couldn't add to cart. Please try again."
+        },
+        {
+          "type": "select",
+          "id": "after_add",
+          "label": "After adding",
+          "options": [
+            {
+              "value": "drawer",
+              "label": "Open theme cart drawer / popup"
+            },
+            {
+              "value": "stay",
+              "label": "Stay on page, update cart count"
+            },
+            {
+              "value": "cart",
+              "label": "Go to cart page"
+            }
+          ],
+          "default": "drawer"
+        },
+        {
+          "type": "select",
+          "id": "button_style",
+          "label": "Button style",
+          "options": [
+            {
+              "value": "filled",
+              "label": "Filled"
+            },
+            {
+              "value": "outline",
+              "label": "Outline"
+            }
+          ],
+          "default": "filled"
+        },
+        {
+          "type": "color",
+          "id": "button_bg",
+          "label": "Button colour",
+          "default": "#121212"
+        },
+        {
+          "type": "color",
+          "id": "button_text",
+          "label": "Button text colour",
+          "default": "#ffffff",
+          "info": "Used for filled buttons."
+        },
+        {
+          "type": "range",
+          "id": "button_radius",
+          "label": "Button shape (square → round)",
+          "min": 0,
+          "max": 40,
+          "step": 1,
+          "unit": "px",
+          "default": 40
+        },
+        {
+          "type": "range",
+          "id": "button_height",
+          "label": "Button height",
+          "min": 30,
+          "max": 56,
+          "step": 2,
+          "unit": "px",
+          "default": 40
+        },
+        {
+          "type": "range",
+          "id": "button_font_size",
+          "label": "Button text size",
+          "min": 11,
+          "max": 20,
+          "step": 1,
+          "unit": "px",
+          "default": 14
+        },
+        {
+          "type": "select",
+          "id": "button_position",
+          "label": "Button position (desktop)",
+          "options": [
+            {
+              "value": "right",
+              "label": "Right of product"
+            },
+            {
+              "value": "below",
+              "label": "Below product details"
+            }
+          ],
+          "default": "right"
+        },
+        {
+          "type": "select",
+          "id": "button_position_mobile",
+          "label": "Button position (mobile)",
+          "options": [
+            {
+              "value": "right",
+              "label": "Right of product"
+            },
+            {
+              "value": "below",
+              "label": "Below product details"
+            }
+          ],
+          "default": "right"
+        },
+        {
+          "type": "checkbox",
+          "id": "button_full_width",
+          "label": "Full-width button when below",
+          "default": false
+        },
+        {
+          "type": "header",
+          "content": "Heading"
+        },
+        {
+          "type": "range",
+          "id": "heading_size",
+          "label": "Heading size (desktop)",
+          "min": 12,
+          "max": 36,
+          "step": 1,
+          "unit": "px",
+          "default": 18
+        },
+        {
+          "type": "range",
+          "id": "heading_size_mobile",
+          "label": "Heading size (mobile)",
+          "min": 12,
+          "max": 32,
+          "step": 1,
+          "unit": "px",
+          "default": 16
+        },
+        {
+          "type": "select",
+          "id": "heading_weight",
+          "label": "Heading weight",
+          "options": [
+            {
+              "value": "400",
+              "label": "Regular"
+            },
+            {
+              "value": "500",
+              "label": "Medium"
+            },
+            {
+              "value": "600",
+              "label": "Semibold"
+            },
+            {
+              "value": "700",
+              "label": "Bold"
+            }
+          ],
+          "default": "600"
+        },
+        {
+          "type": "select",
+          "id": "heading_align",
+          "label": "Heading alignment",
+          "options": [
+            {
+              "value": "left",
+              "label": "Left"
+            },
+            {
+              "value": "center",
+              "label": "Center"
+            },
+            {
+              "value": "right",
+              "label": "Right"
+            }
+          ],
+          "default": "left"
+        },
+        {
+          "type": "color",
+          "id": "heading_color",
+          "label": "Heading colour",
+          "default": "#121212"
+        },
+        {
+          "type": "header",
+          "content": "Product text"
+        },
+        {
+          "type": "range",
+          "id": "title_size",
+          "label": "Title size",
+          "min": 11,
+          "max": 22,
+          "step": 1,
+          "unit": "px",
+          "default": 14
+        },
+        {
+          "type": "select",
+          "id": "title_weight",
+          "label": "Title weight",
+          "options": [
+            {
+              "value": "400",
+              "label": "Regular"
+            },
+            {
+              "value": "500",
+              "label": "Medium"
+            },
+            {
+              "value": "600",
+              "label": "Semibold"
+            },
+            {
+              "value": "700",
+              "label": "Bold"
+            }
+          ],
+          "default": "600"
+        },
+        {
+          "type": "select",
+          "id": "title_lines",
+          "label": "Title lines",
+          "options": [
+            {
+              "value": "1",
+              "label": "1"
+            },
+            {
+              "value": "2",
+              "label": "2"
+            },
+            {
+              "value": "3",
+              "label": "3"
+            },
+            {
+              "value": "none",
+              "label": "No limit"
+            }
+          ],
+          "default": "2"
+        },
+        {
+          "type": "color",
+          "id": "text_color",
+          "label": "Title colour",
+          "default": "#121212"
+        },
+        {
+          "type": "color",
+          "id": "muted_color",
+          "label": "Variant / vendor colour",
+          "default": "#6b6b6b"
+        },
+        {
+          "type": "range",
+          "id": "price_size",
+          "label": "Price size",
+          "min": 11,
+          "max": 22,
+          "step": 1,
+          "unit": "px",
+          "default": 14
+        },
+        {
+          "type": "color",
+          "id": "price_color",
+          "label": "Price colour",
+          "default": "#121212"
+        },
+        {
+          "type": "color",
+          "id": "sale_price_color",
+          "label": "Sale price colour",
+          "default": "#c4231a"
+        },
+        {
+          "type": "color",
+          "id": "compare_color",
+          "label": "Compare-at price colour",
+          "default": "#8a8a8a"
+        },
+        {
+          "type": "color",
+          "id": "badge_bg",
+          "label": "Discount badge background",
+          "default": "#c4231a",
+          "visible_if": "{{ block.settings.show_sale_badge }}"
+        },
+        {
+          "type": "color",
+          "id": "badge_color",
+          "label": "Discount badge text",
+          "default": "#ffffff",
+          "visible_if": "{{ block.settings.show_sale_badge }}"
+        },
+        {
+          "type": "color",
+          "id": "rating_color",
+          "label": "Star colour",
+          "default": "#f5a623",
+          "visible_if": "{{ block.settings.show_rating }}"
+        },
+        {
+          "type": "header",
+          "content": "Carousel (Slides layout)"
+        },
+        {
+          "type": "range",
+          "id": "slides_per_view",
+          "label": "Products per slide (desktop)",
+          "min": 1,
+          "max": 3,
+          "step": 1,
+          "default": 1,
+          "visible_if": "{{ block.settings.cro_up_cross_selling_layout == 'slides' }}"
+        },
+        {
+          "type": "range",
+          "id": "slides_per_view_mobile",
+          "label": "Products per slide (mobile)",
+          "min": 1,
+          "max": 2,
+          "step": 1,
+          "default": 1,
+          "visible_if": "{{ block.settings.cro_up_cross_selling_layout == 'slides' }}"
+        },
+        {
+          "type": "checkbox",
+          "id": "show_arrows",
+          "label": "Show arrows",
+          "default": true,
+          "visible_if": "{{ block.settings.cro_up_cross_selling_layout == 'slides' }}"
+        },
+        {
+          "type": "checkbox",
+          "id": "show_dots",
+          "label": "Show dots",
+          "default": true,
+          "visible_if": "{{ block.settings.cro_up_cross_selling_layout == 'slides' }}"
+        },
+        {
+          "type": "checkbox",
+          "id": "loop",
+          "label": "Loop back to the start",
+          "default": false,
+          "visible_if": "{{ block.settings.cro_up_cross_selling_layout == 'slides' }}"
+        },
+        {
+          "type": "select",
+          "id": "arrow_style",
+          "label": "Arrow style",
+          "options": [
+            {
+              "value": "filled",
+              "label": "Filled"
+            },
+            {
+              "value": "outline",
+              "label": "Outline"
+            }
+          ],
+          "default": "filled",
+          "visible_if": "{{ block.settings.cro_up_cross_selling_layout == 'slides' }}"
+        },
+        {
+          "type": "range",
+          "id": "arrow_size",
+          "label": "Arrow size",
+          "min": 24,
+          "max": 48,
+          "step": 2,
+          "unit": "px",
+          "default": 32,
+          "visible_if": "{{ block.settings.cro_up_cross_selling_layout == 'slides' }}"
+        },
+        {
+          "type": "range",
+          "id": "arrow_radius",
+          "label": "Arrow shape (square → round)",
+          "min": 0,
+          "max": 24,
+          "step": 1,
+          "unit": "px",
+          "default": 24,
+          "visible_if": "{{ block.settings.cro_up_cross_selling_layout == 'slides' }}"
+        },
+        {
+          "type": "color",
+          "id": "arrow_bg",
+          "label": "Arrow background",
+          "default": "#ececec",
+          "visible_if": "{{ block.settings.cro_up_cross_selling_layout == 'slides' }}"
+        },
+        {
+          "type": "color",
+          "id": "arrow_color",
+          "label": "Arrow icon colour",
+          "default": "#121212",
+          "visible_if": "{{ block.settings.cro_up_cross_selling_layout == 'slides' }}"
+        },
+        {
+          "type": "header",
+          "content": "Stack toggle (Stack layout)"
+        },
+        {
+          "type": "color",
+          "id": "toggle_bg",
+          "label": "Toggle background",
+          "default": "#f6f6f6",
+          "visible_if": "{{ block.settings.cro_up_cross_selling_layout == 'stack' }}"
+        },
+        {
+          "type": "header",
+          "content": "Box and rows"
+        },
+        {
+          "type": "select",
+          "id": "container_style",
+          "label": "Product area style",
+          "options": [
+            {
+              "value": "boxed",
+              "label": "Boxed"
+            },
+            {
+              "value": "plain",
+              "label": "Plain"
+            }
+          ],
+          "default": "boxed"
+        },
+        {
+          "type": "color",
+          "id": "container_bg",
+          "label": "Background",
+          "default": "#ffffff"
+        },
+        {
+          "type": "color",
+          "id": "border_color",
+          "label": "Border colour",
+          "default": "#e3e3e3"
+        },
+        {
+          "type": "range",
+          "id": "border_width",
+          "label": "Border thickness",
+          "min": 0,
+          "max": 4,
+          "step": 1,
+          "unit": "px",
+          "default": 1
+        },
+        {
+          "type": "range",
+          "id": "container_radius",
+          "label": "Corner radius",
+          "min": 0,
+          "max": 24,
+          "step": 1,
+          "unit": "px",
+          "default": 8
+        },
+        {
+          "type": "range",
+          "id": "container_padding",
+          "label": "Inner padding (desktop)",
+          "min": 0,
+          "max": 40,
+          "step": 2,
+          "unit": "px",
+          "default": 16
+        },
+        {
+          "type": "range",
+          "id": "container_padding_mobile",
+          "label": "Inner padding (mobile)",
+          "min": 0,
+          "max": 32,
+          "step": 2,
+          "unit": "px",
+          "default": 12
+        },
+        {
+          "type": "range",
+          "id": "row_gap",
+          "label": "Space between products",
+          "min": 0,
+          "max": 40,
+          "step": 2,
+          "unit": "px",
+          "default": 16
+        },
+        {
+          "type": "checkbox",
+          "id": "show_dividers",
+          "label": "Divider lines between products",
+          "default": true
+        },
+        {
+          "type": "color",
+          "id": "divider_color",
+          "label": "Divider colour",
+          "default": "#e6e6e6",
+          "visible_if": "{{ block.settings.show_dividers }}"
+        },
+        {
+          "type": "header",
+          "content": "Spacing"
+        },
+        {
+          "type": "range",
+          "id": "cross_selling_space_top",
+          "label": "Space top (desktop)",
+          "min": -16,
+          "max": 64,
+          "step": 2,
+          "unit": "px",
+          "default": 16
+        },
+        {
+          "type": "range",
+          "id": "cross_selling_space_bottom",
+          "label": "Space bottom (desktop)",
+          "min": -16,
+          "max": 64,
+          "step": 2,
+          "unit": "px",
+          "default": 16
+        },
+        {
+          "type": "range",
+          "id": "cross_selling_space_top_mobile",
+          "label": "Space top (mobile)",
+          "min": -16,
+          "max": 64,
+          "step": 2,
+          "unit": "px",
+          "default": 16
+        },
+        {
+          "type": "range",
+          "id": "cross_selling_space_bottom_mobile",
+          "label": "Space bottom (mobile)",
+          "min": -16,
+          "max": 64,
+          "step": 2,
+          "unit": "px",
+          "default": 16
+        },
+        {
+          "type": "range",
+          "id": "mobile_breakpoint",
+          "label": "Mobile breakpoint",
+          "min": 480,
+          "max": 1200,
+          "step": 10,
+          "unit": "px",
+          "default": 750,
+          "info": "Screens narrower than this use the mobile settings."
         }
       ]
     },
