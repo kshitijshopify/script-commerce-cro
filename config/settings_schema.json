@@ -1946,5 +1946,622 @@
         "default": false
       }
     ]
+  },
+  {
+    "name": "SC – Free gift",
+    "settings": [
+      {
+        "type": "paragraph",
+        "content": "Free gift progress bar for the cart page and the cart drawer. Customers see how much more they need to spend to unlock a free gift. Setup guide: docs/sc-cart-free-gift-progress-setup.md"
+      },
+      {
+        "type": "header",
+        "content": "Visibility"
+      },
+      {
+        "type": "checkbox",
+        "id": "sc_fg_enable",
+        "label": "Enable free gift",
+        "default": true,
+        "info": "Master switch for the cart page and cart drawer. Use it for A/B tests."
+      },
+      {
+        "type": "checkbox",
+        "id": "sc_fg_show_cart",
+        "label": "Show on cart page",
+        "default": true
+      },
+      {
+        "type": "checkbox",
+        "id": "sc_fg_show_drawer",
+        "label": "Show in cart drawer",
+        "default": true,
+        "info": "Needs Cart type: Drawer (Theme settings → Cart)."
+      },
+      {
+        "type": "checkbox",
+        "id": "sc_fg_hide_when_empty",
+        "label": "Hide when the cart is empty",
+        "default": true
+      },
+      {
+        "type": "checkbox",
+        "id": "sc_fg_hide_when_sold_out",
+        "label": "Hide when the gift is sold out",
+        "default": true
+      },
+      {
+        "type": "header",
+        "content": "Free gift"
+      },
+      {
+        "type": "text",
+        "id": "sc_fg_headline",
+        "label": "Cart free gift headline",
+        "default": "Free gift"
+      },
+      {
+        "type": "number",
+        "id": "sc_fg_threshold",
+        "label": "Free gift minimum amount",
+        "default": 100,
+        "info": "In your store's default currency, e.g. 100 = 100.00. Converted automatically for other markets."
+      },
+      {
+        "type": "select",
+        "id": "sc_fg_subtotal_basis",
+        "label": "Amount that counts towards the minimum",
+        "options": [
+          {
+            "value": "items_subtotal",
+            "label": "Subtotal after product discounts"
+          },
+          {
+            "value": "original",
+            "label": "Subtotal before discounts"
+          },
+          {
+            "value": "total",
+            "label": "Total after all discounts"
+          }
+        ],
+        "default": "items_subtotal",
+        "info": "The gift's own value never counts towards the minimum."
+      },
+      {
+        "type": "product",
+        "id": "sc_fg_gift_product",
+        "label": "Gift product"
+      },
+      {
+        "type": "select",
+        "id": "sc_fg_pricing_mode",
+        "label": "Gift pricing",
+        "options": [
+          {
+            "value": "zero_price",
+            "label": "Gift product priced 0.00"
+          },
+          {
+            "value": "automatic_discount",
+            "label": "Automatic discount makes it free"
+          }
+        ],
+        "default": "zero_price",
+        "info": "Selecting a product does not make it free. Use a 0.00 gift product (tag it hidden) or a Shopify automatic discount."
+      },
+      {
+        "type": "checkbox",
+        "id": "sc_fg_auto_add",
+        "label": "Auto add",
+        "default": false,
+        "info": "Adds the gift as soon as the minimum is reached. When off, customers get an \"Add free gift\" button."
+      },
+      {
+        "type": "select",
+        "id": "sc_fg_readd_mode",
+        "label": "If the customer removes the auto-added gift",
+        "options": [
+          {
+            "value": "respect",
+            "label": "Don't add it again (show button)"
+          },
+          {
+            "value": "always",
+            "label": "Add it again automatically"
+          }
+        ],
+        "default": "respect"
+      },
+      {
+        "type": "checkbox",
+        "id": "sc_fg_remove_when_ineligible",
+        "label": "Remove gift when cart drops below minimum",
+        "default": true,
+        "info": "Recommended. If off, a customer could keep a free gift without reaching the minimum."
+      },
+      {
+        "type": "checkbox",
+        "id": "sc_fg_round_converted",
+        "label": "Round converted minimum up to a whole number",
+        "default": true,
+        "info": "Only for other currencies, e.g. 108.43 becomes 109.00."
+      },
+      {
+        "type": "select",
+        "id": "sc_fg_cart_refresh",
+        "label": "After the gift is added or removed",
+        "options": [
+          {
+            "value": "sections",
+            "label": "Refresh cart without reload"
+          },
+          {
+            "value": "reload",
+            "label": "Reload the page"
+          }
+        ],
+        "default": "sections"
+      },
+      {
+        "type": "header",
+        "content": "Progress bar icon"
+      },
+      {
+        "type": "select",
+        "id": "sc_fg_icon_type",
+        "label": "Icon",
+        "options": [
+          {
+            "value": "gift",
+            "label": "Gift"
+          },
+          {
+            "value": "box",
+            "label": "Box"
+          },
+          {
+            "value": "star",
+            "label": "Star"
+          },
+          {
+            "value": "heart",
+            "label": "Heart"
+          },
+          {
+            "value": "image",
+            "label": "Custom image"
+          },
+          {
+            "value": "custom_svg",
+            "label": "Custom SVG code"
+          },
+          {
+            "value": "none",
+            "label": "None"
+          }
+        ],
+        "default": "gift"
+      },
+      {
+        "type": "html",
+        "id": "sc_fg_custom_svg",
+        "label": "Progress bar gift icon (SVG code)",
+        "info": "Used when Icon is \"Custom SVG code\". Only shapes are kept; scripts, links and styles are removed for safety."
+      },
+      {
+        "type": "image_picker",
+        "id": "sc_fg_icon_image",
+        "label": "Custom icon image",
+        "info": "Used when Icon is \"Custom image\"."
+      },
+      {
+        "type": "range",
+        "id": "sc_fg_icon_size",
+        "label": "Icon size",
+        "min": 24,
+        "max": 72,
+        "step": 2,
+        "unit": "px",
+        "default": 40
+      },
+      {
+        "type": "header",
+        "content": "Messages"
+      },
+      {
+        "type": "paragraph",
+        "content": "Placeholders: [amount] = amount still needed, [threshold] = minimum amount, [gift] = gift product name."
+      },
+      {
+        "type": "text",
+        "id": "sc_fg_locked_message",
+        "label": "Locked message",
+        "default": "Add [amount] more to unlock your free gift!"
+      },
+      {
+        "type": "text",
+        "id": "sc_fg_unlocked_message",
+        "label": "Unlocked message",
+        "default": "Congratulations! You've unlocked your free gift!"
+      },
+      {
+        "type": "text",
+        "id": "sc_fg_added_message",
+        "label": "Gift added message",
+        "default": "Your free gift has been added to your cart."
+      },
+      {
+        "type": "text",
+        "id": "sc_fg_removed_message",
+        "label": "Gift removed message",
+        "default": "Your free gift was removed because your cart is below [threshold]."
+      },
+      {
+        "type": "text",
+        "id": "sc_fg_sold_out_message",
+        "label": "Gift sold out message",
+        "default": "The free gift is currently out of stock."
+      },
+      {
+        "type": "text",
+        "id": "sc_fg_error_message",
+        "label": "Error message",
+        "default": "We couldn't add your free gift. Please try again."
+      },
+      {
+        "type": "text",
+        "id": "sc_fg_add_button_label",
+        "label": "Add gift button text",
+        "default": "Add free gift"
+      },
+      {
+        "type": "text",
+        "id": "sc_fg_added_label",
+        "label": "Gift in cart label",
+        "default": "Added"
+      },
+      {
+        "type": "text",
+        "id": "sc_fg_locked_label",
+        "label": "Gift locked label",
+        "default": "Locked"
+      },
+      {
+        "type": "text",
+        "id": "sc_fg_free_label",
+        "label": "Free label",
+        "default": "Free"
+      },
+      {
+        "type": "select",
+        "id": "sc_fg_money_style",
+        "label": "Amount format",
+        "options": [
+          {
+            "value": "money",
+            "label": "With symbol (€35.00)"
+          },
+          {
+            "value": "money_with_currency",
+            "label": "With currency code (€35.00 EUR)"
+          },
+          {
+            "value": "amount",
+            "label": "Number only (35.00)"
+          }
+        ],
+        "default": "money"
+      },
+      {
+        "type": "header",
+        "content": "Gift product display"
+      },
+      {
+        "type": "checkbox",
+        "id": "sc_fg_show_gift",
+        "label": "Show gift product",
+        "default": true
+      },
+      {
+        "type": "checkbox",
+        "id": "sc_fg_show_gift_when_locked",
+        "label": "Show gift while still locked",
+        "default": true
+      },
+      {
+        "type": "image_picker",
+        "id": "sc_fg_gift_image",
+        "label": "Custom gift image",
+        "info": "Optional. Defaults to the gift product image."
+      },
+      {
+        "type": "range",
+        "id": "sc_fg_gift_image_size",
+        "label": "Gift image size",
+        "min": 40,
+        "max": 120,
+        "step": 4,
+        "unit": "px",
+        "default": 60
+      },
+      {
+        "type": "checkbox",
+        "id": "sc_fg_show_original_price",
+        "label": "Show crossed-out gift value",
+        "default": true,
+        "info": "Automatic discount: shows the product price. 0.00 product: shows its compare-at price, if set."
+      },
+      {
+        "type": "header",
+        "content": "Layout"
+      },
+      {
+        "type": "select",
+        "id": "sc_fg_container_style",
+        "label": "Style",
+        "options": [
+          {
+            "value": "card",
+            "label": "Card with border"
+          },
+          {
+            "value": "plain",
+            "label": "Plain"
+          }
+        ],
+        "default": "card"
+      },
+      {
+        "type": "select",
+        "id": "sc_fg_text_align",
+        "label": "Text alignment",
+        "options": [
+          {
+            "value": "left",
+            "label": "Left"
+          },
+          {
+            "value": "center",
+            "label": "Center"
+          }
+        ],
+        "default": "left"
+      },
+      {
+        "type": "range",
+        "id": "sc_fg_card_padding",
+        "label": "Card padding",
+        "min": 8,
+        "max": 32,
+        "step": 2,
+        "unit": "px",
+        "default": 16
+      },
+      {
+        "type": "range",
+        "id": "sc_fg_card_radius",
+        "label": "Card corner radius",
+        "min": 0,
+        "max": 24,
+        "step": 1,
+        "unit": "px",
+        "default": 10
+      },
+      {
+        "type": "range",
+        "id": "sc_fg_bar_height",
+        "label": "Bar height",
+        "min": 4,
+        "max": 24,
+        "step": 1,
+        "unit": "px",
+        "default": 10
+      },
+      {
+        "type": "range",
+        "id": "sc_fg_bar_radius",
+        "label": "Bar corner radius",
+        "min": 0,
+        "max": 20,
+        "step": 1,
+        "unit": "px",
+        "default": 20
+      },
+      {
+        "type": "checkbox",
+        "id": "sc_fg_bar_stripes",
+        "label": "Animated stripes on the bar",
+        "default": false
+      },
+      {
+        "type": "range",
+        "id": "sc_fg_spacing_cart",
+        "label": "Space above/below on cart page",
+        "min": 0,
+        "max": 60,
+        "step": 2,
+        "unit": "px",
+        "default": 16
+      },
+      {
+        "type": "range",
+        "id": "sc_fg_spacing_drawer",
+        "label": "Space above/below in cart drawer",
+        "min": 0,
+        "max": 40,
+        "step": 2,
+        "unit": "px",
+        "default": 8
+      },
+      {
+        "type": "header",
+        "content": "Typography"
+      },
+      {
+        "type": "range",
+        "id": "sc_fg_headline_size",
+        "label": "Headline size (desktop)",
+        "min": 12,
+        "max": 32,
+        "step": 1,
+        "unit": "px",
+        "default": 17
+      },
+      {
+        "type": "range",
+        "id": "sc_fg_headline_size_mobile",
+        "label": "Headline size (mobile)",
+        "min": 12,
+        "max": 28,
+        "step": 1,
+        "unit": "px",
+        "default": 16
+      },
+      {
+        "type": "select",
+        "id": "sc_fg_headline_weight",
+        "label": "Headline weight",
+        "options": [
+          {
+            "value": "400",
+            "label": "Regular"
+          },
+          {
+            "value": "500",
+            "label": "Medium"
+          },
+          {
+            "value": "600",
+            "label": "Semibold"
+          },
+          {
+            "value": "700",
+            "label": "Bold"
+          }
+        ],
+        "default": "600"
+      },
+      {
+        "type": "range",
+        "id": "sc_fg_message_size",
+        "label": "Text size (desktop)",
+        "min": 11,
+        "max": 22,
+        "step": 1,
+        "unit": "px",
+        "default": 14
+      },
+      {
+        "type": "range",
+        "id": "sc_fg_message_size_mobile",
+        "label": "Text size (mobile)",
+        "min": 11,
+        "max": 20,
+        "step": 1,
+        "unit": "px",
+        "default": 13
+      },
+      {
+        "type": "header",
+        "content": "Colors"
+      },
+      {
+        "type": "color",
+        "id": "sc_fg_card_bg",
+        "label": "Card background",
+        "default": "#ffffff"
+      },
+      {
+        "type": "color",
+        "id": "sc_fg_card_border",
+        "label": "Card border and divider",
+        "default": "#dddddd"
+      },
+      {
+        "type": "color",
+        "id": "sc_fg_headline_color",
+        "label": "Headline",
+        "default": "#222222"
+      },
+      {
+        "type": "color",
+        "id": "sc_fg_text_color",
+        "label": "Text",
+        "default": "#555555"
+      },
+      {
+        "type": "color",
+        "id": "sc_fg_success_color",
+        "label": "Unlocked message",
+        "default": "#1e7b34"
+      },
+      {
+        "type": "color",
+        "id": "sc_fg_bar_bg",
+        "label": "Bar background",
+        "default": "#ececec"
+      },
+      {
+        "type": "color",
+        "id": "sc_fg_bar_fill",
+        "label": "Bar fill",
+        "default": "#4a4a4a"
+      },
+      {
+        "type": "color",
+        "id": "sc_fg_bar_fill_complete",
+        "label": "Bar fill when unlocked",
+        "default": "#1e7b34"
+      },
+      {
+        "type": "color",
+        "id": "sc_fg_icon_color",
+        "label": "Icon",
+        "default": "#555555"
+      },
+      {
+        "type": "color",
+        "id": "sc_fg_icon_bg",
+        "label": "Icon background",
+        "default": "#ffffff"
+      },
+      {
+        "type": "color",
+        "id": "sc_fg_icon_border",
+        "label": "Icon border",
+        "default": "#8a8a8a"
+      },
+      {
+        "type": "color",
+        "id": "sc_fg_icon_unlocked_color",
+        "label": "Icon when unlocked",
+        "default": "#ffffff"
+      },
+      {
+        "type": "color",
+        "id": "sc_fg_icon_unlocked_bg",
+        "label": "Icon background when unlocked",
+        "default": "#1e7b34"
+      },
+      {
+        "type": "color",
+        "id": "sc_fg_free_color",
+        "label": "Free label",
+        "default": "#1e7b34"
+      },
+      {
+        "type": "color",
+        "id": "sc_fg_button_bg",
+        "label": "Button background",
+        "default": "#222222"
+      },
+      {
+        "type": "color",
+        "id": "sc_fg_button_text",
+        "label": "Button text",
+        "default": "#ffffff"
+      }
+    ]
   }
 ]

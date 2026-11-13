@@ -96,6 +96,7 @@
           </span>
         </button>
       </div>
+      {%- render 'sc-cart-free-gift', placement: 'drawer' -%}
       <cart-drawer-items
         view-event-payload="{{ cart | standard_event_data: 'view', context: 'dialog' | escape }}"
         view-event-trigger="manual"
