@@ -1,0 +1,771 @@
+{%- comment -%}
+  Theme block entry point (Horizon and other themes whose sections accept @theme blocks).
+  Settings mirror the "sc_pdp_variant_cards" block in sections/main-product.liquid – keep them in sync.
+  Place it where the theme's variant picker sits (above the Add to Cart / buy buttons block).
+{%- endcomment -%}
+{%- liquid
+  assign sc_product = closest.product
+  if sc_product == blank
+    assign sc_product = product
+  endif
+-%}
+{% render 'sc-pdp-variant-cards', block: block, product: sc_product, section: section %}
+
+{% schema %}
+{
+  "name": "SC – Variant cards",
+  "settings": [
+    {
+      "type": "header",
+      "content": "General"
+    },
+    {
+      "type": "checkbox",
+      "id": "enable",
+      "label": "Enable block",
+      "default": true
+    },
+    {
+      "type": "checkbox",
+      "id": "hide_theme_picker",
+      "label": "Hide the theme's own variant picker",
+      "default": true,
+      "info": "The cards drive the theme's picker in the background, so price, images and Add to cart stay in sync."
+    },
+    {
+      "type": "text",
+      "id": "theme_picker_selector",
+      "label": "Theme variant picker selector (advanced)",
+      "info": "Optional CSS selector of the theme's variant picker, e.g. variant-selects. Leave empty for auto-detection."
+    },
+    {
+      "type": "checkbox",
+      "id": "hide_sold_out",
+      "label": "Hide sold-out variants",
+      "default": false
+    },
+    {
+      "type": "text",
+      "id": "sold_out_text",
+      "label": "Sold-out label",
+      "default": "Sold out"
+    },
+    {
+      "type": "range",
+      "id": "sold_out_opacity",
+      "label": "Sold-out card opacity",
+      "min": 30,
+      "max": 100,
+      "step": 5,
+      "unit": "%",
+      "default": 55
+    },
+    {
+      "type": "header",
+      "content": "Heading"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_heading",
+      "label": "Show heading",
+      "default": true
+    },
+    {
+      "type": "text",
+      "id": "heading_text",
+      "label": "Heading",
+      "default": "[option]: [value]",
+      "info": "[option] = option name, [value] = selected card title."
+    },
+    {
+      "type": "range",
+      "id": "heading_size",
+      "label": "Heading size (desktop)",
+      "min": 11,
+      "max": 28,
+      "step": 1,
+      "unit": "px",
+      "default": 15
+    },
+    {
+      "type": "range",
+      "id": "heading_size_mobile",
+      "label": "Heading size (mobile)",
+      "min": 11,
+      "max": 28,
+      "step": 1,
+      "unit": "px",
+      "default": 14
+    },
+    {
+      "type": "color",
+      "id": "heading_color",
+      "label": "Heading color",
+      "default": "#6B6B6B"
+    },
+    {
+      "type": "color",
+      "id": "heading_value_color",
+      "label": "Selected value color",
+      "default": "#1A1A1A"
+    },
+    {
+      "type": "header",
+      "content": "Card content"
+    },
+    {
+      "type": "select",
+      "id": "title_source",
+      "label": "Card title",
+      "default": "variant_title",
+      "options": [
+        {
+          "value": "variant_title",
+          "label": "Variant title"
+        },
+        {
+          "value": "option1",
+          "label": "Option 1 value"
+        },
+        {
+          "value": "option2",
+          "label": "Option 2 value"
+        },
+        {
+          "value": "option3",
+          "label": "Option 3 value"
+        }
+      ]
+    },
+    {
+      "type": "checkbox",
+      "id": "show_price",
+      "label": "Show variant price",
+      "default": false
+    },
+    {
+      "type": "checkbox",
+      "id": "show_compare_at",
+      "label": "Show compare-at price",
+      "default": true,
+      "info": "Only when the variant price is shown and is on sale."
+    },
+    {
+      "type": "checkbox",
+      "id": "show_unit_price",
+      "label": "Show unit price",
+      "default": true
+    },
+    {
+      "type": "checkbox",
+      "id": "unit_price_fallback",
+      "label": "Show variant price when no unit price is available",
+      "default": true
+    },
+    {
+      "type": "header",
+      "content": "Unit price"
+    },
+    {
+      "type": "select",
+      "id": "unit_source",
+      "label": "Unit data source",
+      "default": "auto",
+      "options": [
+        {
+          "value": "auto",
+          "label": "Auto (Shopify unit price → metafield → weight)"
+        },
+        {
+          "value": "native",
+          "label": "Shopify unit price only"
+        },
+        {
+          "value": "metafield",
+          "label": "Variant metafield only"
+        },
+        {
+          "value": "weight",
+          "label": "Variant shipping weight only"
+        }
+      ],
+      "info": "Shopify unit price = 'Show unit price' on the variant. Weight = the variant's shipping weight."
+    },
+    {
+      "type": "text",
+      "id": "unit_format",
+      "label": "Unit price format",
+      "default": "[price]/[unit]",
+      "info": "e.g. [price]/[unit] or ([price] per [unit])"
+    },
+    {
+      "type": "select",
+      "id": "mass_unit",
+      "label": "Show weight-based prices per",
+      "default": "kg",
+      "options": [
+        {
+          "value": "kg",
+          "label": "1 kg"
+        },
+        {
+          "value": "100g",
+          "label": "100 g"
+        },
+        {
+          "value": "g",
+          "label": "1 g"
+        },
+        {
+          "value": "lb",
+          "label": "1 lb"
+        },
+        {
+          "value": "oz",
+          "label": "1 oz"
+        }
+      ]
+    },
+    {
+      "type": "select",
+      "id": "volume_unit",
+      "label": "Show volume-based prices per",
+      "default": "l",
+      "options": [
+        {
+          "value": "l",
+          "label": "1 L"
+        },
+        {
+          "value": "100ml",
+          "label": "100 ml"
+        },
+        {
+          "value": "ml",
+          "label": "1 ml"
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "id": "qty_metafield",
+      "label": "Quantity metafield (namespace.key)",
+      "default": "custom.unit_quantity",
+      "info": "Variant metafield of type Weight, Volume, Integer or Decimal."
+    },
+    {
+      "type": "select",
+      "id": "qty_metafield_unit",
+      "label": "Unit of number metafields",
+      "default": "kg",
+      "options": [
+        {
+          "value": "g",
+          "label": "g"
+        },
+        {
+          "value": "kg",
+          "label": "kg"
+        },
+        {
+          "value": "lb",
+          "label": "lb"
+        },
+        {
+          "value": "oz",
+          "label": "oz"
+        },
+        {
+          "value": "ml",
+          "label": "ml"
+        },
+        {
+          "value": "cl",
+          "label": "cl"
+        },
+        {
+          "value": "l",
+          "label": "L"
+        },
+        {
+          "value": "other",
+          "label": "Other (use label below)"
+        }
+      ],
+      "info": "Weight and Volume metafields carry their own unit."
+    },
+    {
+      "type": "text",
+      "id": "qty_metafield_unit_label",
+      "label": "Label for 'Other' unit",
+      "default": "pc",
+      "info": "e.g. m², pc, wash"
+    },
+    {
+      "type": "header",
+      "content": "Savings badge"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_savings",
+      "label": "Show savings badge",
+      "default": true
+    },
+    {
+      "type": "select",
+      "id": "savings_basis",
+      "label": "Calculate savings from",
+      "default": "unit_price",
+      "options": [
+        {
+          "value": "unit_price",
+          "label": "Unit price vs reference variant"
+        },
+        {
+          "value": "compare_at",
+          "label": "Compare-at price"
+        }
+      ]
+    },
+    {
+      "type": "select",
+      "id": "savings_reference",
+      "label": "Reference variant (unit price)",
+      "default": "first",
+      "options": [
+        {
+          "value": "first",
+          "label": "First variant with unit data"
+        },
+        {
+          "value": "highest",
+          "label": "Highest unit price"
+        }
+      ],
+      "info": "Savings % = (reference unit price − card unit price) ÷ reference unit price × 100"
+    },
+    {
+      "type": "select",
+      "id": "savings_rounding",
+      "label": "Rounding",
+      "default": "round",
+      "options": [
+        {
+          "value": "round",
+          "label": "Nearest whole %"
+        },
+        {
+          "value": "floor",
+          "label": "Round down"
+        }
+      ]
+    },
+    {
+      "type": "range",
+      "id": "savings_min",
+      "label": "Minimum savings to show",
+      "min": 1,
+      "max": 50,
+      "step": 1,
+      "unit": "%",
+      "default": 1
+    },
+    {
+      "type": "text",
+      "id": "savings_text",
+      "label": "Badge text",
+      "default": "Save [percent]%",
+      "info": "[percent] = saving without the % sign"
+    },
+    {
+      "type": "select",
+      "id": "savings_style",
+      "label": "Badge style",
+      "default": "bar",
+      "options": [
+        {
+          "value": "bar",
+          "label": "Full-width bar"
+        },
+        {
+          "value": "pill",
+          "label": "Pill"
+        }
+      ]
+    },
+    {
+      "type": "color",
+      "id": "savings_bg",
+      "label": "Badge background",
+      "default": "#4A4A4A"
+    },
+    {
+      "type": "color",
+      "id": "savings_color",
+      "label": "Badge text",
+      "default": "#FFFFFF"
+    },
+    {
+      "type": "range",
+      "id": "savings_size",
+      "label": "Badge text size",
+      "min": 10,
+      "max": 20,
+      "step": 1,
+      "unit": "px",
+      "default": 14
+    },
+    {
+      "type": "header",
+      "content": "Popular variant label"
+    },
+    {
+      "type": "paragraph",
+      "content": "Shows on every variant whose metafield is true. Create a variant metafield definition 'Popular variant' (True or false) and set it on the variant."
+    },
+    {
+      "type": "checkbox",
+      "id": "show_popular",
+      "label": "Show popular label",
+      "default": true
+    },
+    {
+      "type": "text",
+      "id": "popular_metafield",
+      "label": "Metafield (namespace.key)",
+      "default": "custom.popular_variant"
+    },
+    {
+      "type": "text",
+      "id": "popular_label",
+      "label": "Label",
+      "default": "Bestseller"
+    },
+    {
+      "type": "color",
+      "id": "popular_bg",
+      "label": "Label background",
+      "default": "#F5A623"
+    },
+    {
+      "type": "color",
+      "id": "popular_color",
+      "label": "Label text",
+      "default": "#1A1A1A"
+    },
+    {
+      "type": "range",
+      "id": "popular_size",
+      "label": "Label text size",
+      "min": 10,
+      "max": 18,
+      "step": 1,
+      "unit": "px",
+      "default": 13
+    },
+    {
+      "type": "color",
+      "id": "popular_border",
+      "label": "Popular card border",
+      "info": "Optional. Leave empty to use the normal border."
+    },
+    {
+      "type": "header",
+      "content": "Layout"
+    },
+    {
+      "type": "range",
+      "id": "columns_desktop",
+      "label": "Cards per row (desktop)",
+      "min": 2,
+      "max": 6,
+      "step": 1,
+      "default": 4
+    },
+    {
+      "type": "range",
+      "id": "columns_tablet",
+      "label": "Cards per row (tablet)",
+      "min": 2,
+      "max": 6,
+      "step": 1,
+      "default": 4
+    },
+    {
+      "type": "select",
+      "id": "mobile_layout",
+      "label": "Mobile layout",
+      "default": "scroll",
+      "options": [
+        {
+          "value": "scroll",
+          "label": "Horizontal scroll (one row)"
+        },
+        {
+          "value": "grid",
+          "label": "Grid"
+        }
+      ]
+    },
+    {
+      "type": "range",
+      "id": "mobile_card_width",
+      "label": "Card width (mobile scroll)",
+      "min": 28,
+      "max": 80,
+      "step": 2,
+      "unit": "%",
+      "default": 40
+    },
+    {
+      "type": "range",
+      "id": "columns_mobile",
+      "label": "Cards per row (mobile grid)",
+      "min": 1,
+      "max": 4,
+      "step": 1,
+      "default": 2
+    },
+    {
+      "type": "range",
+      "id": "gap",
+      "label": "Card spacing (desktop)",
+      "min": 4,
+      "max": 24,
+      "step": 1,
+      "unit": "px",
+      "default": 10
+    },
+    {
+      "type": "range",
+      "id": "gap_mobile",
+      "label": "Card spacing (mobile)",
+      "min": 4,
+      "max": 24,
+      "step": 1,
+      "unit": "px",
+      "default": 8
+    },
+    {
+      "type": "select",
+      "id": "text_align",
+      "label": "Text alignment",
+      "default": "center",
+      "options": [
+        {
+          "value": "left",
+          "label": "Left"
+        },
+        {
+          "value": "center",
+          "label": "Center"
+        }
+      ]
+    },
+    {
+      "type": "range",
+      "id": "mobile_breakpoint",
+      "label": "Mobile breakpoint",
+      "min": 600,
+      "max": 1000,
+      "step": 10,
+      "unit": "px",
+      "default": 750,
+      "info": "Screens narrower than this use the mobile settings."
+    },
+    {
+      "type": "header",
+      "content": "Card style"
+    },
+    {
+      "type": "range",
+      "id": "card_padding_y",
+      "label": "Vertical padding",
+      "min": 4,
+      "max": 32,
+      "step": 1,
+      "unit": "px",
+      "default": 14
+    },
+    {
+      "type": "range",
+      "id": "card_padding_x",
+      "label": "Horizontal padding",
+      "min": 4,
+      "max": 24,
+      "step": 1,
+      "unit": "px",
+      "default": 8
+    },
+    {
+      "type": "range",
+      "id": "card_radius",
+      "label": "Corner radius",
+      "min": 0,
+      "max": 24,
+      "step": 1,
+      "unit": "px",
+      "default": 10
+    },
+    {
+      "type": "range",
+      "id": "border_width",
+      "label": "Border width",
+      "min": 1,
+      "max": 4,
+      "step": 1,
+      "unit": "px",
+      "default": 1
+    },
+    {
+      "type": "range",
+      "id": "selected_border_width",
+      "label": "Selected border width",
+      "min": 1,
+      "max": 5,
+      "step": 1,
+      "unit": "px",
+      "default": 3
+    },
+    {
+      "type": "color",
+      "id": "card_bg",
+      "label": "Background",
+      "default": "#FFFFFF"
+    },
+    {
+      "type": "color",
+      "id": "card_border",
+      "label": "Border",
+      "default": "#D4D4D4"
+    },
+    {
+      "type": "color",
+      "id": "card_text",
+      "label": "Title text",
+      "default": "#1A1A1A"
+    },
+    {
+      "type": "color",
+      "id": "card_muted",
+      "label": "Price text",
+      "default": "#7A7A7A"
+    },
+    {
+      "type": "color",
+      "id": "selected_bg",
+      "label": "Selected background",
+      "default": "#FFFFFF"
+    },
+    {
+      "type": "color",
+      "id": "selected_border",
+      "label": "Selected border",
+      "default": "#1A1A1A"
+    },
+    {
+      "type": "color",
+      "id": "hover_border",
+      "label": "Hover border",
+      "default": "#8C8C8C"
+    },
+    {
+      "type": "header",
+      "content": "Typography"
+    },
+    {
+      "type": "range",
+      "id": "title_size",
+      "label": "Title size (desktop)",
+      "min": 11,
+      "max": 26,
+      "step": 1,
+      "unit": "px",
+      "default": 16
+    },
+    {
+      "type": "range",
+      "id": "title_size_mobile",
+      "label": "Title size (mobile)",
+      "min": 11,
+      "max": 26,
+      "step": 1,
+      "unit": "px",
+      "default": 15
+    },
+    {
+      "type": "select",
+      "id": "title_weight",
+      "label": "Title weight",
+      "default": "500",
+      "options": [
+        {
+          "value": "400",
+          "label": "Regular"
+        },
+        {
+          "value": "500",
+          "label": "Medium"
+        },
+        {
+          "value": "600",
+          "label": "Semibold"
+        },
+        {
+          "value": "700",
+          "label": "Bold"
+        }
+      ]
+    },
+    {
+      "type": "range",
+      "id": "price_size",
+      "label": "Price size (desktop)",
+      "min": 10,
+      "max": 22,
+      "step": 1,
+      "unit": "px",
+      "default": 15
+    },
+    {
+      "type": "range",
+      "id": "price_size_mobile",
+      "label": "Price size (mobile)",
+      "min": 10,
+      "max": 22,
+      "step": 1,
+      "unit": "px",
+      "default": 14
+    },
+    {
+      "type": "header",
+      "content": "Spacing"
+    },
+    {
+      "type": "range",
+      "id": "margin_top",
+      "label": "Top margin",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 8
+    },
+    {
+      "type": "range",
+      "id": "margin_bottom",
+      "label": "Bottom margin",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 20
+    }
+  ],
+  "presets": [
+    {
+      "name": "SC – Variant cards"
+    }
+  ]
+}
+{% endschema %}

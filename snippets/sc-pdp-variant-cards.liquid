@@ -1,0 +1,1114 @@
+{%- comment -%}
+  SC – PDP Variant Cards (PDP block)
+  ----------------------------------------------------------------------------
+  Replaces the theme's dropdown / pill variant picker with clickable cards.
+  Each card = one variant and can show:
+    - title (variant title or a single option value)
+    - variant price (+ compare-at)
+    - unit price, e.g. "€8,81/kg"
+    - savings badge, e.g. "Save 37%"
+    - popular label, e.g. "Bestseller" (variant metafield, Boolean)
+
+  Usage (inside any product section's block loop):
+    {%- when 'sc_pdp_variant_cards' -%}
+      {% render 'sc-pdp-variant-cards', block: block, product: product, section: section %}
+
+  Accepts:
+  - block:   {Object} block whose settings match the "sc_pdp_variant_cards" schema
+             (see sections/main-product.liquid or blocks/sc-pdp-variant-cards.liquid).
+  - product: {Object} product to read variants from (defaults to the global product).
+  - section: {Object} parent section (used to scope the theme picker / pre-hide CSS).
+
+  Unit price (per variant, first match wins in "Auto"):
+    1. Shopify native unit price (variant "Show unit price" – unit_price + unit_price_measurement).
+    2. Variant quantity metafield (Weight / Volume / Integer / Decimal), converted to the display unit.
+    3. Variant shipping weight (always grams in Liquid), converted to the display unit.
+    Nothing found -> no unit price and no unit-price savings for that variant.
+
+  Savings (unit price basis):
+    Savings % = (reference unit price − card unit price) ÷ reference unit price × 100
+    Reference = first variant with unit data (default) or the highest unit price,
+    only compared between variants that use the same unit (kg vs kg, L vs L ...).
+
+  Theme independence:
+  - Everything is rendered server-side with the `money` filter (active market currency).
+  - Clicking a card sets the matching option inputs of the theme's own picker and fires a
+    native "change" event, so the theme updates price, media, URL and Add to cart as usual.
+    If no picker is found (or it doesn't react) the product form's name="id" input and the
+    ?variant= URL parameter are set directly, so Add to cart always adds the chosen variant.
+  - Variant changes made elsewhere (URL, other pickers, theme events) re-select the card.
+{%- endcomment -%}
+
+{%- liquid
+  assign s = block.settings
+  assign uid = 'sc-vc-' | append: block.id
+  assign p = product
+-%}
+
+{%- if s.enable != false -%}
+  {%- if p == blank or p.has_only_default_variant -%}
+    {%- if request.design_mode -%}
+      <div {{ block.shopify_attributes }} style="padding:10px;font-size:13px;opacity:.6;font-style:italic;">
+        {%- if p == blank -%}
+          SC – Variant cards: add this block to a product section to preview it.
+        {%- else -%}
+          SC – Variant cards: this product has no variants, so nothing is shown. Preview a product with variants.
+        {%- endif -%}
+      </div>
+    {%- endif -%}
+  {%- else -%}
+    {%- liquid
+      assign current = p.selected_or_first_available_variant
+
+      # --- metafield keys (namespace.key) ---
+      assign pop_ns = ''
+      assign pop_key = ''
+      assign parts = s.popular_metafield | strip | split: '.'
+      if parts.size == 2
+        assign pop_ns = parts[0] | strip
+        assign pop_key = parts[1] | strip
+      endif
+      assign popular_label = s.popular_label | strip | escape
+
+      assign qty_ns = ''
+      assign qty_key = ''
+      assign parts = s.qty_metafield | strip | split: '.'
+      if parts.size == 2
+        assign qty_ns = parts[0] | strip
+        assign qty_key = parts[1] | strip
+      endif
+      assign other_unit_label = s.qty_metafield_unit_label | strip | escape
+
+      assign unit_source = s.unit_source | default: 'auto'
+
+      # --- display units ---
+      case s.mass_unit
+        when '100g'
+          assign mass_factor = 100.0
+          assign mass_label = '100g'
+        when 'g'
+          assign mass_factor = 1.0
+          assign mass_label = 'g'
+        when 'lb'
+          assign mass_factor = 453.59237
+          assign mass_label = 'lb'
+        when 'oz'
+          assign mass_factor = 28.349523125
+          assign mass_label = 'oz'
+        else
+          assign mass_factor = 1000.0
+          assign mass_label = 'kg'
+      endcase
+      case s.volume_unit
+        when '100ml'
+          assign vol_factor = 100.0
+          assign vol_label = '100ml'
+        when 'ml'
+          assign vol_factor = 1.0
+          assign vol_label = 'ml'
+        else
+          assign vol_factor = 1000.0
+          assign vol_label = 'L'
+      endcase
+
+      assign unit_format = s.unit_format | strip | escape
+      if unit_format == blank
+        assign unit_format = '[price]/[unit]'
+      endif
+      assign savings_text = s.savings_text | strip | escape
+      assign sold_out_text = s.sold_out_text | strip | escape
+
+      assign ref_key = ''
+      assign ref_ppb = 0
+      assign has_popular = false
+      assign card_count = 0
+      assign current_title = ''
+    -%}
+
+    {%- capture cards_html -%}
+      {%- for pass in (1..2) -%}
+        {%- for v in p.variants -%}
+          {%- liquid
+            # ---------- unit data ----------
+            assign ukey = ''
+            assign ppb = 0
+            assign u_cents = 0
+            assign u_label = ''
+            assign fam = ''
+            assign base_qty = 0
+
+            if unit_source == 'auto' or unit_source == 'native'
+              if v.unit_price_measurement and v.unit_price
+                assign m = v.unit_price_measurement
+                assign ref_val = m.reference_value | default: 1
+                assign ppb = v.unit_price | times: 1.0 | divided_by: ref_val
+                assign ukey = 'native:' | append: m.reference_unit
+                assign u_cents = v.unit_price
+                assign u_label = m.reference_unit | escape
+                if ref_val != 1
+                  assign u_label = ref_val | append: u_label
+                endif
+              endif
+            endif
+
+            if ukey == blank and qty_ns != blank
+              if unit_source == 'auto' or unit_source == 'metafield'
+                assign mf = v.metafields[qty_ns][qty_key]
+                if mf != blank
+                  assign q = 0
+                  assign q_unit = ''
+                  if mf.type == 'weight' or mf.type == 'volume'
+                    assign q = mf.value.value | times: 1.0
+                    assign q_unit = mf.value.unit | append: '' | downcase
+                  else
+                    assign q = mf.value | append: '' | strip | replace: ',', '.' | times: 1.0
+                    assign q_unit = s.qty_metafield_unit
+                  endif
+                  assign q_factor = 0
+                  case q_unit
+                    when 'g', 'grams'
+                      assign fam = 'mass'
+                      assign q_factor = 1.0
+                    when 'kg', 'kilograms'
+                      assign fam = 'mass'
+                      assign q_factor = 1000.0
+                    when 'lb', 'pounds'
+                      assign fam = 'mass'
+                      assign q_factor = 453.59237
+                    when 'oz', 'ounces'
+                      assign fam = 'mass'
+                      assign q_factor = 28.349523125
+                    when 'ml', 'milliliters'
+                      assign fam = 'volume'
+                      assign q_factor = 1.0
+                    when 'cl', 'centiliters'
+                      assign fam = 'volume'
+                      assign q_factor = 10.0
+                    when 'l', 'liters'
+                      assign fam = 'volume'
+                      assign q_factor = 1000.0
+                    when 'm3', 'cubic_meters'
+                      assign fam = 'volume'
+                      assign q_factor = 1000000.0
+                    when 'us_fl_oz', 'fluid_ounces'
+                      assign fam = 'volume'
+                      assign q_factor = 29.5735295625
+                    when 'us_gal', 'gallons'
+                      assign fam = 'volume'
+                      assign q_factor = 3785.411784
+                    when 'imp_fl_oz', 'imperial_fluid_ounces'
+                      assign fam = 'volume'
+                      assign q_factor = 28.4130625
+                    when 'other'
+                      if other_unit_label != blank
+                        assign fam = 'other'
+                        assign q_factor = 1.0
+                      endif
+                  endcase
+                  if fam != blank and q > 0
+                    assign base_qty = q | times: q_factor
+                  else
+                    assign fam = ''
+                  endif
+                endif
+              endif
+            endif
+
+            if ukey == blank and fam == blank
+              if unit_source == 'auto' or unit_source == 'weight'
+                if v.weight > 0
+                  assign fam = 'mass'
+                  assign base_qty = v.weight | times: 1.0
+                endif
+              endif
+            endif
+
+            if ukey == blank and fam != blank and base_qty > 0
+              assign ppb = v.price | times: 1.0 | divided_by: base_qty
+              assign ukey = fam
+              case fam
+                when 'mass'
+                  assign u_cents = ppb | times: mass_factor | round
+                  assign u_label = mass_label
+                when 'volume'
+                  assign u_cents = ppb | times: vol_factor | round
+                  assign u_label = vol_label
+                else
+                  assign u_cents = ppb | round
+                  assign u_label = other_unit_label
+                  assign ukey = 'other:' | append: other_unit_label
+              endcase
+            endif
+
+            # ---------- popular ----------
+            assign is_pop = false
+            if s.show_popular and pop_ns != blank and popular_label != blank
+              assign pv = v.metafields[pop_ns][pop_key].value | append: '' | strip | downcase
+              if pv == 'true' or pv == 'yes' or pv == '1'
+                assign is_pop = true
+              endif
+            endif
+
+            # ---------- pass 1: savings reference ----------
+            if pass == 1
+              if ukey != blank
+                if ref_key == blank
+                  assign ref_key = ukey
+                  assign ref_ppb = ppb
+                elsif s.savings_reference == 'highest' and ukey == ref_key and ppb > ref_ppb
+                  assign ref_ppb = ppb
+                endif
+              endif
+              if is_pop
+                unless s.hide_sold_out and v.available == false
+                  assign has_popular = true
+                endunless
+              endif
+              continue
+            endif
+
+            # ---------- pass 2: render ----------
+            if s.hide_sold_out and v.available == false
+              continue
+            endif
+
+            case s.title_source
+              when 'option1'
+                assign title = v.option1
+              when 'option2'
+                assign title = v.option2
+              when 'option3'
+                assign title = v.option3
+              else
+                assign title = v.title
+            endcase
+            if title == blank
+              assign title = v.title
+            endif
+            assign title = title | escape
+
+            assign save_pct = 0
+            if s.show_savings and savings_text != blank
+              assign diff = 0
+              if s.savings_basis == 'compare_at'
+                if v.compare_at_price > v.price
+                  assign diff = v.compare_at_price | minus: v.price | times: 100.0 | divided_by: v.compare_at_price
+                endif
+              elsif ukey != blank and ukey == ref_key and ref_ppb > 0 and ppb < ref_ppb
+                assign diff = ref_ppb | minus: ppb | times: 100.0 | divided_by: ref_ppb
+              endif
+              if s.savings_rounding == 'floor'
+                assign save_pct = diff | floor
+              else
+                assign save_pct = diff | round
+              endif
+              if save_pct < s.savings_min
+                assign save_pct = 0
+              endif
+            endif
+
+            assign show_unit = false
+            if s.show_unit_price and ukey != blank and u_cents > 0
+              assign show_unit = true
+            endif
+            assign show_price = s.show_price
+            if s.show_unit_price and show_unit == false and s.unit_price_fallback
+              assign show_price = true
+            endif
+
+            assign selected = false
+            if v.id == current.id
+              assign selected = true
+              assign current_title = title
+            endif
+            assign card_count = card_count | plus: 1
+          -%}
+          <button
+            type="button"
+            role="radio"
+            class="sc-vc__card{% if selected %} is-selected{% endif %}{% if v.available == false %} is-sold-out{% endif %}{% if is_pop %} is-popular{% endif %}{% if save_pct > 0 %} has-save{% endif %}"
+            aria-checked="{{ selected }}"
+            tabindex="{% if selected %}0{% else %}-1{% endif %}"
+            data-sc-vc-card
+            data-variant-id="{{ v.id }}"
+            data-title="{{ title }}"
+            data-options="{{ v.options | json | escape }}"
+          >
+            {%- if is_pop -%}
+              <span class="sc-vc__popular">{{ popular_label }}</span>
+            {%- endif -%}
+            <span class="sc-vc__body">
+              <span class="sc-vc__title">{{ title }}</span>
+              {%- if show_price -%}
+                <span class="sc-vc__price">
+                  {%- if s.show_compare_at and v.compare_at_price > v.price -%}
+                    <s class="sc-vc__compare">{{ v.compare_at_price | money }}</s>
+                  {%- endif -%}
+                  <span>{{ v.price | money }}</span>
+                </span>
+              {%- endif -%}
+              {%- if show_unit -%}
+                {%- assign u_money = u_cents | money -%}
+                <span class="sc-vc__unit">{{ unit_format | replace: '[price]', u_money | replace: '[unit]', u_label }}</span>
+              {%- endif -%}
+              {%- if v.available == false and sold_out_text != blank -%}
+                <span class="sc-vc__soldout">{{ sold_out_text }}</span>
+              {%- endif -%}
+              {%- if save_pct > 0 and s.savings_style == 'pill' -%}
+                <span class="sc-vc__save sc-vc__save--pill">{{ savings_text | replace: '[percent]', save_pct }}</span>
+              {%- endif -%}
+            </span>
+            {%- if save_pct > 0 and s.savings_style != 'pill' -%}
+              <span class="sc-vc__save sc-vc__save--bar">{{ savings_text | replace: '[percent]', save_pct }}</span>
+            {%- endif -%}
+          </button>
+        {%- endfor -%}
+      {%- endfor -%}
+    {%- endcapture -%}
+
+    {%- liquid
+      if p.options.size == 1
+        assign option_name = p.options.first | escape
+      else
+        assign option_name = p.options | join: ' / ' | escape
+      endif
+      assign heading_html = ''
+      if s.show_heading
+        assign value_html = '<span class="sc-vc__heading-value" data-sc-vc-value>' | append: current_title | append: '</span>'
+        assign heading_html = s.heading_text | strip | escape | replace: '[option]', option_name | replace: '[value]', value_html
+      endif
+
+      assign picker_selector = s.theme_picker_selector | strip | remove: '<' | remove: '>' | remove: '{' | remove: '}'
+      assign mobile_bp = s.mobile_breakpoint | default: 750
+      assign mobile_max = mobile_bp | minus: 1
+      assign pop_border = s.popular_border
+      if pop_border == blank or pop_border.alpha == 0
+        assign pop_border = s.card_border
+      endif
+    -%}
+
+    {%- if card_count > 0 -%}
+      <sc-variant-cards
+        id="{{ uid }}"
+        class="sc-vc sc-vc--{{ s.mobile_layout | default: 'scroll' }} sc-vc--align-{{ s.text_align | default: 'center' }}{% if has_popular %} sc-vc--has-popular{% endif %}"
+        data-product-id="{{ p.id }}"
+        data-variant-id="{{ current.id }}"
+        {% if s.hide_theme_picker %}data-hide-picker="true"{% endif %}
+        {% if picker_selector != blank %}data-picker-selector="{{ picker_selector | escape }}"{% endif %}
+        style="
+          --sc-vc-cols: {{ s.columns_desktop | default: 4 }};
+          --sc-vc-cols-t: {{ s.columns_tablet | default: 4 }};
+          --sc-vc-cols-m: {{ s.columns_mobile | default: 2 }};
+          --sc-vc-mw: {{ s.mobile_card_width | default: 40 }}%;
+          --sc-vc-gap: {{ s.gap | default: 10 }}px;
+          --sc-vc-gap-m: {{ s.gap_mobile | default: 8 }}px;
+          --sc-vc-py: {{ s.card_padding_y }}px;
+          --sc-vc-px: {{ s.card_padding_x }}px;
+          --sc-vc-radius: {{ s.card_radius }}px;
+          --sc-vc-bw: {{ s.border_width | default: 1 }}px;
+          --sc-vc-sbw: {{ s.selected_border_width | default: 3 }}px;
+          --sc-vc-bg: {{ s.card_bg }};
+          --sc-vc-border: {{ s.card_border }};
+          --sc-vc-text: {{ s.card_text }};
+          --sc-vc-muted: {{ s.card_muted }};
+          --sc-vc-sel-bg: {{ s.selected_bg }};
+          --sc-vc-sel-border: {{ s.selected_border }};
+          --sc-vc-hover: {{ s.hover_border }};
+          --sc-vc-pop-border: {{ pop_border }};
+          --sc-vc-soldout-op: {{ s.sold_out_opacity | default: 55 | divided_by: 100.0 }};
+          --sc-vc-save-bg: {{ s.savings_bg }};
+          --sc-vc-save-c: {{ s.savings_color }};
+          --sc-vc-save-fs: {{ s.savings_size | default: 14 }}px;
+          --sc-vc-pop-bg: {{ s.popular_bg }};
+          --sc-vc-pop-c: {{ s.popular_color }};
+          --sc-vc-pop-fs: {{ s.popular_size | default: 13 }}px;
+          --sc-vc-title-fs: {{ s.title_size | default: 16 }}px;
+          --sc-vc-title-fs-m: {{ s.title_size_mobile | default: 15 }}px;
+          --sc-vc-title-fw: {{ s.title_weight | default: 500 }};
+          --sc-vc-price-fs: {{ s.price_size | default: 15 }}px;
+          --sc-vc-price-fs-m: {{ s.price_size_mobile | default: 14 }}px;
+          --sc-vc-h-fs: {{ s.heading_size | default: 15 }}px;
+          --sc-vc-h-fs-m: {{ s.heading_size_mobile | default: 14 }}px;
+          --sc-vc-h-c: {{ s.heading_color }};
+          --sc-vc-h-vc: {{ s.heading_value_color }};
+          --sc-vc-mt: {{ s.margin_top }}px;
+          --sc-vc-mb: {{ s.margin_bottom }}px;
+        "
+        {{ block.shopify_attributes }}
+      >
+        {%- if heading_html != blank -%}
+          <p class="sc-vc__heading" id="{{ uid }}-label">{{ heading_html }}</p>
+        {%- endif -%}
+        <div
+          class="sc-vc__track"
+          role="radiogroup"
+          {% if heading_html != blank %}aria-labelledby="{{ uid }}-label"{% else %}aria-label="{{ option_name }}"{% endif %}
+          data-sc-vc-track
+        >
+          {{ cards_html }}
+        </div>
+      </sc-variant-cards>
+
+      <style>
+        {%- if s.hide_theme_picker -%}
+          {%- comment -%} Pre-hide the theme picker to avoid a flash; JS also hides whatever it detects. {%- endcomment -%}
+          #shopify-section-{{ section.id }} :is(variant-selects, variant-radios, variant-picker):not(quick-add-modal *):not(dialog *),
+          [data-sc-vc-hidden] { display: none !important; }
+          {%- if picker_selector != blank %}
+          #shopify-section-{{ section.id }} :is({{ picker_selector }}):not(#{{ uid }}):not(#{{ uid }} *) { display: none !important; }
+          {%- endif -%}
+        {%- endif -%}
+
+        #{{ uid }} {
+          display: block;
+          box-sizing: border-box;
+          width: 100%;
+          max-width: 100%;
+          margin: var(--sc-vc-mt) 0 var(--sc-vc-mb);
+          line-height: 1.35;
+          letter-spacing: normal;
+          text-transform: none;
+          --sc-vc-pop-space: calc(var(--sc-vc-pop-fs) * 0.8 + 5px);
+        }
+        #{{ uid }} *,
+        #{{ uid }} *::before,
+        #{{ uid }} *::after { box-sizing: border-box; }
+
+        #{{ uid }} .sc-vc__heading {
+          margin: 0 0 12px;
+          padding: 0;
+          font-size: var(--sc-vc-h-fs);
+          line-height: 1.4;
+          color: var(--sc-vc-h-c);
+          overflow-wrap: anywhere;
+        }
+        #{{ uid }} .sc-vc__heading-value { color: var(--sc-vc-h-vc); }
+
+        #{{ uid }} .sc-vc__track {
+          position: relative;
+          display: grid;
+          grid-template-columns: repeat(var(--sc-vc-cols), minmax(0, 1fr));
+          gap: var(--sc-vc-gap);
+          margin: 0;
+          padding: 0;
+          list-style: none;
+        }
+        #{{ uid }}.sc-vc--has-popular .sc-vc__track {
+          padding-top: var(--sc-vc-pop-space);
+          row-gap: calc(var(--sc-vc-gap) + var(--sc-vc-pop-space));
+        }
+
+        #{{ uid }} .sc-vc__card {
+          -webkit-appearance: none;
+          appearance: none;
+          position: relative;
+          display: flex;
+          flex-direction: column;
+          width: 100%;
+          min-width: 0;
+          height: auto;
+          min-height: 0;
+          margin: 0;
+          padding: 0;
+          font: inherit;
+          letter-spacing: normal;
+          text-transform: none;
+          text-decoration: none;
+          text-align: inherit;
+          color: var(--sc-vc-text);
+          background: var(--sc-vc-bg);
+          border: var(--sc-vc-bw) solid var(--sc-vc-border);
+          border-radius: var(--sc-vc-radius);
+          box-shadow: none;
+          cursor: pointer;
+          -webkit-tap-highlight-color: transparent;
+          transition: border-color .15s ease, background-color .15s ease, opacity .15s ease;
+        }
+        #{{ uid }}.sc-vc--align-center .sc-vc__card { text-align: center; }
+        #{{ uid }}.sc-vc--align-left .sc-vc__card { text-align: left; }
+        #{{ uid }} .sc-vc__card::before,
+        #{{ uid }} .sc-vc__card::after { content: none; }
+        #{{ uid }} .sc-vc__card.is-popular { border-color: var(--sc-vc-pop-border); }
+        @media (hover: hover) {
+          #{{ uid }} .sc-vc__card:hover { border-color: var(--sc-vc-hover); }
+        }
+        /* Selected ring drawn on top of the card (incl. the savings bar), no layout shift. */
+        #{{ uid }} .sc-vc__card::after {
+          content: '';
+          position: absolute;
+          inset: calc(var(--sc-vc-bw) * -1);
+          border: var(--sc-vc-sbw) solid transparent;
+          border-radius: var(--sc-vc-radius);
+          pointer-events: none;
+          z-index: 2;
+          transition: border-color .15s ease;
+        }
+        #{{ uid }} .sc-vc__card.is-selected { background: var(--sc-vc-sel-bg); }
+        #{{ uid }} .sc-vc__card.is-selected::after { border-color: var(--sc-vc-sel-border); }
+        #{{ uid }} .sc-vc__card:focus { outline: none; }
+        #{{ uid }} .sc-vc__card:focus-visible {
+          outline: 2px solid var(--sc-vc-sel-border);
+          outline-offset: 3px;
+        }
+        #{{ uid }} .sc-vc__card.is-sold-out .sc-vc__body,
+        #{{ uid }} .sc-vc__card.is-sold-out .sc-vc__save { opacity: var(--sc-vc-soldout-op); }
+        #{{ uid }} .sc-vc__card.is-sold-out .sc-vc__title { text-decoration: line-through; }
+
+        #{{ uid }} .sc-vc__body {
+          flex: 1 1 auto;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          gap: 4px;
+          min-width: 0;
+          padding: var(--sc-vc-py) var(--sc-vc-px);
+        }
+        #{{ uid }}.sc-vc--align-center .sc-vc__body { align-items: center; }
+        #{{ uid }}.sc-vc--align-left .sc-vc__body { align-items: flex-start; }
+        #{{ uid }} .sc-vc__title {
+          display: block;
+          max-width: 100%;
+          font-size: var(--sc-vc-title-fs);
+          font-weight: var(--sc-vc-title-fw);
+          line-height: 1.25;
+          color: var(--sc-vc-text);
+          overflow-wrap: anywhere;
+        }
+        #{{ uid }} .sc-vc__price,
+        #{{ uid }} .sc-vc__unit {
+          display: block;
+          max-width: 100%;
+          font-size: var(--sc-vc-price-fs);
+          line-height: 1.3;
+          color: var(--sc-vc-muted);
+          overflow-wrap: anywhere;
+        }
+        #{{ uid }} .sc-vc__compare { margin-right: .35em; opacity: .75; font-size: .9em; }
+        #{{ uid }} .sc-vc__soldout {
+          display: block;
+          font-size: calc(var(--sc-vc-price-fs) * .8);
+          line-height: 1.3;
+          color: var(--sc-vc-muted);
+        }
+        #{{ uid }} .sc-vc__sr {
+          position: absolute !important;
+          width: 1px; height: 1px;
+          margin: -1px; padding: 0;
+          overflow: hidden;
+          clip: rect(0 0 0 0);
+          white-space: nowrap;
+          border: 0;
+        }
+
+        #{{ uid }} .sc-vc__save {
+          display: block;
+          font-size: var(--sc-vc-save-fs);
+          font-weight: 500;
+          line-height: 1.3;
+          color: var(--sc-vc-save-c);
+          background: var(--sc-vc-save-bg);
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        #{{ uid }} .sc-vc__save--bar {
+          flex: 0 0 auto;
+          width: 100%;
+          padding: 4px 6px;
+          text-align: center;
+          border-radius: 0 0 max(0px, calc(var(--sc-vc-radius) - var(--sc-vc-bw))) max(0px, calc(var(--sc-vc-radius) - var(--sc-vc-bw)));
+        }
+        #{{ uid }} .sc-vc__save--pill {
+          max-width: 100%;
+          margin-top: 2px;
+          padding: 2px 8px;
+          border-radius: 999px;
+          font-size: calc(var(--sc-vc-save-fs) * .9);
+        }
+
+        #{{ uid }} .sc-vc__popular {
+          position: absolute;
+          top: 0;
+          left: 50%;
+          z-index: 3;
+          max-width: calc(100% - 8px);
+          padding: 3px 10px;
+          font-size: var(--sc-vc-pop-fs);
+          font-weight: 500;
+          line-height: 1.3;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          color: var(--sc-vc-pop-c);
+          background: var(--sc-vc-pop-bg);
+          border-radius: 6px;
+          transform: translate(-50%, -62%);
+          pointer-events: none;
+        }
+
+        @media screen and (min-width: {{ mobile_bp }}px) and (max-width: 989px) {
+          #{{ uid }} .sc-vc__track { grid-template-columns: repeat(var(--sc-vc-cols-t), minmax(0, 1fr)); }
+        }
+
+        @media screen and (max-width: {{ mobile_max }}px) {
+          #{{ uid }} .sc-vc__heading { font-size: var(--sc-vc-h-fs-m); }
+          #{{ uid }} .sc-vc__title { font-size: var(--sc-vc-title-fs-m); }
+          #{{ uid }} .sc-vc__price,
+          #{{ uid }} .sc-vc__unit { font-size: var(--sc-vc-price-fs-m); }
+          #{{ uid }} .sc-vc__soldout { font-size: calc(var(--sc-vc-price-fs-m) * .8); }
+
+          #{{ uid }}.sc-vc--grid .sc-vc__track {
+            grid-template-columns: repeat(var(--sc-vc-cols-m), minmax(0, 1fr));
+            gap: var(--sc-vc-gap-m);
+          }
+          #{{ uid }}.sc-vc--grid.sc-vc--has-popular .sc-vc__track {
+            row-gap: calc(var(--sc-vc-gap-m) + var(--sc-vc-pop-space));
+          }
+
+          #{{ uid }}.sc-vc--scroll .sc-vc__track {
+            display: flex;
+            flex-wrap: nowrap;
+            gap: var(--sc-vc-gap-m);
+            overflow-x: auto;
+            overflow-y: hidden;
+            overscroll-behavior-x: contain;
+            scroll-snap-type: x proximity;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+            /* room for the selected ring / focus outline inside the scroller */
+            padding: calc(var(--sc-vc-sbw) + 1px);
+            margin: calc((var(--sc-vc-sbw) + 1px) * -1);
+            scroll-padding-inline: calc(var(--sc-vc-sbw) + 1px);
+          }
+          #{{ uid }}.sc-vc--scroll.sc-vc--has-popular .sc-vc__track {
+            padding-top: var(--sc-vc-pop-space);
+            margin-top: 0;
+          }
+          #{{ uid }}.sc-vc--scroll .sc-vc__track::-webkit-scrollbar { display: none; }
+          #{{ uid }}.sc-vc--scroll .sc-vc__card {
+            flex: 0 0 var(--sc-vc-mw);
+            width: var(--sc-vc-mw);
+            scroll-snap-align: start;
+          }
+          #{{ uid }} .sc-vc__card:focus-visible { outline-offset: -2px; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          #{{ uid }} .sc-vc__card,
+          #{{ uid }} .sc-vc__card::after { transition: none; }
+        }
+      </style>
+
+      <script>
+        (function () {
+          if (!window.customElements || window.customElements.get('sc-variant-cards')) return;
+
+          /* Common variant-change events across OS 2.0 themes (Dawn, Horizon, Focal, Impulse, Prestige ...) */
+          var VARIANT_EVENTS = [
+            'variant:change', 'variant:changed', 'variant:update', 'variantChange', 'variant-change',
+            'on:variant:change', 'theme:variant:change', 'product:variant-change', 'product:variantChange',
+            'shopify:variant:change'
+          ];
+          /* Where themes usually render their variant picker. */
+          var PICKER_SELECTORS = 'variant-selects, variant-radios, variant-picker, variant-swatches, product-variants, variant-selection, [data-variant-picker], .variant-picker, .product-form__variants, .product-options, .selector-wrapper';
+          var SKIP_NAMES = /^(id|quantity|selling_plan|product-id|section-id)$|^(properties|attributes)/;
+          var EXCLUDE_CONTAINERS = 'quick-add-modal, dialog, [role="dialog"]';
+
+          /* Shared with other SC blocks: themes update ?variant= via replaceState, emit an event for it once. */
+          if (!window.__scInvHistoryPatched && window.history) {
+            window.__scInvHistoryPatched = true;
+            ['pushState', 'replaceState'].forEach(function (fn) {
+              var orig = window.history[fn];
+              if (typeof orig !== 'function') return;
+              window.history[fn] = function () {
+                var result = orig.apply(this, arguments);
+                try { window.dispatchEvent(new Event('sc:urlchange')); } catch (e) {}
+                return result;
+              };
+            });
+          }
+
+          function idFromDetail(detail) {
+            if (!detail || typeof detail !== 'object') return null;
+            var v = detail.variant || detail.resource || detail.selectedVariant || detail.currentVariant || detail.newVariant;
+            if (v && typeof v === 'object' && v.id) return String(v.id);
+            if (detail.variantId) return String(detail.variantId);
+            return null;
+          }
+
+          function toArray(list) { return Array.prototype.slice.call(list || []); }
+
+          class ScVariantCards extends HTMLElement {
+            connectedCallback() {
+              if (this._connected) return;
+              this._connected = true;
+              this.track = this.querySelector('[data-sc-vc-track]');
+              this.cards = toArray(this.querySelectorAll('[data-sc-vc-card]'));
+              this.valueEl = this.querySelector('[data-sc-vc-value]');
+              this.current = String(this.dataset.variantId || '');
+              this.scope = this.closest('[id^="shopify-section-"]') || this.closest('section, main') || document;
+              this.reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+              /* Option values per position, collected from the cards (used to map theme inputs to options). */
+              this.optionSets = [];
+              this.cards.forEach(function (card) {
+                var opts = this.cardOptions(card);
+                opts.forEach(function (val, i) {
+                  (this.optionSets[i] = this.optionSets[i] || {})[val] = true;
+                }, this);
+              }, this);
+
+              this._onClick = this.onClick.bind(this);
+              this._onKey = this.onKey.bind(this);
+              this._onEvent = this.onVariantEvent.bind(this);
+              this._onChange = this.onChange.bind(this);
+              this._onUrl = this.scheduleSync.bind(this);
+              this._onResize = this.onResize.bind(this);
+
+              this.addEventListener('click', this._onClick);
+              this.addEventListener('keydown', this._onKey);
+              VARIANT_EVENTS.forEach(function (name) { document.addEventListener(name, this._onEvent); }, this);
+              document.addEventListener('change', this._onChange, true);
+              window.addEventListener('sc:urlchange', this._onUrl);
+              window.addEventListener('popstate', this._onUrl);
+              window.addEventListener('resize', this._onResize);
+
+              this.hidePicker();
+              this.setActive(this.current, false);
+              this.sync();
+            }
+
+            disconnectedCallback() {
+              this._connected = false;
+              this.removeEventListener('click', this._onClick);
+              this.removeEventListener('keydown', this._onKey);
+              VARIANT_EVENTS.forEach(function (name) { document.removeEventListener(name, this._onEvent); }, this);
+              document.removeEventListener('change', this._onChange, true);
+              window.removeEventListener('sc:urlchange', this._onUrl);
+              window.removeEventListener('popstate', this._onUrl);
+              window.removeEventListener('resize', this._onResize);
+              clearTimeout(this._t1); clearTimeout(this._t2); clearTimeout(this._verify); clearTimeout(this._rt);
+            }
+
+            cardOptions(card) {
+              try { return JSON.parse(card.getAttribute('data-options') || '[]') || []; } catch (e) { return []; }
+            }
+
+            /* ---------- user interaction ---------- */
+
+            onClick(event) {
+              var card = event.target.closest && event.target.closest('[data-sc-vc-card]');
+              if (!card || !this.contains(card)) return;
+              event.preventDefault();
+              this.choose(card);
+            }
+
+            onKey(event) {
+              var card = event.target.closest && event.target.closest('[data-sc-vc-card]');
+              if (!card) return;
+              var i = this.cards.indexOf(card);
+              var next = -1;
+              switch (event.key) {
+                case 'ArrowRight': case 'ArrowDown': next = (i + 1) % this.cards.length; break;
+                case 'ArrowLeft': case 'ArrowUp': next = (i - 1 + this.cards.length) % this.cards.length; break;
+                case 'Home': next = 0; break;
+                case 'End': next = this.cards.length - 1; break;
+                default: return;
+              }
+              event.preventDefault();
+              var target = this.cards[next];
+              target.focus({ preventScroll: true });
+              this.choose(target);
+            }
+
+            onResize() {
+              var self = this;
+              clearTimeout(this._rt);
+              this._rt = setTimeout(function () {
+                var active = self.activeCard();
+                if (active) self.reveal(active, false);
+              }, 150);
+            }
+
+            choose(card) {
+              var id = String(card.dataset.variantId || '');
+              if (!id) return;
+              this.setActive(id, true);
+              this.lock = { id: id, until: Date.now() + 2500 };
+
+              if (!this.driveThemePicker(card)) this.setFormVariant(id);
+
+              /* Safety net: whatever the theme does, Add to cart must post the chosen variant. */
+              var self = this;
+              clearTimeout(this._verify);
+              this._verify = setTimeout(function () {
+                if (!self.lock || self.lock.id !== id) return;
+                var formId = self.readVariantId();
+                if (formId !== null && formId !== id) self.setFormVariant(id);
+              }, 1500);
+            }
+
+            /* ---------- theme picker ---------- */
+
+            pickerRoots() {
+              var roots = [];
+              var custom = this.dataset.pickerSelector;
+              if (custom) {
+                try { roots = toArray(this.scope.querySelectorAll(custom)); } catch (e) { roots = []; }
+              }
+              if (!roots.length) roots = toArray(this.scope.querySelectorAll(PICKER_SELECTORS));
+              var self = this;
+              roots = roots.filter(function (r) {
+                return !self.contains(r) && !r.contains(self) && !(r.closest && r.closest(EXCLUDE_CONTAINERS));
+              });
+              /* keep only outermost roots */
+              return roots.filter(function (r) {
+                return !roots.some(function (o) { return o !== r && o.contains(r); });
+              });
+            }
+
+            /* Returns [{type, els|el, root}] indexed by option position. */
+            mapGroups() {
+              var self = this;
+              var roots = this.pickerRoots();
+              var fromScope = !roots.length;
+              if (fromScope) roots = [this.scope];
+              var groups = [];
+              var byName = {};
+              var seen = [];
+              roots.forEach(function (root) {
+                toArray(root.querySelectorAll('input[type="radio"], select')).forEach(function (el) {
+                  if (seen.indexOf(el) !== -1 || self.contains(el)) return;
+                  seen.push(el);
+                  if (el.name && SKIP_NAMES.test(el.name)) return;
+                  if (el.closest(EXCLUDE_CONTAINERS) || !self.belongsToUs(el)) return;
+                  if (el.tagName === 'SELECT') {
+                    var values = [];
+                    toArray(el.options).forEach(function (o) { values.push(o.value, (o.textContent || '').trim()); });
+                    groups.push({ type: 'select', el: el, values: values, root: fromScope ? null : root });
+                  } else {
+                    var key = (el.form ? 'f' : '') + (el.name || '_');
+                    if (!byName[key]) {
+                      byName[key] = { type: 'radio', els: [], values: [], root: fromScope ? null : root };
+                      groups.push(byName[key]);
+                    }
+                    byName[key].els.push(el);
+                    byName[key].values.push(el.value, el.getAttribute('data-value') || '');
+                  }
+                });
+              });
+
+              var result = [];
+              var used = [];
+              this.optionSets.forEach(function (set, pos) {
+                var best = -1;
+                var bestScore = 0;
+                groups.forEach(function (g, i) {
+                  if (used[i]) return;
+                  var score = 0;
+                  g.values.forEach(function (v) { if (v && set[v]) score++; });
+                  if (score > bestScore) { bestScore = score; best = i; }
+                });
+                if (best > -1) { used[best] = true; result[pos] = groups[best]; }
+              });
+              return result;
+            }
+
+            driveThemePicker(card) {
+              var opts = this.cardOptions(card);
+              var groups = this.mapGroups();
+              var last = null;
+              opts.forEach(function (val, pos) {
+                var g = groups[pos];
+                if (!g) return;
+                if (g.type === 'radio') {
+                  var input = null;
+                  g.els.forEach(function (el) { if (!input && el.value === val) input = el; });
+                  if (!input) g.els.forEach(function (el) { if (!input && el.getAttribute('data-value') === val) input = el; });
+                  if (input && !input.checked) {
+                    g.els.forEach(function (el) { if (el !== input) el.checked = false; });
+                    input.checked = true;
+                    last = input;
+                  }
+                } else {
+                  var sel = g.el;
+                  var match = null;
+                  toArray(sel.options).forEach(function (o) { if (!match && o.value === val) match = o; });
+                  if (!match) toArray(sel.options).forEach(function (o) { if (!match && (o.textContent || '').trim() === val) match = o; });
+                  if (match && (!match.selected || !match.hasAttribute('selected'))) {
+                    toArray(sel.options).forEach(function (o) { o.removeAttribute('selected'); });
+                    match.setAttribute('selected', 'selected');
+                    match.selected = true;
+                    last = sel;
+                  }
+                }
+              });
+              if (!last) return false;
+              last.dispatchEvent(new Event('change', { bubbles: true }));
+              return true;
+            }
+
+            hidePicker() {
+              if (this.dataset.hidePicker !== 'true' || !this.cards.length) return;
+              var groups = this.mapGroups().filter(Boolean);
+              groups.forEach(function (g) {
+                var el = g.root;
+                if (!el) {
+                  var ctrl = g.el || g.els[0];
+                  el = ctrl && ctrl.closest('fieldset');
+                }
+                if (el && !el.hasAttribute('data-sc-vc-hidden')) el.setAttribute('data-sc-vc-hidden', '');
+              });
+            }
+
+            /* ---------- product form ---------- */
+
+            belongsToUs(node) {
+              if (!node || !node.closest) return true;
+              var form = node.closest('form') || node.form;
+              var pid = form && form.querySelector('[name="product-id"]');
+              return !pid || !pid.value || pid.value === this.dataset.productId;
+            }
+
+            productForms() {
+              var self = this;
+              return toArray(document.querySelectorAll('form[action*="/cart/add"]')).filter(function (form) {
+                if (form.closest(EXCLUDE_CONTAINERS)) return false;
+                var pid = form.querySelector('[name="product-id"]');
+                if (pid && pid.value) return pid.value === self.dataset.productId;
+                return self.scope !== document && self.scope.contains(form);
+              });
+            }
+
+            setFormVariant(id) {
+              this.productForms().forEach(function (form) {
+                var field = form.elements ? form.elements.namedItem('id') : null;
+                if (!field) return;
+                var fields = field.tagName ? [field] : toArray(field);
+                fields.forEach(function (f) {
+                  if (String(f.value) === id) return;
+                  if (f.tagName === 'SELECT') {
+                    var ok = toArray(f.options).some(function (o) { return o.value === id; });
+                    if (!ok) return;
+                  }
+                  f.value = id;
+                  f.dispatchEvent(new Event('change', { bubbles: true }));
+                });
+              });
+              if (/\/products\//.test(window.location.pathname)) {
+                try {
+                  var url = new URL(window.location.href);
+                  if (url.searchParams.get('variant') !== id) {
+                    url.searchParams.set('variant', id);
+                    window.history.replaceState(window.history.state, '', url.toString());
+                  }
+                } catch (e) {}
+              }
+            }
+
+            readVariantId() {
+              var forms = this.productForms();
+              var hasField = false;
+              for (var i = 0; i < forms.length; i++) {
+                var field = forms[i].elements ? forms[i].elements.namedItem('id') : null;
+                if (field && !field.tagName && field.length) field = field[0];
+                if (field) {
+                  hasField = true;
+                  if (field.value) return String(field.value);
+                }
+              }
+              if (hasField) return '';
+              try {
+                var fromUrl = new URL(window.location.href).searchParams.get('variant');
+                if (fromUrl) return fromUrl;
+              } catch (e) {}
+              return null;
+            }
+
+            /* ---------- keeping in sync ---------- */
+
+            onVariantEvent(event) {
+              if (event.target && event.target !== document && event.target.closest && !this.belongsToUs(event.target)) return;
+              var id = idFromDetail(event.detail);
+              if (id) this.update(id); else this.scheduleSync();
+            }
+
+            onChange(event) {
+              var t = event.target;
+              if (!t || this.contains(t) || !this.belongsToUs(t)) return;
+              if (t.name === 'id' && t.form && t.form.matches('form[action*="/cart/add"]')) { this.update(t.value); return; }
+              this.scheduleSync();
+            }
+
+            scheduleSync() {
+              var self = this;
+              clearTimeout(this._t1); clearTimeout(this._t2);
+              this._t1 = setTimeout(function () { self.sync(); }, 80);
+              this._t2 = setTimeout(function () { self.sync(); }, 600);
+            }
+
+            sync() {
+              this.hidePicker();
+              var id = this.readVariantId();
+              if (id !== null) this.update(id);
+            }
+
+            update(id) {
+              id = String(id || '');
+              if (this.lock) {
+                if (id === this.lock.id) this.lock = null;
+                else if (Date.now() < this.lock.until) return;
+                else this.lock = null;
+              }
+              if (id === this.current) return;
+              this.setActive(id, false);
+            }
+
+            activeCard() {
+              var id = this.current;
+              var found = null;
+              this.cards.forEach(function (c) { if (!found && c.dataset.variantId === id) found = c; });
+              return found;
+            }
+
+            setActive(id, fromUser) {
+              this.current = String(id || '');
+              var active = null;
+              this.cards.forEach(function (c) {
+                var on = c.dataset.variantId === this.current;
+                c.setAttribute('aria-checked', on ? 'true' : 'false');
+                c.classList.toggle('is-selected', on);
+                c.tabIndex = on ? 0 : -1;
+                if (on) active = c;
+              }, this);
+              if (!active && this.cards.length) this.cards[0].tabIndex = 0;
+              if (this.valueEl) this.valueEl.textContent = active ? (active.dataset.title || '') : '';
+              if (active) this.reveal(active, fromUser);
+            }
+
+            /* Mobile scroll row: bring the selected card into view without moving the page vertically. */
+            reveal(card, smooth) {
+              var t = this.track;
+              if (!t || t.scrollWidth <= t.clientWidth + 1) return;
+              var left = card.offsetLeft;
+              var right = left + card.offsetWidth;
+              if (left >= t.scrollLeft && right <= t.scrollLeft + t.clientWidth) return;
+              var target = Math.max(0, left - (t.clientWidth - card.offsetWidth) / 2);
+              if (typeof t.scrollTo === 'function') {
+                t.scrollTo({ left: target, behavior: smooth && !this.reduceMotion ? 'smooth' : 'auto' });
+              } else {
+                t.scrollLeft = target;
+              }
+            }
+          }
+
+          window.customElements.define('sc-variant-cards', ScVariantCards);
+        })();
+      </script>
+    {%- elsif request.design_mode -%}
+      <div {{ block.shopify_attributes }} style="padding:10px;font-size:13px;opacity:.6;font-style:italic;">
+        SC – Variant cards: all variants are sold out and hidden.
+      </div>
+    {%- endif -%}
+  {%- endif -%}
+{%- endif -%}

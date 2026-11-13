@@ -34,6 +34,10 @@
             "swatch_shape": "circle"
           }
         },
+        "sc_pdp_variant_cards": {
+          "type": "sc_pdp_variant_cards",
+          "settings": {}
+        },
         "quantity_selector": {
           "type": "quantity_selector",
           "settings": {}
@@ -392,6 +396,7 @@
         "title",
         "price",
         "variant_picker",
+        "sc_pdp_variant_cards",
         "quantity_selector",
         "sc_inventory_status",
         "buy_buttons",
