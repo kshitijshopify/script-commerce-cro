@@ -127,8 +127,6 @@
     "cart_drawer_collection": "",
     "cart_color_scheme": "scheme-1",
     "customer_account_menu": "customer-account-main-menu",
-    "sc_pay_heading_align": "center",
-    "sc_pay_icon_style": "color",
     "sections": {
       "main-password-header": {
         "type": "main-password-header",
