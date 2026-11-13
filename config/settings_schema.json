@@ -1453,6 +1453,138 @@
     ]
   },
   {
+    "name": "SC – Cart shipping breakdown",
+    "settings": [
+      {
+        "type": "paragraph",
+        "content": "Shows Subtotal, Shipping and Total in the cart drawer and on the cart page. When disabled, the default cart total is shown."
+      },
+      {
+        "type": "checkbox",
+        "id": "sc_csb_enable",
+        "label": "Show shipping cost breakdown",
+        "default": true
+      },
+      {
+        "type": "checkbox",
+        "id": "sc_csb_show_drawer",
+        "label": "Show in cart drawer",
+        "default": true
+      },
+      {
+        "type": "checkbox",
+        "id": "sc_csb_show_page",
+        "label": "Show on cart page",
+        "default": true
+      },
+      {
+        "type": "select",
+        "id": "sc_csb_mode",
+        "label": "Shipping cost source",
+        "options": [
+          {
+            "value": "fixed",
+            "label": "Fixed delivery fee"
+          },
+          {
+            "value": "live",
+            "label": "Live shipping rates (country + postal code)"
+          }
+        ],
+        "default": "fixed",
+        "info": "Live rates use your Shopify shipping settings and show the cheapest rate for the shopper's address."
+      },
+      {
+        "type": "text",
+        "id": "sc_csb_fee",
+        "label": "Delivery fee",
+        "default": "4.95",
+        "info": "Fixed mode only. Numbers only (eg. 4.95). For multiple currencies use CODE:amount pairs (eg. USD:4.95,EUR:4.50). Leave empty to show only the total."
+      },
+      {
+        "type": "text",
+        "id": "sc_csb_free_threshold",
+        "label": "Free shipping minimum amount",
+        "default": "50",
+        "info": "Numbers only (eg. 50). For multiple currencies use CODE:amount pairs (eg. USD:50,EUR:60,JPY:9000). Leave empty to disable."
+      },
+      {
+        "type": "text",
+        "id": "sc_csb_default_country",
+        "label": "Default country (live mode)",
+        "info": "English country name, eg. Germany. Leave empty to use the shopper's market country."
+      },
+      {
+        "type": "header",
+        "content": "Labels"
+      },
+      {
+        "type": "text",
+        "id": "sc_csb_label_subtotal",
+        "label": "Subtotal",
+        "default": "Subtotal"
+      },
+      {
+        "type": "text",
+        "id": "sc_csb_label_shipping",
+        "label": "Shipping",
+        "default": "Shipping"
+      },
+      {
+        "type": "text",
+        "id": "sc_csb_label_total",
+        "label": "Total",
+        "default": "Total"
+      },
+      {
+        "type": "text",
+        "id": "sc_csb_label_free",
+        "label": "Free shipping text",
+        "default": "Free"
+      },
+      {
+        "type": "text",
+        "id": "sc_csb_label_zip",
+        "label": "Postal code placeholder",
+        "default": "Postal code"
+      },
+      {
+        "type": "text",
+        "id": "sc_csb_label_calculate",
+        "label": "Calculate button",
+        "default": "Calculate"
+      },
+      {
+        "type": "text",
+        "id": "sc_csb_label_zip_required",
+        "label": "Postal code required message",
+        "default": "Enter your postal code to see shipping costs."
+      },
+      {
+        "type": "text",
+        "id": "sc_csb_label_no_rates",
+        "label": "No rates message",
+        "default": "No shipping options available for this address."
+      },
+      {
+        "type": "text",
+        "id": "sc_csb_label_error",
+        "label": "Error message",
+        "default": "We couldn't calculate shipping for this address."
+      },
+      {
+        "type": "header",
+        "content": "Colors"
+      },
+      {
+        "type": "color",
+        "id": "sc_csb_free_color",
+        "label": "Free shipping text color",
+        "default": "#007600"
+      }
+    ]
+  },
+  {
     "name": "t:settings_schema.customer_accounts.name",
     "settings": [
       {
