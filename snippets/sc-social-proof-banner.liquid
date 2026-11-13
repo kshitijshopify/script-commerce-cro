@@ -1,0 +1,285 @@
+{%- comment -%}
+  SC – Social proof banner (avatar stack + rating pill)
+  ----------------------------------------------------------------------------
+  Self-contained PDP block: Liquid + scoped CSS, no JavaScript, no theme deps.
+
+  Usage (inside any product section's block loop):
+    {%- when 'sc_social_proof_banner' -%}
+      {% render 'sc-social-proof-banner', block: block %}
+
+  Accepts:
+  - block: {Object} the block whose settings match the "sc_social_proof_banner"
+    schema (see sections/main-product.liquid or blocks/sc-social-proof-banner.liquid).
+
+  The (rating) placeholder is replaced server-side with five inline SVG stars,
+  so it renders instantly, works without JS and survives theme editor reloads.
+{%- endcomment -%}
+
+{%- liquid
+  assign s = block.settings
+  assign uid = 'sc-spb-' | append: block.id
+  assign is_rating = false
+  if s.banner_type == 'rating'
+    assign is_rating = true
+  endif
+-%}
+
+{%- comment -%} Collect uploaded avatars (empty slots are skipped) {%- endcomment -%}
+{%- capture avatar_markup -%}
+  {%- assign avatar_count = 0 -%}
+  {%- for i in (1..5) -%}
+    {%- assign key = 'avatar_' | append: i -%}
+    {%- assign img = s[key] -%}
+    {%- if img != blank -%}
+      {%- assign avatar_count = avatar_count | plus: 1 -%}
+      <span class="sc-spb__avatar">
+        {{-
+          img
+          | image_url: width: 120, height: 120, crop: 'center'
+          | image_tag: alt: '', width: 60, height: 60, loading: 'lazy', class: 'sc-spb__avatar-img'
+        -}}
+      </span>
+    {%- endif -%}
+  {%- endfor -%}
+{%- endcapture -%}
+
+{%- liquid
+  assign name = s.name | strip
+  assign social_text = s.social_text | strip
+  assign rating_text = s.rating_text | strip
+
+  assign has_content = false
+  if is_rating
+    if rating_text != blank
+      assign has_content = true
+    endif
+  else
+    if avatar_count > 0 or name != blank or social_text != blank
+      assign has_content = true
+    endif
+  endif
+
+  assign radius = '0px'
+  if s.corner_style == 'rounded'
+    if is_rating
+      assign radius = '999px'
+    else
+      assign radius = s.corner_radius | append: 'px'
+    endif
+  endif
+
+  assign avatar_radius = '50%'
+  if s.avatar_shape == 'square'
+    assign avatar_radius = '0px'
+  endif
+
+  assign name_color = s.name_color
+  if name_color == blank or name_color.alpha == 0
+    assign name_color = s.text_color
+  endif
+-%}
+
+{%- if has_content or request.design_mode -%}
+  {%- capture star_svg -%}
+    <svg class="sc-spb__star" viewBox="0 0 20 19" width="20" height="19" aria-hidden="true" focusable="false"><path d="M10 0l2.645 6.36 6.866.55-5.231 4.48 1.598 6.7L10 14.5l-5.878 3.59 1.598-6.7L.49 6.91l6.865-.55L10 0z" fill="currentColor"/></svg>
+  {%- endcapture -%}
+  {%- capture stars_html -%}
+    <span class="sc-spb__stars" role="img" aria-label="{{ s.stars_label | default: 'Rated 5 out of 5 stars' | escape }}">
+      {%- for i in (1..5) -%}{{ star_svg }}{%- endfor -%}
+    </span>
+  {%- endcapture -%}
+  {%- assign stars_html = stars_html | strip_newlines -%}
+
+  <div
+    id="{{ uid }}"
+    class="sc-spb sc-spb--{% if is_rating %}rating{% else %}social{% endif %} sc-spb--align-{{ s.text_alignment }}{% if s.show_border %} sc-spb--border{% endif %}"
+    style="
+      --sc-spb-bg: {{ s.background_color }};
+      --sc-spb-text: {{ s.text_color }};
+      --sc-spb-name: {{ name_color }};
+      --sc-spb-check: {{ s.check_color }};
+      --sc-spb-star: {{ s.star_color }};
+      --sc-spb-border: {{ s.border_color }};
+      --sc-spb-ring: {{ s.avatar_ring_color }};
+      --sc-spb-radius: {{ radius }};
+      --sc-spb-avatar-radius: {{ avatar_radius }};
+      --sc-spb-mt: {{ s.margin_top }}px;
+      --sc-spb-mb: {{ s.margin_bottom }}px;
+      --sc-spb-py: {{ s.padding_y }}px;
+      --sc-spb-px: {{ s.padding_x }}px;
+      --sc-spb-fs: {{ s.font_size }}px;
+      --sc-spb-fs-m: {{ s.font_size_mobile }}px;
+      --sc-spb-avatar: {{ s.avatar_size }}px;
+      --sc-spb-avatar-m: {{ s.avatar_size_mobile }}px;
+      --sc-spb-overlap: {{ s.avatar_overlap }}px;
+      --sc-spb-star-size: {{ s.star_size }}px;
+    "
+    {{ block.shopify_attributes }}
+  >
+    {%- if is_rating -%}
+      {%- liquid
+        assign rating_out = rating_text | replace: '(rating)', stars_html | replace: '(Rating)', stars_html | replace: '(RATING)', stars_html
+        if rating_out == rating_text and s.append_stars and rating_text != blank
+          assign rating_out = rating_text | append: stars_html
+        endif
+      -%}
+      <div class="sc-spb__rating">
+        {%- if rating_text != blank -%}
+          {{ rating_out }}
+        {%- else -%}
+          <p class="sc-spb__editor-hint">Add a rating message. Type (rating) where the stars should appear.</p>
+        {%- endif -%}
+      </div>
+    {%- else -%}
+      <div class="sc-spb__inner">
+        {%- if avatar_count > 0 -%}
+          <span class="sc-spb__avatars" aria-hidden="true">{{ avatar_markup }}</span>
+        {%- elsif request.design_mode -%}
+          <span class="sc-spb__avatars sc-spb__avatars--placeholder" aria-hidden="true">
+            {%- for i in (1..3) -%}
+              <span class="sc-spb__avatar">
+                <svg viewBox="0 0 24 24" width="24" height="24" focusable="false"><rect width="24" height="24" fill="#e3e3e3"/><circle cx="12" cy="9.5" r="4" fill="#bdbdbd"/><path d="M4 22c.8-4.2 4.1-6.5 8-6.5s7.2 2.3 8 6.5z" fill="#bdbdbd"/></svg>
+              </span>
+            {%- endfor -%}
+          </span>
+        {%- endif -%}
+
+        {%- if name != blank or social_text != blank -%}
+          <div class="sc-spb__label">
+            {%- if name != blank -%}
+              <span class="sc-spb__name">
+                {{- name | escape -}}
+                {%- if s.show_verified -%}
+                  <svg class="sc-spb__check" viewBox="0 0 12 12" width="12" height="12" role="img" aria-label="Verified" focusable="false"><path d="M11.36 5.175l-.92-.74a.55.55 0 01-.2-.5l.125-1.17a1.05 1.05 0 00-1.15-1.155l-1.175.125a.55.55 0 01-.5-.2L6.815.63a1.08 1.08 0 00-1.63 0l-.74.92a.55.55 0 01-.5.2l-1.16-.125A1.05 1.05 0 001.635 2.78l.125 1.17a.55.55 0 01-.2.5l-.92.725a1.05 1.05 0 000 1.63l.92.74c.073.06.13.136.165.224.035.087.047.182.035.276l-.125 1.175a1.05 1.05 0 00.3.85c.108.113.242.199.39.251.147.052.305.069.46.049l1.175-.125a.55.55 0 01.5.2l.74.92a1.06 1.06 0 001.63 0l.74-.92a.55.55 0 01.5-.2l1.175.125c.155.02.313.003.46-.049a1.05 1.05 0 00.69-1.1l-.125-1.175a.55.55 0 01.2-.5l.92-.74a1.05 1.05 0 000-1.63h-.03zM6.2 7.525a.9.9 0 01-1.335.095l-1.22-1.22a.5.5 0 01.71-.71L5.5 6.815l1.955-2.605a.5.5 0 01.8.6L6.2 7.525z" fill="currentColor"/></svg>
+                {%- endif -%}
+              </span>
+            {%- endif -%}
+            {%- if name != blank and social_text != blank %} {% endif -%}
+            {%- if social_text != blank -%}
+              <span class="sc-spb__msg{% if s.bold_text %} sc-spb__msg--bold{% endif %}">{{ social_text }}</span>
+            {%- endif -%}
+          </div>
+        {%- elsif request.design_mode -%}
+          <div class="sc-spb__label sc-spb__editor-hint">Add a name or message to the social banner.</div>
+        {%- endif -%}
+      </div>
+    {%- endif -%}
+  </div>
+
+  <style>
+    #{{ uid }} {
+      display: block;
+      box-sizing: border-box;
+      width: 100%;
+      max-width: 100%;
+      margin: var(--sc-spb-mt) 0 var(--sc-spb-mb);
+      padding: var(--sc-spb-py) var(--sc-spb-px);
+      background: var(--sc-spb-bg);
+      color: var(--sc-spb-text);
+      border-radius: var(--sc-spb-radius);
+      font-size: var(--sc-spb-fs);
+      line-height: 1.4;
+      letter-spacing: normal;
+      text-align: left;
+      overflow: hidden;
+    }
+    #{{ uid }} *,
+    #{{ uid }} *::before,
+    #{{ uid }} *::after { box-sizing: border-box; }
+    #{{ uid }}.sc-spb--border { border: 1px solid var(--sc-spb-border); }
+    #{{ uid }}.sc-spb--align-center { text-align: center; }
+    #{{ uid }} p { margin: 0; }
+
+    /* ---- Social banner ---- */
+    #{{ uid }} .sc-spb__inner {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+    #{{ uid }}.sc-spb--align-center .sc-spb__inner { justify-content: center; }
+    #{{ uid }} .sc-spb__avatars {
+      display: inline-flex;
+      align-items: center;
+      flex-shrink: 0;
+      /* room for the ring so it is never clipped */
+      padding: 2px;
+    }
+    #{{ uid }} .sc-spb__avatar {
+      position: relative;
+      display: block;
+      flex-shrink: 0;
+      width: var(--sc-spb-avatar);
+      height: var(--sc-spb-avatar);
+      border-radius: var(--sc-spb-avatar-radius);
+      overflow: hidden;
+      background: #efefef;
+      box-shadow: 0 0 0 2px var(--sc-spb-ring);
+    }
+    #{{ uid }} .sc-spb__avatar + .sc-spb__avatar { margin-left: calc(var(--sc-spb-overlap) * -1); }
+    #{{ uid }} .sc-spb__avatar img,
+    #{{ uid }} .sc-spb__avatar svg {
+      display: block;
+      width: 100%;
+      height: 100%;
+      max-width: none;
+      margin: 0;
+      object-fit: cover;
+    }
+    #{{ uid }} .sc-spb__label {
+      flex: 1 1 auto;
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+    #{{ uid }}.sc-spb--align-center .sc-spb__label { flex: 0 1 auto; }
+    #{{ uid }} .sc-spb__name {
+      font-weight: 700;
+      color: var(--sc-spb-name);
+    }
+    #{{ uid }} .sc-spb__check {
+      display: inline-block;
+      width: 1em;
+      height: 1em;
+      margin-left: 0.3em;
+      vertical-align: -0.12em;
+      color: var(--sc-spb-check);
+    }
+    #{{ uid }} .sc-spb__msg { font-weight: 400; }
+    #{{ uid }} .sc-spb__msg--bold { font-weight: 600; }
+    #{{ uid }} .sc-spb__msg p,
+    #{{ uid }} .sc-spb__msg ul,
+    #{{ uid }} .sc-spb__msg ol { display: inline; margin: 0; padding: 0; }
+    #{{ uid }} .sc-spb__msg p + p::before { content: ' '; }
+    #{{ uid }} strong, #{{ uid }} b { font-weight: 700; }
+    #{{ uid }} a { color: inherit; text-decoration: underline; }
+
+    /* ---- Rating banner ---- */
+    #{{ uid }} .sc-spb__rating > * + * { margin-top: 0.15em; }
+    #{{ uid }} .sc-spb__stars {
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+      margin: 0 0.25em;
+      vertical-align: -0.1em;
+      white-space: nowrap;
+      color: var(--sc-spb-star);
+    }
+    #{{ uid }} .sc-spb__star {
+      display: block;
+      width: var(--sc-spb-star-size);
+      height: var(--sc-spb-star-size);
+      flex-shrink: 0;
+    }
+
+    #{{ uid }} .sc-spb__editor-hint { opacity: 0.6; font-style: italic; }
+
+    @media screen and (max-width: 749px) {
+      #{{ uid }} { font-size: var(--sc-spb-fs-m); }
+      #{{ uid }} .sc-spb__avatar {
+        width: var(--sc-spb-avatar-m);
+        height: var(--sc-spb-avatar-m);
+      }
+      #{{ uid }} .sc-spb__inner { gap: 8px; }
+    }
+  </style>
+{%- endif -%}
