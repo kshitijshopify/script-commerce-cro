@@ -685,6 +685,8 @@
                   </product-recommendations>
                 {%- when 'sc_social_proof_banner' -%}
                   {% render 'sc-social-proof-banner', block: block %}
+                {%- when 'sc_inventory_status' -%}
+                  {% render 'sc-inventory-status', block: block, product: product, section: section %}
                 {%- when 'icon-with-text' -%}
                   {% render 'icon-with-text', block: block %}
               {%- endcase -%}
@@ -2436,6 +2438,401 @@
           "step": 2,
           "unit": "px",
           "default": 16
+        }
+      ]
+    },
+    {
+      "type": "sc_inventory_status",
+      "name": "SC – Stock status",
+      "limit": 1,
+      "settings": [
+        {
+          "type": "header",
+          "content": "General"
+        },
+        {
+          "type": "checkbox",
+          "id": "enable",
+          "label": "Enable block",
+          "default": true
+        },
+        {
+          "type": "checkbox",
+          "id": "show_dot",
+          "label": "Show status dot",
+          "default": true
+        },
+        {
+          "type": "checkbox",
+          "id": "pulse",
+          "label": "Pulsing dot animation",
+          "default": true,
+          "info": "Disabled automatically for visitors who prefer reduced motion."
+        },
+        {
+          "type": "range",
+          "id": "dot_size",
+          "label": "Dot size",
+          "min": 6,
+          "max": 16,
+          "step": 1,
+          "default": 10,
+          "unit": "px"
+        },
+        {
+          "type": "select",
+          "id": "text_alignment",
+          "label": "Alignment",
+          "options": [
+            {
+              "value": "left",
+              "label": "Left"
+            },
+            {
+              "value": "center",
+              "label": "Center"
+            },
+            {
+              "value": "right",
+              "label": "Right"
+            }
+          ],
+          "default": "left"
+        },
+        {
+          "type": "text",
+          "id": "separator",
+          "label": "Separator between label and delivery text",
+          "default": "-",
+          "info": "Leave empty to hide."
+        },
+        {
+          "type": "select",
+          "id": "date_format",
+          "label": "[next_incoming_date] format",
+          "options": [
+            {
+              "value": "%d.%m.%Y",
+              "label": "31.12.2026"
+            },
+            {
+              "value": "%d/%m/%Y",
+              "label": "31/12/2026"
+            },
+            {
+              "value": "%m/%d/%Y",
+              "label": "12/31/2026"
+            },
+            {
+              "value": "%Y-%m-%d",
+              "label": "2026-12-31"
+            },
+            {
+              "value": "%-d %B %Y",
+              "label": "31 December 2026"
+            },
+            {
+              "value": "%B %-d, %Y",
+              "label": "December 31, 2026"
+            }
+          ],
+          "default": "%d.%m.%Y",
+          "info": "Month names are always in English. Use a numeric format for other languages."
+        },
+        {
+          "type": "checkbox",
+          "id": "reserve_space",
+          "label": "Keep space when no message is shown",
+          "default": true,
+          "info": "Prevents the Add to Cart button from jumping when a hidden state is selected."
+        },
+        {
+          "type": "header",
+          "content": "Typography"
+        },
+        {
+          "type": "range",
+          "id": "font_size",
+          "label": "Font size – desktop",
+          "min": 11,
+          "max": 22,
+          "step": 1,
+          "default": 14,
+          "unit": "px"
+        },
+        {
+          "type": "range",
+          "id": "font_size_mobile",
+          "label": "Font size – mobile",
+          "min": 11,
+          "max": 20,
+          "step": 1,
+          "default": 14,
+          "unit": "px"
+        },
+        {
+          "type": "select",
+          "id": "label_weight",
+          "label": "Label font weight",
+          "options": [
+            {
+              "value": "400",
+              "label": "Regular"
+            },
+            {
+              "value": "500",
+              "label": "Medium"
+            },
+            {
+              "value": "600",
+              "label": "Semibold"
+            },
+            {
+              "value": "700",
+              "label": "Bold"
+            }
+          ],
+          "default": "400"
+        },
+        {
+          "type": "header",
+          "content": "Spacing"
+        },
+        {
+          "type": "range",
+          "id": "margin_top",
+          "label": "Top margin",
+          "min": 0,
+          "max": 40,
+          "step": 1,
+          "default": 10,
+          "unit": "px"
+        },
+        {
+          "type": "range",
+          "id": "margin_bottom",
+          "label": "Bottom margin",
+          "min": 0,
+          "max": 40,
+          "step": 1,
+          "default": 10,
+          "unit": "px"
+        },
+        {
+          "type": "range",
+          "id": "padding_y",
+          "label": "Vertical padding (with background)",
+          "min": 0,
+          "max": 20,
+          "step": 1,
+          "default": 8,
+          "unit": "px"
+        },
+        {
+          "type": "range",
+          "id": "padding_x",
+          "label": "Horizontal padding (with background)",
+          "min": 0,
+          "max": 30,
+          "step": 1,
+          "default": 12,
+          "unit": "px"
+        },
+        {
+          "type": "range",
+          "id": "corner_radius",
+          "label": "Corner radius (with background)",
+          "min": 0,
+          "max": 30,
+          "step": 1,
+          "default": 4,
+          "unit": "px"
+        },
+        {
+          "type": "header",
+          "content": "In stock"
+        },
+        {
+          "type": "checkbox",
+          "id": "show_in_stock",
+          "label": "Show in-stock message",
+          "default": true
+        },
+        {
+          "type": "text",
+          "id": "text_before_in_stock",
+          "label": "Label text",
+          "default": "In stock"
+        },
+        {
+          "type": "color",
+          "id": "instock_label_color",
+          "label": "Label color",
+          "default": "#2E7D32"
+        },
+        {
+          "type": "text",
+          "id": "text_in_stock",
+          "label": "Delivery text",
+          "default": "delivered in 1–2 business days"
+        },
+        {
+          "type": "color",
+          "id": "instock_color",
+          "label": "Delivery text color",
+          "default": "#000000",
+          "info": "Also used for the low-stock delivery text."
+        },
+        {
+          "type": "color",
+          "id": "instock_dot_color",
+          "label": "Dot color",
+          "info": "Leave empty to use the label color."
+        },
+        {
+          "type": "color",
+          "id": "instock_bg_color",
+          "label": "Background color",
+          "info": "Leave empty for no background. Padding is only added when a background is set."
+        },
+        {
+          "type": "header",
+          "content": "Low stock"
+        },
+        {
+          "type": "checkbox",
+          "id": "show_low_stock",
+          "label": "Show low-stock message",
+          "default": true
+        },
+        {
+          "type": "range",
+          "id": "low_inventory_threshold",
+          "label": "Low inventory threshold",
+          "min": 0,
+          "max": 100,
+          "step": 1,
+          "default": 5,
+          "info": "Show low stock when the quantity is at or below this number. Choose 0 to never show low stock. Only applies to variants with inventory tracking."
+        },
+        {
+          "type": "text",
+          "id": "low_stock_with_quantity_count",
+          "label": "Message",
+          "default": "Only [count] left in stock",
+          "info": "[count] is replaced with the variant's available quantity."
+        },
+        {
+          "type": "text",
+          "id": "low_stock_text",
+          "label": "Delivery text after message",
+          "info": "Optional, e.g. \"delivered in 1–2 business days\"."
+        },
+        {
+          "type": "color",
+          "id": "low_stock_color",
+          "label": "Text color",
+          "default": "#D32F2F"
+        },
+        {
+          "type": "color",
+          "id": "low_stock_dot_color",
+          "label": "Dot color",
+          "info": "Leave empty to use the text color."
+        },
+        {
+          "type": "color",
+          "id": "low_stock_bg_color",
+          "label": "Background color",
+          "info": "Leave empty for no background. Padding is only added when a background is set."
+        },
+        {
+          "type": "checkbox",
+          "id": "low_stock_continue",
+          "label": "Also show for variants that continue selling when out of stock",
+          "default": false
+        },
+        {
+          "type": "header",
+          "content": "Overselling / Preorder"
+        },
+        {
+          "type": "checkbox",
+          "id": "show_preorder",
+          "label": "Show preorder message",
+          "default": true
+        },
+        {
+          "type": "text",
+          "id": "oversell_stock",
+          "label": "Preorder message",
+          "default": "Back in stock soon – order now",
+          "info": "Shown when a tracked variant sells at 0 stock (\"Continue selling when out of stock\")."
+        },
+        {
+          "type": "text",
+          "id": "incoming_stock",
+          "label": "Incoming stock message",
+          "default": "Back in stock on [next_incoming_date]",
+          "info": "Used when an incoming stock date exists. [next_incoming_date] is replaced with the date; falls back to the preorder message."
+        },
+        {
+          "type": "color",
+          "id": "oversell_stock_color",
+          "label": "Text color",
+          "default": "#B26A00"
+        },
+        {
+          "type": "color",
+          "id": "oversell_stock_dot_color",
+          "label": "Dot color",
+          "info": "Leave empty to use the text color."
+        },
+        {
+          "type": "color",
+          "id": "oversell_stock_bg_color",
+          "label": "Background color",
+          "info": "Leave empty for no background. Padding is only added when a background is set."
+        },
+        {
+          "type": "checkbox",
+          "id": "preorder_digital",
+          "label": "Also use preorder for products that don't require shipping",
+          "default": false
+        },
+        {
+          "type": "header",
+          "content": "Sold out"
+        },
+        {
+          "type": "checkbox",
+          "id": "show_sold_out",
+          "label": "Show sold-out message",
+          "default": true
+        },
+        {
+          "type": "text",
+          "id": "empty_stock",
+          "label": "Message",
+          "default": "Sold out – back soon"
+        },
+        {
+          "type": "color",
+          "id": "empty_stock_color",
+          "label": "Text color",
+          "default": "#D32F2F"
+        },
+        {
+          "type": "color",
+          "id": "empty_stock_dot_color",
+          "label": "Dot color",
+          "info": "Leave empty to use the text color."
+        },
+        {
+          "type": "color",
+          "id": "empty_stock_bg_color",
+          "label": "Background color",
+          "info": "Leave empty for no background. Padding is only added when a background is set."
         }
       ]
     }

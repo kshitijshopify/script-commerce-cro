@@ -1,0 +1,563 @@
+{%- comment -%}
+  SC – Delivery time & stock status (PDP block)
+  ----------------------------------------------------------------------------
+  Shows a coloured status dot + availability / delivery message directly above
+  the Add to Cart button. Four states, all merchant-configurable:
+    in_stock  – "In stock – delivered in 1–2 business days"
+    low_stock – "Only [count] left"           (tracked + qty <= threshold)
+    preorder  – "Back in stock soon" / "Back in stock on [next_incoming_date]"
+                (continue-selling at qty <= 0, or sold out with incoming stock)
+    sold_out  – "Sold out – back soon"
+
+  Usage (inside any product section's block loop):
+    {%- when 'sc_inventory_status' -%}
+      {% render 'sc-inventory-status', block: block, product: product, section: section %}
+
+  Accepts:
+  - block:   {Object} block whose settings match the "sc_inventory_status" schema
+             (see sections/main-product.liquid or blocks/sc-inventory-status.liquid).
+  - product: {Object} product to read variants from (defaults to the global product).
+  - section: {Object} parent section (used for the >250 variant fallback fetch).
+
+  Theme independence:
+  - Every variant's message is pre-rendered server-side into a JSON map, so a
+    variant change only swaps HTML (no layout logic in JS, no theme events needed).
+  - Variant changes are detected generically: the product form's name="id" input,
+    the ?variant= URL parameter and common theme events (Dawn, Horizon, Focal,
+    Impulse, Prestige …). Variants missing from the map are fetched once via the
+    Section Rendering API.
+{%- endcomment -%}
+
+{%- liquid
+  assign s = block.settings
+  assign uid = 'sc-inv-' | append: block.id
+  assign p = product
+-%}
+
+{%- if s.enable != false -%}
+  {%- if p == blank -%}
+    {%- if request.design_mode -%}
+      <div class="sc-inv-hint" {{ block.shopify_attributes }} style="padding:10px;font-size:13px;opacity:.6;font-style:italic;">
+        SC – Stock status: add this block to a product section to preview it.
+      </div>
+    {%- endif -%}
+  {%- else -%}
+    {%- liquid
+      assign current = p.selected_or_first_available_variant
+      assign threshold = s.low_inventory_threshold | default: 0
+      assign date_format = s.date_format | default: '%d.%m.%Y'
+      assign sep = s.separator | strip | escape
+      assign delivery_text = s.text_in_stock | strip | escape
+      assign low_delivery_text = s.low_stock_text | strip | escape
+
+      # Per-state padding: only add inner padding when that state has a visible background.
+      assign pad = s.padding_y | append: 'px ' | append: s.padding_x | append: 'px'
+      assign in_bg = s.instock_bg_color
+      assign in_pad = pad
+      if in_bg == blank or in_bg.alpha == 0
+        assign in_bg = 'transparent'
+        assign in_pad = '0px'
+      endif
+      assign low_bg = s.low_stock_bg_color
+      assign low_pad = pad
+      if low_bg == blank or low_bg.alpha == 0
+        assign low_bg = 'transparent'
+        assign low_pad = '0px'
+      endif
+      assign pre_bg = s.oversell_stock_bg_color
+      assign pre_pad = pad
+      if pre_bg == blank or pre_bg.alpha == 0
+        assign pre_bg = 'transparent'
+        assign pre_pad = '0px'
+      endif
+      assign out_bg = s.empty_stock_bg_color
+      assign out_pad = pad
+      if out_bg == blank or out_bg.alpha == 0
+        assign out_bg = 'transparent'
+        assign out_pad = '0px'
+      endif
+
+      assign in_dot = s.instock_dot_color
+      if in_dot == blank or in_dot.alpha == 0
+        assign in_dot = s.instock_label_color
+      endif
+      assign low_dot = s.low_stock_dot_color
+      if low_dot == blank or low_dot.alpha == 0
+        assign low_dot = s.low_stock_color
+      endif
+      assign pre_dot = s.oversell_stock_dot_color
+      if pre_dot == blank or pre_dot.alpha == 0
+        assign pre_dot = s.oversell_stock_color
+      endif
+      assign out_dot = s.empty_stock_dot_color
+      if out_dot == blank or out_dot.alpha == 0
+        assign out_dot = s.empty_stock_color
+      endif
+
+      assign total = p.variants.size
+      assign current_found = false
+      assign initial_state = 'none'
+      assign initial_html = ''
+    -%}
+
+    {%- capture variant_json -%}
+      {%- for i in (0..total) -%}
+        {%- liquid
+          # Iterate product.variants, then (only if needed) the selected variant
+          # itself, so the initial render is correct even past the 250-variant limit.
+          if i < total
+            assign v = p.variants[i]
+          elsif current_found
+            break
+          else
+            assign v = current
+          endif
+          if v == blank
+            continue
+          endif
+          if v.id == current.id
+            assign current_found = true
+          endif
+
+          assign qty = v.inventory_quantity | default: 0
+          assign tracked = false
+          if v.inventory_management != blank
+            assign tracked = true
+          endif
+
+          # Resolve the state. Low stock only fires for tracked variants with a
+          # threshold > 0 (and, by default, only when overselling is not allowed),
+          # so untracked products never show a misleading count.
+          assign state = 'sold_out'
+          assign has_date = false
+          if v.available
+            assign state = 'in_stock'
+            if tracked and threshold > 0 and qty > 0 and qty <= threshold
+              if v.inventory_policy == 'deny' or s.low_stock_continue
+                assign state = 'low_stock'
+              endif
+            endif
+            if state == 'in_stock' and tracked and v.inventory_policy == 'continue' and qty <= 0
+              if v.requires_shipping or s.preorder_digital
+                assign state = 'preorder'
+              endif
+            endif
+          elsif v.incoming
+            assign state = 'preorder'
+          endif
+
+          if state == 'preorder' and v.incoming and v.next_incoming_date
+            assign has_date = true
+          endif
+
+          assign show_state = true
+          case state
+            when 'in_stock'
+              assign show_state = s.show_in_stock
+            when 'low_stock'
+              assign show_state = s.show_low_stock
+            when 'preorder'
+              assign show_state = s.show_preorder
+            when 'sold_out'
+              assign show_state = s.show_sold_out
+          endcase
+        -%}
+
+        {%- capture msg -%}
+          {%- if show_state != false -%}
+            {%- case state -%}
+              {%- when 'in_stock' -%}
+                {%- assign label = s.text_before_in_stock | strip | escape -%}
+                {%- if label != blank -%}
+                  <span class="sc-inv__label">{{ label }}{% if sep != blank and delivery_text != blank %}<span class="sc-inv__sep"> {{ sep }}</span>{% endif %}</span>
+                {%- endif -%}
+                {%- if label != blank and delivery_text != blank %} {% endif -%}
+                {%- if delivery_text != blank -%}
+                  <span class="sc-inv__text">{{ delivery_text }}</span>
+                {%- endif -%}
+              {%- when 'low_stock' -%}
+                {%- assign label = s.low_stock_with_quantity_count | strip | escape | replace: '[count]', qty | replace: '[COUNT]', qty -%}
+                {%- if label != blank -%}
+                  <span class="sc-inv__label">{{ label }}{% if sep != blank and low_delivery_text != blank %}<span class="sc-inv__sep"> {{ sep }}</span>{% endif %}</span>
+                {%- endif -%}
+                {%- if label != blank and low_delivery_text != blank %} {% endif -%}
+                {%- if low_delivery_text != blank -%}
+                  <span class="sc-inv__text">{{ low_delivery_text }}</span>
+                {%- endif -%}
+              {%- when 'preorder' -%}
+                {%- liquid
+                  assign label = s.oversell_stock | strip | escape
+                  assign incoming_text = s.incoming_stock | strip | escape
+                  if has_date and incoming_text != blank
+                    assign next_date = v.next_incoming_date | date: date_format
+                    assign label = incoming_text | replace: '[next_incoming_date]', next_date | replace: '[NEXT_INCOMING_DATE]', next_date
+                  elsif label == blank and incoming_text != blank
+                    unless incoming_text contains '[next_incoming_date]'
+                      assign label = incoming_text
+                    endunless
+                  endif
+                -%}
+                {%- if label != blank -%}<span class="sc-inv__label">{{ label }}</span>{%- endif -%}
+              {%- when 'sold_out' -%}
+                {%- assign label = s.empty_stock | strip | escape -%}
+                {%- if label != blank -%}<span class="sc-inv__label">{{ label }}</span>{%- endif -%}
+            {%- endcase -%}
+          {%- endif -%}
+        {%- endcapture -%}
+
+        {%- liquid
+          assign msg = msg | strip
+          assign out_state = state
+          if msg == blank
+            assign out_state = 'none'
+          endif
+          if v.id == current.id
+            assign initial_state = out_state
+            assign initial_html = msg
+          endif
+        -%}
+        {%- unless forloop.first %},{% endunless -%}
+        "{{- v.id -}}":{"s":{{ out_state | json }},"h":{{ msg | json }}}
+      {%- endfor -%}
+    {%- endcapture -%}
+
+    <sc-inventory-status
+      id="{{ uid }}"
+      class="sc-inv sc-inv--align-{{ s.text_alignment | default: 'left' }}{% if s.show_dot %} sc-inv--dot{% endif %}{% if s.pulse %} sc-inv--pulse{% endif %}{% if s.reserve_space %} sc-inv--reserve{% endif %}"
+      data-state="{{ initial_state }}"
+      data-product-id="{{ p.id }}"
+      data-variant-id="{{ current.id }}"
+      {%- if section and section.id != blank and p.variants_count > total %}
+        data-section-id="{{ section.id }}"
+        data-product-url="{{ p.url }}"
+      {%- endif %}
+      style="
+        --sc-inv-fs: {{ s.font_size | default: 14 }}px;
+        --sc-inv-fs-m: {{ s.font_size_mobile | default: 14 }}px;
+        --sc-inv-fw: {{ s.label_weight | default: 400 }};
+        --sc-inv-dot: {{ s.dot_size | default: 10 }}px;
+        --sc-inv-mt: {{ s.margin_top }}px;
+        --sc-inv-mb: {{ s.margin_bottom }}px;
+        --sc-inv-radius: {{ s.corner_radius }}px;
+        --sc-inv-in-label: {{ s.instock_label_color }};
+        --sc-inv-in-text: {{ s.instock_color }};
+        --sc-inv-in-dot: {{ in_dot }};
+        --sc-inv-in-bg: {{ in_bg }};
+        --sc-inv-in-pad: {{ in_pad }};
+        --sc-inv-low-label: {{ s.low_stock_color }};
+        --sc-inv-low-text: {{ s.instock_color }};
+        --sc-inv-low-dot: {{ low_dot }};
+        --sc-inv-low-bg: {{ low_bg }};
+        --sc-inv-low-pad: {{ low_pad }};
+        --sc-inv-pre-label: {{ s.oversell_stock_color }};
+        --sc-inv-pre-dot: {{ pre_dot }};
+        --sc-inv-pre-bg: {{ pre_bg }};
+        --sc-inv-pre-pad: {{ pre_pad }};
+        --sc-inv-out-label: {{ s.empty_stock_color }};
+        --sc-inv-out-dot: {{ out_dot }};
+        --sc-inv-out-bg: {{ out_bg }};
+        --sc-inv-out-pad: {{ out_pad }};
+      "
+      {{ block.shopify_attributes }}
+    >
+      <div class="sc-inv__box">
+        {%- if s.show_dot -%}
+          <span class="sc-inv__dot" aria-hidden="true"></span>
+        {%- endif -%}
+        <p class="sc-inv__msg" role="status" aria-live="polite" aria-atomic="true" data-sc-inv-msg>
+          {%- if initial_html != blank -%}{{ initial_html }}{%- else -%}&nbsp;{%- endif -%}
+        </p>
+      </div>
+      <script type="application/json" data-sc-inv-data>{"v":{ {{- variant_json | strip -}} }}</script>
+    </sc-inventory-status>
+
+    <style>
+      #{{ uid }} {
+        display: block;
+        box-sizing: border-box;
+        width: 100%;
+        max-width: 100%;
+        margin: var(--sc-inv-mt) 0 var(--sc-inv-mb);
+        font-size: var(--sc-inv-fs);
+        line-height: 1.45;
+        letter-spacing: normal;
+        text-transform: none;
+        --sc-inv-c-label: var(--sc-inv-in-label);
+        --sc-inv-c-text: var(--sc-inv-in-text);
+        --sc-inv-c-dot: var(--sc-inv-in-dot);
+        --sc-inv-c-bg: var(--sc-inv-in-bg);
+        --sc-inv-c-pad: var(--sc-inv-in-pad);
+      }
+      #{{ uid }} *,
+      #{{ uid }} *::before,
+      #{{ uid }} *::after { box-sizing: border-box; }
+      #{{ uid }}[data-state="low_stock"] {
+        --sc-inv-c-label: var(--sc-inv-low-label);
+        --sc-inv-c-text: var(--sc-inv-low-text);
+        --sc-inv-c-dot: var(--sc-inv-low-dot);
+        --sc-inv-c-bg: var(--sc-inv-low-bg);
+        --sc-inv-c-pad: var(--sc-inv-low-pad);
+      }
+      #{{ uid }}[data-state="preorder"] {
+        --sc-inv-c-label: var(--sc-inv-pre-label);
+        --sc-inv-c-text: var(--sc-inv-pre-label);
+        --sc-inv-c-dot: var(--sc-inv-pre-dot);
+        --sc-inv-c-bg: var(--sc-inv-pre-bg);
+        --sc-inv-c-pad: var(--sc-inv-pre-pad);
+      }
+      #{{ uid }}[data-state="sold_out"] {
+        --sc-inv-c-label: var(--sc-inv-out-label);
+        --sc-inv-c-text: var(--sc-inv-out-label);
+        --sc-inv-c-dot: var(--sc-inv-out-dot);
+        --sc-inv-c-bg: var(--sc-inv-out-bg);
+        --sc-inv-c-pad: var(--sc-inv-out-pad);
+      }
+      #{{ uid }}[data-state="none"]:not(.sc-inv--reserve) { display: none; }
+      #{{ uid }}[data-state="none"].sc-inv--reserve .sc-inv__box { visibility: hidden; }
+      #{{ uid }}[hidden] { display: none !important; }
+
+      #{{ uid }} .sc-inv__box {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.55em;
+        width: fit-content;
+        max-width: 100%;
+        min-height: 1.45em;
+        padding: var(--sc-inv-c-pad);
+        background: var(--sc-inv-c-bg);
+        border-radius: var(--sc-inv-radius);
+        transition: background-color 0.2s ease;
+      }
+      #{{ uid }}.sc-inv--align-center .sc-inv__box { margin-left: auto; margin-right: auto; }
+      #{{ uid }}.sc-inv--align-right .sc-inv__box { margin-left: auto; }
+      #{{ uid }}.sc-inv--align-center .sc-inv__msg { text-align: center; }
+      #{{ uid }}.sc-inv--align-right .sc-inv__msg { text-align: right; }
+
+      #{{ uid }} .sc-inv__dot {
+        position: relative;
+        flex: 0 0 auto;
+        display: block;
+        width: var(--sc-inv-dot);
+        height: var(--sc-inv-dot);
+        margin-top: calc((1.45em - var(--sc-inv-dot)) / 2);
+        border-radius: 50%;
+        background: var(--sc-inv-c-dot);
+        transition: background-color 0.2s ease;
+      }
+      #{{ uid }}.sc-inv--pulse .sc-inv__dot::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        border-radius: 50%;
+        background: var(--sc-inv-c-dot);
+        animation: sc-inv-pulse 2s ease-out infinite;
+        pointer-events: none;
+      }
+      @keyframes sc-inv-pulse {
+        0% { transform: scale(1); opacity: 0.55; }
+        70%, 100% { transform: scale(2.4); opacity: 0; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #{{ uid }}.sc-inv--pulse .sc-inv__dot::after { animation: none; display: none; }
+      }
+
+      #{{ uid }} .sc-inv__msg {
+        flex: 0 1 auto;
+        min-width: 0;
+        margin: 0;
+        padding: 0;
+        font-size: inherit;
+        line-height: inherit;
+        color: var(--sc-inv-c-text);
+        overflow-wrap: anywhere;
+      }
+      #{{ uid }} .sc-inv__label {
+        color: var(--sc-inv-c-label);
+        font-weight: var(--sc-inv-fw);
+      }
+      #{{ uid }} .sc-inv__text { color: var(--sc-inv-c-text); }
+
+      @media screen and (max-width: 749px) {
+        #{{ uid }} { font-size: var(--sc-inv-fs-m); }
+      }
+    </style>
+
+    <script>
+      (function () {
+        if (!window.customElements || window.customElements.get('sc-inventory-status')) return;
+
+        /* Common variant-change events across OS 2.0 themes (Dawn, Horizon, Focal, Impulse, Prestige, Symmetry …) */
+        var VARIANT_EVENTS = [
+          'variant:change', 'variant:changed', 'variant:update', 'variantChange', 'variant-change',
+          'on:variant:change', 'theme:variant:change', 'product:variant-change', 'product:variantChange',
+          'shopify:variant:change'
+        ];
+
+        /* Themes usually update ?variant= with replaceState; emit an event for it once per page. */
+        if (!window.__scInvHistoryPatched && window.history) {
+          window.__scInvHistoryPatched = true;
+          ['pushState', 'replaceState'].forEach(function (fn) {
+            var orig = window.history[fn];
+            if (typeof orig !== 'function') return;
+            window.history[fn] = function () {
+              var result = orig.apply(this, arguments);
+              try { window.dispatchEvent(new Event('sc:urlchange')); } catch (e) {}
+              return result;
+            };
+          });
+        }
+
+        function idFromDetail(detail) {
+          if (!detail || typeof detail !== 'object') return null;
+          var v = detail.variant || detail.resource || detail.selectedVariant || detail.currentVariant || detail.newVariant;
+          if (v && typeof v === 'object' && v.id) return String(v.id);
+          if (detail.variantId) return String(detail.variantId);
+          if (detail.id && (detail.inventory_management !== undefined || detail.available !== undefined)) return String(detail.id);
+          return null;
+        }
+
+        class ScInventoryStatus extends HTMLElement {
+          connectedCallback() {
+            if (this._connected) return;
+            this._connected = true;
+            this.msgEl = this.querySelector('[data-sc-inv-msg]');
+            this.data = {};
+            try {
+              var raw = this.querySelector('[data-sc-inv-data]');
+              this.data = (raw && JSON.parse(raw.textContent).v) || {};
+            } catch (e) { this.data = {}; }
+            this.current = String(this.dataset.variantId || '');
+            this.pending = {};
+            this.scope = this.closest('[id^="shopify-section-"]') || this.closest('section, main, form') || document;
+
+            this._onEvent = this.onVariantEvent.bind(this);
+            this._onChange = this.onChange.bind(this);
+            this._onUrl = this.scheduleSync.bind(this);
+            VARIANT_EVENTS.forEach(function (name) { document.addEventListener(name, this._onEvent); }, this);
+            document.addEventListener('change', this._onChange, true);
+            this.scope.addEventListener('click', this._onUrl);
+            window.addEventListener('sc:urlchange', this._onUrl);
+            window.addEventListener('popstate', this._onUrl);
+            /* Make sure we match the variant the theme selected before we connected (e.g. bfcache, URL). */
+            this.sync();
+          }
+
+          disconnectedCallback() {
+            this._connected = false;
+            VARIANT_EVENTS.forEach(function (name) { document.removeEventListener(name, this._onEvent); }, this);
+            document.removeEventListener('change', this._onChange, true);
+            if (this.scope) this.scope.removeEventListener('click', this._onUrl);
+            window.removeEventListener('sc:urlchange', this._onUrl);
+            window.removeEventListener('popstate', this._onUrl);
+            clearTimeout(this._t1); clearTimeout(this._t2);
+          }
+
+          belongsToUs(node) {
+            if (!node || !node.closest) return true;
+            if (this.scope !== document && !this.scope.contains(node)) return false;
+            var form = node.closest('form');
+            var pid = form && form.querySelector('[name="product-id"]');
+            return !pid || !pid.value || pid.value === this.dataset.productId;
+          }
+
+          onVariantEvent(event) {
+            if (event.target && event.target !== document && !this.belongsToUs(event.target)) return;
+            var id = idFromDetail(event.detail);
+            if (id) this.update(id); else this.scheduleSync();
+          }
+
+          onChange(event) {
+            var t = event.target;
+            if (!t || !this.belongsToUs(t)) return;
+            if (t.name === 'id' && t.form && t.form.matches('form[action*="/cart/add"]')) { this.update(t.value); return; }
+            this.scheduleSync();
+          }
+
+          /* Some themes update the hidden id input / URL a moment after the option change. */
+          scheduleSync() {
+            var self = this;
+            clearTimeout(this._t1); clearTimeout(this._t2);
+            this._t1 = setTimeout(function () { self.sync(); }, 60);
+            this._t2 = setTimeout(function () { self.sync(); }, 400);
+          }
+
+          readVariantId() {
+            var forms = this.scope.querySelectorAll('form[action*="/cart/add"]');
+            for (var i = 0; i < forms.length; i++) {
+              var form = forms[i];
+              var pid = form.querySelector('[name="product-id"]');
+              if (pid && pid.value && pid.value !== this.dataset.productId) continue;
+              var field = form.elements ? form.elements.namedItem('id') : null;
+              if (field) {
+                this.hasIdField = true;
+                if (field.value) return String(field.value);
+              }
+            }
+            if (forms.length && this.hasIdField) return '';
+            try {
+              var fromUrl = new URL(window.location.href).searchParams.get('variant');
+              if (fromUrl) return fromUrl;
+            } catch (e) {}
+            return null;
+          }
+
+          sync() {
+            var id = this.readVariantId();
+            if (id !== null) this.update(id);
+          }
+
+          update(id) {
+            id = String(id || '');
+            if (id === this.current) return;
+            if (!id) {
+              /* Unavailable option combination: hide the message until a real variant is picked. */
+              this.current = '';
+              this.render({ s: 'none', h: '' });
+              return;
+            }
+            var entry = this.data[id];
+            if (entry) {
+              this.current = id;
+              this.render(entry);
+            } else if (/^\d+$/.test(id)) {
+              this.fetchVariant(id);
+            }
+          }
+
+          render(entry) {
+            if (!entry) return;
+            var html = entry.h || '';
+            this.setAttribute('data-state', html ? entry.s : 'none');
+            if (this.msgEl) this.msgEl.innerHTML = html || '&nbsp;';
+          }
+
+          /* Fallback for variants not in the pre-rendered map (products with > 250 variants). */
+          fetchVariant(id) {
+            var sectionId = this.dataset.sectionId;
+            var url = this.dataset.productUrl;
+            if (!sectionId || !url || this.pending[id] || !window.fetch) return;
+            var self = this;
+            this.pending[id] = true;
+            var sep = url.indexOf('?') === -1 ? '?' : '&';
+            fetch(url + sep + 'variant=' + encodeURIComponent(id) + '&section_id=' + encodeURIComponent(sectionId))
+              .then(function (r) { return r.ok ? r.text() : ''; })
+              .then(function (text) {
+                if (!text) return;
+                var doc = new DOMParser().parseFromString(text, 'text/html');
+                var fresh = doc.getElementById(self.id);
+                var raw = fresh && fresh.querySelector('[data-sc-inv-data]');
+                if (!raw) return;
+                var map = JSON.parse(raw.textContent).v || {};
+                Object.keys(map).forEach(function (k) { self.data[k] = map[k]; });
+                if (self.data[id]) { self.current = id; self.render(self.data[id]); }
+              })
+              .catch(function () {})
+              .then(function () { delete self.pending[id]; });
+          }
+        }
+
+        window.customElements.define('sc-inventory-status', ScInventoryStatus);
+      })();
+    </script>
+  {%- endif -%}
+{%- endif -%}
