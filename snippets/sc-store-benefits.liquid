@@ -1,0 +1,693 @@
+{%- comment -%}
+  SC – Store benefits (Icon + text USPs: Normal grid / List / Slider tabs)
+  ----------------------------------------------------------------------------
+  Self-contained PDP block: Liquid + scoped CSS + scoped JS, no theme dependencies.
+  Usually placed directly below the Add to cart button.
+
+  Usage (inside any product section's block loop):
+    {%- when 'sc_store_benefits' -%}
+      {% render 'sc-store-benefits', block: block %}
+
+  Accepts:
+  - block: {Object} the block whose settings match the "sc_store_benefits" schema
+    (see sections/main-product.liquid or blocks/sc-store-benefits.liquid).
+
+  Up to 4 benefits (settings b1_ … b4_). Each: icon image or SVG code (SVG wins), optional
+  active icon (slider), headline, description, link, desktop/mobile font + icon sizes.
+  Slider style is an accessible WAI-ARIA tab list (arrows / Home / End) and fires a bubbling
+  `sc:store-benefits:change` event when a shopper switches tab (for tab-click analytics).
+{%- endcomment -%}
+
+{%- liquid
+  assign s = block.settings
+  assign uid = 'sc-sb-' | append: block.id
+  assign bp = s.mobile_breakpoint
+  assign bp_max = bp | minus: 0.02
+
+  comment
+    Collect the benefits that are enabled and have an icon or a headline.
+  endcomment
+  assign visible = ''
+  for i in (1..4)
+    assign p = 'b' | append: i | append: '_'
+    assign k = p | append: 'enabled'
+    unless s[k]
+      continue
+    endunless
+    assign k = p | append: 'icon'
+    assign v_icon = s[k]
+    assign k = p | append: 'svg'
+    assign v_svg = s[k] | strip
+    assign k = p | append: 'title'
+    assign v_title = s[k]
+    if v_icon != blank or v_svg != blank or v_title != blank
+      assign visible = visible | append: i | append: ','
+    endif
+  endfor
+  assign idx = visible | split: ','
+  assign count = idx.size
+
+  assign is_list = false
+  if s.display_style == 'list'
+    assign is_list = true
+  endif
+
+  assign item_layout = s.item_layout
+  assign show_desc = s.show_description_normal
+  assign cols_d = s.columns_desktop
+  assign cols_m = s.columns_mobile
+  if is_list
+    assign item_layout = 'horizontal'
+    assign show_desc = s.list_show_description
+    assign cols_d = 1
+    assign cols_m = 1
+  endif
+  if count > 0
+    if count < cols_d
+      assign cols_d = count
+    endif
+    if count < cols_m
+      assign cols_m = count
+    endif
+  endif
+
+  case s.content_align
+    when 'center'
+      assign justify = 'center'
+    when 'right'
+      assign justify = 'flex-end'
+    else
+      assign justify = 'flex-start'
+  endcase
+
+  assign line_height = s.line_height | divided_by: 10.0
+  assign weight = 400
+  if s.bold_text
+    assign weight = 600
+  endif
+-%}
+
+{%- if s.enable and count > 0 -%}
+  <style>
+    .{{ uid }} {
+      --sc-sb-text: {{ s.text_color }};
+      --sc-sb-desc: {{ s.description_color }};
+      --sc-sb-icon: {% if s.icon_color != blank %}{{ s.icon_color }}{% else %}currentColor{% endif %};
+      --sc-sb-item-bg: {{ s.item_bg }};
+      --sc-sb-border: {{ s.item_border_color }};
+      --sc-sb-border-w: {{ s.item_border_width }}px;
+      --sc-sb-radius: {{ s.border_radius }}px;
+      --sc-sb-gap: {{ s.gap }}px;
+      --sc-sb-icon-gap: {{ s.icon_gap }}px;
+      --sc-sb-pad: {{ s.item_padding }}px;
+      --sc-sb-justify: {{ justify }};
+      --sc-sb-ul: {{ s.underline_color }};
+      --sc-sb-ul-off: {{ s.underline_inactive_color }};
+      --sc-sb-ul-w: {{ s.underline_thickness }}px;
+      --sc-sb-cols: {{ cols_m }};
+      --sc-sb-desc-fs: {{ s.description_size_mobile }}px;
+      --sc-sb-heading-fs: {{ s.heading_size_mobile }}px;
+      display: block;
+      box-sizing: border-box;
+      width: 100%;
+      max-width: 100%;
+      margin: {{ s.margin_top }}px 0 {{ s.margin_bottom }}px;
+      padding: {{ s.wrapper_padding }}px;
+      background: {{ s.background }};
+      border-radius: var(--sc-sb-radius);
+      color: var(--sc-sb-text);
+      font-size: var(--sc-sb-desc-fs);
+      line-height: {{ line_height }};
+      text-align: {{ s.content_align }};
+    }
+    .{{ uid }} *,
+    .{{ uid }} *::before,
+    .{{ uid }} *::after { box-sizing: border-box; }
+
+    .{{ uid }} .sc-sb__heading {
+      margin: 0 0 var(--sc-sb-gap);
+      font-size: var(--sc-sb-heading-fs);
+      line-height: 1.25;
+      font-weight: 700;
+      color: inherit;
+      text-align: {{ s.heading_align }};
+    }
+
+    /* ---------- Shared icon + text ---------- */
+    .{{ uid }} .sc-sb__icon {
+      flex: 0 0 auto;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: var(--sc-sb-ic);
+      max-width: 100%;
+      line-height: 0;
+      color: var(--sc-sb-icon);
+    }
+    .{{ uid }} .sc-sb__icon img,
+    .{{ uid }} .sc-sb__icon svg {
+      display: block;
+      width: 100%;
+      max-width: 100%;
+      height: auto;
+      margin: 0;
+    }
+    .{{ uid }} .sc-sb__title {
+      display: block;
+      margin: 0;
+      font-size: var(--sc-sb-fs);
+      font-weight: {{ weight }};
+      letter-spacing: normal;
+      color: var(--sc-sb-text);
+      overflow-wrap: anywhere;
+    }
+    .{{ uid }} .sc-sb__desc {
+      margin-top: 4px;
+      font-size: var(--sc-sb-desc-fs);
+      font-weight: 400;
+      color: var(--sc-sb-desc);
+      overflow-wrap: anywhere;
+    }
+    .{{ uid }} .sc-sb__desc > * { margin: 0; }
+    .{{ uid }} .sc-sb__desc > * + * { margin-top: 6px; }
+    .{{ uid }} .sc-sb__desc a,
+    .{{ uid }} .sc-sb__title a,
+    .{{ uid }} .sc-sb__more { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+    .{{ uid }} .sc-sb__more { display: inline-block; margin-top: 6px; font-size: var(--sc-sb-desc-fs); color: var(--sc-sb-text); }
+
+    /* ---------- Normal style ---------- */
+    .{{ uid }} .sc-sb__grid {
+      display: grid;
+      grid-template-columns: repeat(var(--sc-sb-cols), minmax(0, 1fr));
+      gap: var(--sc-sb-gap);
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+    .{{ uid }} .sc-sb__cell { display: flex; min-width: 0; margin: 0; padding: 0; }
+    .{{ uid }} .sc-sb__cell::before,
+    .{{ uid }} .sc-sb__cell::marker { content: none; }
+    .{{ uid }} .sc-sb__item {
+      display: flex;
+      flex: 1 1 auto;
+      min-width: 0;
+      gap: var(--sc-sb-icon-gap);
+      align-items: {% if s.icon_valign == 'top' %}flex-start{% else %}center{% endif %};
+      justify-content: var(--sc-sb-justify);
+      padding: var(--sc-sb-pad);
+      background: var(--sc-sb-item-bg);
+      border: var(--sc-sb-border-w) solid var(--sc-sb-border);
+      border-radius: var(--sc-sb-radius);
+      color: inherit;
+      text-decoration: none;
+    }
+    .{{ uid }} .sc-sb__item--vertical {
+      flex-direction: column;
+      align-items: var(--sc-sb-justify);
+      justify-content: flex-start;
+    }
+    .{{ uid }} .sc-sb__text { min-width: 0; }
+    .{{ uid }} a.sc-sb__item { transition: opacity 0.2s ease; }
+    .{{ uid }} a.sc-sb__item:hover { opacity: 0.8; }
+    .{{ uid }} a.sc-sb__item:focus-visible { outline: 2px solid var(--sc-sb-text); outline-offset: 2px; }
+
+    /* ---------- List style ---------- */
+    .{{ uid }}.sc-sb--list .sc-sb__grid { gap: 0; }
+    .{{ uid }}.sc-sb--list .sc-sb__item {
+      padding: {{ s.list_row_gap | divided_by: 2.0 }}px 0;
+      background: transparent;
+      border: 0;
+      border-radius: 0;
+    }
+    .{{ uid }}.sc-sb--list .sc-sb__cell:first-child .sc-sb__item { padding-top: 0; }
+    .{{ uid }}.sc-sb--list .sc-sb__cell:last-child .sc-sb__item { padding-bottom: 0; }
+    {%- if s.list_divider %}
+      .{{ uid }}.sc-sb--list .sc-sb__cell + .sc-sb__cell { border-top: 1px solid {{ s.list_divider_color }}; }
+    {%- endif %}
+    {%- if s.list_icon_column > 0 %}
+      .{{ uid }}.sc-sb--list .sc-sb__icon-col {
+        flex: 0 0 {{ s.list_icon_column }}px;
+        display: inline-flex;
+        justify-content: center;
+      }
+    {%- endif %}
+
+    /* ---------- Slider style ---------- */
+    .{{ uid }} .sc-sb__tabs {
+      display: grid;
+      grid-auto-flow: column;
+      grid-auto-columns: minmax(0, 1fr);
+      margin: 0;
+    }
+    .{{ uid }} .sc-sb__tab {
+      -webkit-appearance: none;
+      appearance: none;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 6px;
+      min-width: 0;
+      min-height: 0;
+      margin: 0;
+      padding: {{ s.tab_padding }}px 4px {{ s.tab_padding | divided_by: 2 }}px;
+      background: transparent;
+      border: 0;
+      border-bottom: var(--sc-sb-ul-w) solid var(--sc-sb-ul-off);
+      border-radius: 0;
+      box-shadow: none;
+      color: inherit;
+      font: inherit;
+      line-height: 1.2;
+      text-transform: none;
+      letter-spacing: normal;
+      cursor: pointer;
+      transition: border-color 0.2s ease, opacity 0.2s ease;
+    }
+    .{{ uid }} .sc-sb__tab::before,
+    .{{ uid }} .sc-sb__tab::after { content: none; }
+    .{{ uid }} .sc-sb__tab:not([aria-selected="true"]):hover { opacity: 0.75; }
+    .{{ uid }} .sc-sb__tab[aria-selected="true"] { border-bottom-color: var(--sc-sb-ul); }
+    .{{ uid }} .sc-sb__tab:focus-visible { outline: 2px solid var(--sc-sb-text); outline-offset: 2px; }
+    .{{ uid }} .sc-sb__tab-label {
+      display: block;
+      max-width: 100%;
+      font-size: var(--sc-sb-desc-fs);
+      font-weight: {{ weight }};
+      overflow-wrap: anywhere;
+    }
+    .{{ uid }} .sc-sb__icon--active { display: none; }
+    .{{ uid }} .sc-sb__tab--has-active[aria-selected="true"] .sc-sb__icon--default { display: none; }
+    .{{ uid }} .sc-sb__tab--has-active[aria-selected="true"] .sc-sb__icon--active { display: inline-flex; }
+
+    .{{ uid }} .sc-sb__panels { margin-top: var(--sc-sb-gap); }
+    .{{ uid }} .sc-sb__panel {
+      padding: var(--sc-sb-pad);
+      background: var(--sc-sb-item-bg);
+      border: var(--sc-sb-border-w) solid var(--sc-sb-border);
+      border-radius: var(--sc-sb-radius);
+    }
+    .{{ uid }} .sc-sb__panel:focus-visible { outline: 2px solid var(--sc-sb-text); outline-offset: 2px; }
+    .{{ uid }} .sc-sb__panels--stacked { display: grid; }
+    .{{ uid }} .sc-sb__panels--stacked > .sc-sb__panel {
+      grid-area: 1 / 1;
+      transition: opacity 0.25s ease;
+    }
+    .{{ uid }} .sc-sb__panels--stacked > .sc-sb__panel[hidden] {
+      display: block;
+      visibility: hidden;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    @media screen and (max-width: {{ bp_max }}px) {
+      .{{ uid }} .sc-sb__fs { --sc-sb-fs: var(--sc-sb-fs-m); }
+      .{{ uid }} .sc-sb__ic { --sc-sb-ic: var(--sc-sb-ic-m); }
+    }
+    @media screen and (min-width: {{ bp }}px) {
+      .{{ uid }} {
+        --sc-sb-cols: {{ cols_d }};
+        --sc-sb-desc-fs: {{ s.description_size_desktop }}px;
+        --sc-sb-heading-fs: {{ s.heading_size_desktop }}px;
+      }
+      .{{ uid }} .sc-sb__fs { --sc-sb-fs: var(--sc-sb-fs-d); }
+      .{{ uid }} .sc-sb__ic { --sc-sb-ic: var(--sc-sb-ic-d); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .{{ uid }} .sc-sb__panel,
+      .{{ uid }} .sc-sb__tab,
+      .{{ uid }} a.sc-sb__item { transition: none; }
+    }
+  </style>
+
+  <sc-store-benefits
+    class="sc-sb {{ uid }} sc-sb--{{ s.display_style }}"
+    {% if s.display_style == 'slider' and s.autoplay %}
+      data-autoplay="{{ s.autoplay_speed | times: 1000 }}"
+    {% endif %}
+    {{ block.shopify_attributes }}
+  >
+    {%- if s.heading != blank -%}
+      <p class="sc-sb__heading">{{ s.heading }}</p>
+    {%- endif -%}
+
+    {%- if s.display_style == 'slider' -%}
+      {%- comment -%} ===== Slider style: tab row ===== {%- endcomment -%}
+      <div class="sc-sb__tabs" role="tablist" aria-label="{{ s.tabs_label | escape }}">
+        {%- for i in idx -%}
+          {%- liquid
+            assign p = 'b' | append: i | append: '_'
+            assign k = p | append: 'icon'
+            assign b_icon = s[k]
+            assign k = p | append: 'svg'
+            assign b_svg = s[k] | strip
+            assign k = p | append: 'icon_active'
+            assign b_icon_active = s[k]
+            assign k = p | append: 'svg_active'
+            assign b_svg_active = s[k] | strip
+            assign k = p | append: 'title'
+            assign b_title = s[k]
+            assign k = p | append: 'icon_label'
+            assign b_icon_label = s[k] | strip
+            assign k = p | append: 'font_size'
+            assign b_fs = s[k]
+            assign k = p | append: 'font_size_mobile'
+            assign b_fs_m = s[k]
+            assign k = p | append: 'icon_size'
+            assign b_ic = s[k]
+            assign k = p | append: 'icon_size_mobile'
+            assign b_ic_m = s[k]
+
+            assign b_label = b_title | strip_html | strip
+            if b_label == blank
+              assign b_label = b_icon_label
+            endif
+            if b_label == blank and b_icon != blank
+              assign b_label = b_icon.alt | strip
+            endif
+            if b_label == blank
+              assign b_label = 'Benefit ' | append: forloop.index
+            endif
+
+            assign b_w = b_ic
+            if b_ic_m > b_w
+              assign b_w = b_ic_m
+            endif
+            assign b_w2 = b_w | times: 2
+            assign b_w3 = b_w | times: 3
+            assign b_widths = b_w | append: ',' | append: b_w2 | append: ',' | append: b_w3
+            assign b_sizes = '(max-width: ' | append: bp_max | append: 'px) ' | append: b_ic_m | append: 'px, ' | append: b_ic | append: 'px'
+
+            assign b_has_icon = false
+            if b_svg != blank or b_icon != blank
+              assign b_has_icon = true
+            endif
+            assign b_has_active = false
+            if b_has_icon
+              if b_svg_active != blank or b_icon_active != blank
+                assign b_has_active = true
+              endif
+            endif
+          -%}
+          <button
+            type="button"
+            role="tab"
+            id="{{ uid }}-tab-{{ i }}"
+            class="sc-sb__tab sc-sb__fs sc-sb__ic{% if b_has_active %} sc-sb__tab--has-active{% endif %}"
+            aria-controls="{{ uid }}-panel-{{ i }}"
+            aria-selected="{% if forloop.first %}true{% else %}false{% endif %}"
+            aria-label="{{ b_label | escape }}"
+            tabindex="{% if forloop.first %}0{% else %}-1{% endif %}"
+            style="--sc-sb-fs-d: {{ b_fs }}px; --sc-sb-fs-m: {{ b_fs_m }}px; --sc-sb-ic-d: {{ b_ic }}px; --sc-sb-ic-m: {{ b_ic_m }}px;"
+          >
+            {%- if b_has_icon -%}
+              <span class="sc-sb__icon sc-sb__icon--default" aria-hidden="true">
+                {%- if b_svg != blank -%}
+                  {{ b_svg }}
+                {%- else -%}
+                  {{ b_icon | image_url: width: b_w3 | image_tag: widths: b_widths, sizes: b_sizes, loading: 'lazy', alt: '' }}
+                {%- endif -%}
+              </span>
+              {%- if b_has_active -%}
+                <span class="sc-sb__icon sc-sb__icon--active" aria-hidden="true">
+                  {%- if b_svg_active != blank -%}
+                    {{ b_svg_active }}
+                  {%- else -%}
+                    {{ b_icon_active | image_url: width: b_w3 | image_tag: widths: b_widths, sizes: b_sizes, loading: 'lazy', alt: '' }}
+                  {%- endif -%}
+                </span>
+              {%- endif -%}
+            {%- endif -%}
+            {%- if s.show_tab_labels or b_has_icon == false -%}
+              <span class="sc-sb__tab-label" aria-hidden="true">{{ b_label | escape }}</span>
+            {%- endif -%}
+          </button>
+        {%- endfor -%}
+      </div>
+
+      {%- comment -%} ===== Slider style: panels ===== {%- endcomment -%}
+      <div class="sc-sb__panels{% if s.stack_panels %} sc-sb__panels--stacked{% endif %}">
+        {%- for i in idx -%}
+          {%- liquid
+            assign p = 'b' | append: i | append: '_'
+            assign k = p | append: 'title'
+            assign b_title = s[k]
+            assign k = p | append: 'text'
+            assign b_text = s[k]
+            assign k = p | append: 'link'
+            assign b_link = s[k]
+            assign k = p | append: 'link_label'
+            assign b_link_label = s[k]
+            assign k = p | append: 'font_size'
+            assign b_fs = s[k]
+            assign k = p | append: 'font_size_mobile'
+            assign b_fs_m = s[k]
+          -%}
+          <div
+            role="tabpanel"
+            id="{{ uid }}-panel-{{ i }}"
+            class="sc-sb__panel sc-sb__fs"
+            aria-labelledby="{{ uid }}-tab-{{ i }}"
+            tabindex="0"
+            style="--sc-sb-fs-d: {{ b_fs }}px; --sc-sb-fs-m: {{ b_fs_m }}px;"
+            {% unless forloop.first %}
+              hidden
+            {% endunless %}
+          >
+            {%- if b_title != blank -%}
+              <span class="sc-sb__title">{{ b_title }}</span>
+            {%- endif -%}
+            {%- if b_text != blank -%}
+              <div class="sc-sb__desc">{{ b_text }}</div>
+            {%- endif -%}
+            {%- if b_link != blank and b_link_label != blank -%}
+              <a class="sc-sb__more" href="{{ b_link }}">{{ b_link_label | escape }}</a>
+            {%- endif -%}
+          </div>
+        {%- endfor -%}
+      </div>
+    {%- else -%}
+      {%- comment -%} ===== Normal style ===== {%- endcomment -%}
+      <ul class="sc-sb__grid" role="list">
+        {%- for i in idx -%}
+          {%- liquid
+            assign p = 'b' | append: i | append: '_'
+            assign k = p | append: 'icon'
+            assign b_icon = s[k]
+            assign k = p | append: 'svg'
+            assign b_svg = s[k] | strip
+            assign k = p | append: 'title'
+            assign b_title = s[k]
+            assign k = p | append: 'text'
+            assign b_text = s[k]
+            assign k = p | append: 'link'
+            assign b_link = s[k]
+            assign k = p | append: 'icon_label'
+            assign b_icon_label = s[k] | strip
+            assign k = p | append: 'font_size'
+            assign b_fs = s[k]
+            assign k = p | append: 'font_size_mobile'
+            assign b_fs_m = s[k]
+            assign k = p | append: 'icon_size'
+            assign b_ic = s[k]
+            assign k = p | append: 'icon_size_mobile'
+            assign b_ic_m = s[k]
+
+            assign b_image_only = false
+            if b_title == blank
+              assign b_image_only = true
+            endif
+            assign b_show_desc = false
+            if show_desc and b_text != blank
+              assign b_show_desc = true
+            endif
+
+            assign b_alt = ''
+            if b_image_only
+              assign b_alt = b_icon_label
+              if b_alt == blank and b_icon != blank
+                assign b_alt = b_icon.alt | strip
+              endif
+            endif
+
+            assign b_w = b_ic
+            if b_ic_m > b_w
+              assign b_w = b_ic_m
+            endif
+            assign b_w2 = b_w | times: 2
+            assign b_w3 = b_w | times: 3
+            assign b_widths = b_w | append: ',' | append: b_w2 | append: ',' | append: b_w3
+            assign b_sizes = '(max-width: ' | append: bp_max | append: 'px) ' | append: b_ic_m | append: 'px, ' | append: b_ic | append: 'px'
+
+            assign b_tag = 'div'
+            if b_link != blank
+              assign b_tag = 'a'
+            endif
+          -%}
+          <li class="sc-sb__cell">
+            <{{ b_tag }}
+              class="sc-sb__item sc-sb__item--{{ item_layout }} sc-sb__fs sc-sb__ic{% if b_image_only %} sc-sb__item--image-only{% endif %}"
+              {% if b_link != blank %}
+                href="{{ b_link }}"
+              {% endif %}
+              style="--sc-sb-fs-d: {{ b_fs }}px; --sc-sb-fs-m: {{ b_fs_m }}px; --sc-sb-ic-d: {{ b_ic }}px; --sc-sb-ic-m: {{ b_ic_m }}px;"
+            >
+              {%- if b_svg != blank or b_icon != blank -%}
+                {%- if is_list and s.list_icon_column > 0 -%}<span class="sc-sb__icon-col">{%- endif -%}
+                <span
+                  class="sc-sb__icon"
+                  {% if b_image_only and b_svg != blank and b_alt != blank %}
+                    role="img" aria-label="{{ b_alt | escape }}"
+                  {% elsif b_image_only == false or b_svg != blank %}
+                    aria-hidden="true"
+                  {% endif %}
+                >
+                  {%- if b_svg != blank -%}
+                    {{ b_svg }}
+                  {%- else -%}
+                    {{ b_icon | image_url: width: b_w3 | image_tag: widths: b_widths, sizes: b_sizes, loading: 'lazy', alt: b_alt }}
+                  {%- endif -%}
+                </span>
+                {%- if is_list and s.list_icon_column > 0 -%}</span>{%- endif -%}
+              {%- endif -%}
+              {%- if b_image_only == false or b_show_desc -%}
+                <div class="sc-sb__text">
+                  {%- if b_title != blank -%}
+                    <span class="sc-sb__title">{{ b_title }}</span>
+                  {%- endif -%}
+                  {%- if b_show_desc -%}
+                    <div class="sc-sb__desc">{{ b_text }}</div>
+                  {%- endif -%}
+                </div>
+              {%- endif -%}
+            </{{ b_tag }}>
+          </li>
+        {%- endfor -%}
+      </ul>
+    {%- endif -%}
+  </sc-store-benefits>
+
+  {%- if s.display_style == 'slider' -%}
+    <script>
+      (function () {
+        if (!window.customElements || window.customElements.get('sc-store-benefits')) return;
+
+        class ScStoreBenefits extends HTMLElement {
+          connectedCallback() {
+            this.tabs = Array.prototype.slice.call(this.querySelectorAll('[role="tab"]'));
+            if (!this.tabs.length) return;
+            var self = this;
+            this.panels = this.tabs.map(function (tab) {
+              return self.querySelector('#' + CSS.escape(tab.getAttribute('aria-controls')));
+            });
+            this.listeners = [];
+            this.index = Math.max(0, this.tabs.findIndex(function (t) {
+              return t.getAttribute('aria-selected') === 'true';
+            }));
+
+            this.tabs.forEach(function (tab, i) {
+              self.on(tab, 'click', function () {
+                self.stopAutoplay();
+                self.select(i, false, true);
+              });
+              self.on(tab, 'keydown', function (e) { self.onKeydown(e, i); });
+            });
+
+            this.delay = parseInt(this.dataset.autoplay, 10) || 0;
+            var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            if (this.delay && this.tabs.length > 1 && !reduce) {
+              this.autoplay = true;
+              this.paused = false;
+              this.on(this, 'mouseenter', function () { self.paused = true; });
+              this.on(this, 'mouseleave', function () { self.paused = false; });
+              this.on(this, 'focusin', function () { self.paused = true; });
+              this.on(this, 'focusout', function () { self.paused = false; });
+              this.tick();
+            }
+          }
+
+          disconnectedCallback() {
+            (this.listeners || []).forEach(function (l) { l[0].removeEventListener(l[1], l[2]); });
+            this.listeners = [];
+            this.stopAutoplay();
+          }
+
+          on(el, type, fn) {
+            el.addEventListener(type, fn);
+            this.listeners.push([el, type, fn]);
+          }
+
+          tick() {
+            var self = this;
+            clearTimeout(this.timer);
+            this.timer = setTimeout(function () {
+              if (!self.autoplay) return;
+              if (!self.paused) self.select((self.index + 1) % self.tabs.length, false, false);
+              self.tick();
+            }, this.delay);
+          }
+
+          stopAutoplay() {
+            this.autoplay = false;
+            clearTimeout(this.timer);
+          }
+
+          onKeydown(e, i) {
+            var last = this.tabs.length - 1;
+            var next = null;
+            switch (e.key) {
+              case 'ArrowRight':
+              case 'ArrowDown':
+                next = i === last ? 0 : i + 1;
+                break;
+              case 'ArrowLeft':
+              case 'ArrowUp':
+                next = i === 0 ? last : i - 1;
+                break;
+              case 'Home':
+                next = 0;
+                break;
+              case 'End':
+                next = last;
+                break;
+            }
+            if (next === null) return;
+            e.preventDefault();
+            this.stopAutoplay();
+            this.select(next, true, true);
+          }
+
+          select(i, focus, emit) {
+            var self = this;
+            var changed = i !== this.index;
+            this.tabs.forEach(function (tab, j) {
+              var on = j === i;
+              tab.setAttribute('aria-selected', on ? 'true' : 'false');
+              tab.tabIndex = on ? 0 : -1;
+              var panel = self.panels[j];
+              if (panel) panel.hidden = !on;
+            });
+            this.index = i;
+            if (focus) this.tabs[i].focus();
+            if (emit && changed) {
+              this.dispatchEvent(new CustomEvent('sc:store-benefits:change', {
+                bubbles: true,
+                detail: { index: i, label: this.tabs[i].getAttribute('aria-label') }
+              }));
+            }
+          }
+        }
+
+        window.customElements.define('sc-store-benefits', ScStoreBenefits);
+      })();
+    </script>
+  {%- endif -%}
+{%- elsif request.design_mode -%}
+  <div {{ block.shopify_attributes }} style="padding: 10px; font-size: 13px; opacity: 0.6; font-style: italic;">
+    {%- if s.enable -%}
+      SC – Store benefits: enable at least one benefit with an icon or headline.
+    {%- else -%}
+      SC – Store benefits is turned off. (Only visible in the theme editor.)
+    {%- endif -%}
+  </div>
+{%- endif -%}

@@ -45,6 +45,13 @@
             "show_gift_card_recipient": true
           }
         },
+        "sc_store_benefits": {
+          "type": "sc_store_benefits",
+          "settings": {
+            "enable": true,
+            "display_style": "normal"
+          }
+        },
         "sc_social_proof_banner": {
           "type": "sc_social_proof_banner",
           "settings": {
@@ -147,6 +154,7 @@
         "quantity_selector",
         "sc_inventory_status",
         "buy_buttons",
+        "sc_store_benefits",
         "sc_social_proof_banner",
         "description",
         "share"
