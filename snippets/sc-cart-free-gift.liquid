@@ -1,0 +1,1311 @@
+{%- comment -%}
+  SC – Free gift (cart page + cart drawer progress bar)
+  ----------------------------------------------------------------------------
+  Every option lives in Theme settings → "SC – Free gift"
+  (config/settings_schema.json, ids prefixed sc_fg_), so the cart page and the
+  cart drawer always share one configuration.
+
+  Usage:
+    Cart page (inside main-cart-items .js-contents):
+      {% render 'sc-cart-free-gift', placement: 'cart' %}
+    Cart drawer (snippets/cart-drawer.liquid, below .drawer__header):
+      {% render 'sc-cart-free-gift', placement: 'drawer' %}
+
+  Accepts:
+  - placement: {String} 'cart' | 'drawer'
+
+  Behaviour:
+  - Shows how much more the customer must spend to unlock the gift, with a
+    progress bar and a gift icon at the end of the bar.
+  - Recalculates after every cart change, whichever script made it: a fetch +
+    XMLHttpRequest watcher catches /cart/add, /change, /update and /clear calls.
+    When Dawn re-renders the drawer / cart page, the snippet is rendered again
+    server-side with the fresh cart.
+  - Auto add (optional), manual "Add free gift" button, duplicate prevention
+    (gift quantity kept at 1), removal of the gift when the cart drops below
+    the minimum. One global lock so the cart page and drawer never both add it.
+  - The gift's own value never counts towards the minimum.
+
+  Gift pricing (setting "Gift pricing", see docs/sc-cart-free-gift-progress-setup.md):
+  - zero_price: dedicated gift product priced 0.00. If the selected variant
+    costs more, nothing is shown on the storefront (editor shows a warning).
+  - automatic_discount: a real product made free by a Shopify automatic
+    discount. "Free" is only shown when the cart line really is 0.00.
+
+  Gift lines added here carry the hidden line item property `_sc_free_gift`.
+
+  Events (document):
+  - Listens: `sc:cart:refresh`     → re-read /cart.js and redraw (for custom code).
+  - Emits:   `sc:cart:changed`      → after any cart mutation seen by the watcher.
+             `sc:free-gift:updated` → after the gift was added / removed / fixed.
+{%- endcomment -%}
+
+{%- liquid
+  assign placement = placement | default: 'cart'
+
+  assign sc_place_on = false
+  if placement == 'drawer'
+    if settings.sc_fg_show_drawer
+      assign sc_place_on = true
+    endif
+  elsif settings.sc_fg_show_cart
+    assign sc_place_on = true
+  endif
+
+  assign sc_gift = settings.sc_fg_gift_product
+  assign sc_gift_variant = blank
+  if sc_gift != blank
+    assign sc_gift_variant = sc_gift.selected_or_first_available_variant
+  endif
+
+  assign sc_mode = settings.sc_fg_pricing_mode
+  assign sc_basis = settings.sc_fg_subtotal_basis
+  assign sc_threshold = settings.sc_fg_threshold | default: 0 | times: 100 | round
+  assign sc_has_threshold = false
+  if sc_threshold > 0
+    assign sc_has_threshold = true
+  endif
+
+  assign sc_gift_usable = false
+  assign sc_price_issue = false
+  if sc_gift_variant != blank
+    if sc_mode == 'automatic_discount'
+      assign sc_gift_usable = true
+    elsif sc_gift_variant.price == 0
+      assign sc_gift_usable = true
+    else
+      assign sc_price_issue = true
+    endif
+  endif
+
+  assign sc_gift_available = false
+  if sc_gift_variant != blank and sc_gift_variant.available
+    assign sc_gift_available = true
+  endif
+
+  assign sc_render = false
+  if settings.sc_fg_enable and sc_place_on and sc_has_threshold and sc_gift_usable
+    if sc_gift_available or settings.sc_fg_hide_when_sold_out == false
+      assign sc_render = true
+    endif
+  endif
+-%}
+
+{%- if sc_render -%}
+  {%- liquid
+    # Server-side first paint (store currency). JS recalculates on load; for
+    # other currencies the bar waits for JS so the converted minimum is used.
+    case sc_basis
+      when 'original'
+        assign sc_base = cart.original_total_price
+      when 'total'
+        assign sc_base = cart.total_price
+      else
+        assign sc_base = cart.items_subtotal_price
+    endcase
+
+    assign sc_gift_value = 0
+    assign sc_gift_in_cart = false
+    assign sc_other_qty = 0
+    for item in cart.items
+      assign sc_is_gift = false
+      if item.properties['_sc_free_gift'] != blank
+        assign sc_is_gift = true
+      elsif sc_mode == 'zero_price' and item.product_id == sc_gift.id
+        assign sc_is_gift = true
+      endif
+      if sc_is_gift
+        assign sc_gift_in_cart = true
+        if sc_basis == 'original'
+          assign sc_gift_value = sc_gift_value | plus: item.original_line_price
+        else
+          assign sc_gift_value = sc_gift_value | plus: item.final_line_price
+        endif
+      else
+        assign sc_other_qty = sc_other_qty | plus: item.quantity
+      endif
+    endfor
+
+    assign sc_eligible = sc_base | minus: sc_gift_value | at_least: 0
+    assign sc_remaining = sc_threshold | minus: sc_eligible | at_least: 0
+    assign sc_pct = sc_eligible | times: 100 | divided_by: sc_threshold | at_most: 100
+    assign sc_unlocked = false
+    if sc_eligible >= sc_threshold and sc_eligible > 0
+      assign sc_unlocked = true
+    endif
+
+    assign sc_same_currency = true
+    if cart.currency.iso_code != shop.currency
+      assign sc_same_currency = false
+    endif
+
+    case settings.sc_fg_money_style
+      when 'money_with_currency'
+        assign sc_remaining_money = sc_remaining | money_with_currency
+        assign sc_threshold_money = sc_threshold | money_with_currency
+        assign sc_money_format = shop.money_with_currency_format | strip_html
+      when 'amount'
+        assign sc_remaining_money = sc_remaining | money_without_currency
+        assign sc_threshold_money = sc_threshold | money_without_currency
+        assign sc_money_format = shop.money_format | strip_html
+      else
+        assign sc_remaining_money = sc_remaining | money
+        assign sc_threshold_money = sc_threshold | money
+        assign sc_money_format = shop.money_format | strip_html
+    endcase
+
+    assign sc_hidden = false
+    if settings.sc_fg_hide_when_empty and sc_other_qty == 0
+      assign sc_hidden = true
+    endif
+
+    assign sc_gift_image = settings.sc_fg_gift_image
+    if sc_gift_image == blank
+      assign sc_gift_image = sc_gift_variant.featured_image | default: sc_gift.featured_image
+    endif
+
+    assign sc_strike_price = 0
+    if settings.sc_fg_show_original_price
+      if sc_mode == 'automatic_discount'
+        assign sc_strike_price = sc_gift_variant.price
+      elsif sc_gift_variant.compare_at_price > sc_gift_variant.price
+        assign sc_strike_price = sc_gift_variant.compare_at_price
+      endif
+    endif
+
+    assign sc_icon_type = settings.sc_fg_icon_type
+    assign sc_custom_svg = ''
+    if sc_icon_type == 'custom_svg' and settings.sc_fg_custom_svg != blank
+      assign sc_svg_check = settings.sc_fg_custom_svg | downcase
+      if sc_svg_check contains '<svg'
+        assign sc_custom_svg = settings.sc_fg_custom_svg
+      endif
+    endif
+
+    assign sc_has_icon = true
+    if sc_icon_type == 'none'
+      assign sc_has_icon = false
+    elsif sc_icon_type == 'image' and settings.sc_fg_icon_image == blank
+      assign sc_has_icon = false
+    endif
+
+    assign sc_state_class = ''
+    if sc_unlocked
+      assign sc_state_class = ' is-unlocked'
+    endif
+    if sc_same_currency == false
+      assign sc_state_class = sc_state_class | append: ' is-pending'
+    endif
+
+    assign sc_amount_html = '<strong class="sc-fg__amount">' | append: sc_remaining_money | append: '</strong>'
+    assign sc_threshold_html = '<strong class="sc-fg__amount">' | append: sc_threshold_money | append: '</strong>'
+    assign sc_gift_title = sc_gift.title | escape
+    if sc_unlocked
+      if sc_gift_available
+        assign sc_message = settings.sc_fg_unlocked_message | escape
+        assign sc_valuetext = settings.sc_fg_unlocked_message
+      else
+        assign sc_message = settings.sc_fg_sold_out_message | escape
+        assign sc_valuetext = settings.sc_fg_sold_out_message
+      endif
+    else
+      assign sc_message = settings.sc_fg_locked_message | escape
+      assign sc_valuetext = settings.sc_fg_locked_message
+    endif
+    assign sc_message = sc_message | replace: '[amount]', sc_amount_html | replace: '[threshold]', sc_threshold_html | replace: '[gift]', sc_gift_title
+    assign sc_valuetext = sc_valuetext | replace: '[amount]', sc_remaining_money | replace: '[threshold]', sc_threshold_money | replace: '[gift]', sc_gift.title
+
+    assign sc_show_row = settings.sc_fg_show_gift
+    if sc_unlocked == false and settings.sc_fg_show_gift_when_locked == false
+      assign sc_show_row = false
+    endif
+
+    assign sc_gift_icon_svg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" focusable="false" aria-hidden="true"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M5 12v8a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-8"/><path d="M12 8v13"/><path d="M12 8S10.5 3.5 8 3.5a2.25 2.25 0 0 0 0 4.5h4Z"/><path d="M12 8s1.5-4.5 4-4.5a2.25 2.25 0 0 1 0 4.5h-4Z"/></svg>'
+  -%}
+
+  <style>
+    .sc-fg {
+      --sc-fg-card-bg: {{ settings.sc_fg_card_bg }};
+      --sc-fg-card-border: {{ settings.sc_fg_card_border }};
+      --sc-fg-headline: {{ settings.sc_fg_headline_color }};
+      --sc-fg-text: {{ settings.sc_fg_text_color }};
+      --sc-fg-success: {{ settings.sc_fg_success_color }};
+      --sc-fg-bar-bg: {{ settings.sc_fg_bar_bg }};
+      --sc-fg-bar-fill: {{ settings.sc_fg_bar_fill }};
+      --sc-fg-bar-done: {{ settings.sc_fg_bar_fill_complete }};
+      --sc-fg-icon: {{ settings.sc_fg_icon_color }};
+      --sc-fg-icon-bg: {{ settings.sc_fg_icon_bg }};
+      --sc-fg-icon-border: {{ settings.sc_fg_icon_border }};
+      --sc-fg-icon-done: {{ settings.sc_fg_icon_unlocked_color }};
+      --sc-fg-icon-done-bg: {{ settings.sc_fg_icon_unlocked_bg }};
+      --sc-fg-btn-bg: {{ settings.sc_fg_button_bg }};
+      --sc-fg-btn-text: {{ settings.sc_fg_button_text }};
+      --sc-fg-free: {{ settings.sc_fg_free_color }};
+      --sc-fg-bar-h: {{ settings.sc_fg_bar_height }}px;
+      --sc-fg-bar-r: {{ settings.sc_fg_bar_radius }}px;
+      --sc-fg-icon-size: {{ settings.sc_fg_icon_size }}px;
+      --sc-fg-gift-img: {{ settings.sc_fg_gift_image_size }}px;
+      --sc-fg-card-r: {{ settings.sc_fg_card_radius }}px;
+      --sc-fg-card-p: {{ settings.sc_fg_card_padding }}px;
+      --sc-fg-h-size: {{ settings.sc_fg_headline_size }}px;
+      --sc-fg-m-size: {{ settings.sc_fg_message_size }}px;
+      --sc-fg-h-weight: {{ settings.sc_fg_headline_weight }};
+      display: block;
+      box-sizing: border-box;
+      width: 100%;
+      font-family: inherit;
+      line-height: 1.4;
+      letter-spacing: normal;
+      text-align: {{ settings.sc_fg_text_align }};
+    }
+    .sc-fg--cart { margin: {{ settings.sc_fg_spacing_cart }}px 0; }
+    .sc-fg--drawer { margin: {{ settings.sc_fg_spacing_drawer }}px 0; flex: 0 0 auto; }
+    .sc-fg[hidden] { display: none !important; }
+    .sc-fg *, .sc-fg *::before, .sc-fg *::after { box-sizing: border-box; }
+    .sc-fg__card--boxed {
+      background: var(--sc-fg-card-bg);
+      border: 1px solid var(--sc-fg-card-border);
+      border-radius: var(--sc-fg-card-r);
+      padding: var(--sc-fg-card-p);
+    }
+    .sc-fg .sc-fg__headline {
+      margin: 0 0 4px;
+      color: var(--sc-fg-headline);
+      font-family: inherit;
+      font-size: var(--sc-fg-h-size);
+      font-weight: var(--sc-fg-h-weight);
+      line-height: 1.3;
+      letter-spacing: normal;
+      text-transform: none;
+    }
+    .sc-fg .sc-fg__message {
+      margin: 0 0 10px;
+      color: var(--sc-fg-text);
+      font-size: var(--sc-fg-m-size);
+      line-height: 1.4;
+      overflow-wrap: anywhere;
+    }
+    .sc-fg__amount { font-weight: 700; color: var(--sc-fg-headline); white-space: nowrap; }
+    .sc-fg.is-unlocked .sc-fg__message { color: var(--sc-fg-success); font-weight: 600; }
+    .sc-fg.is-pending .sc-fg__message,
+    .sc-fg.is-pending .sc-fg__fill { visibility: hidden; }
+
+    .sc-fg__progress { display: flex; align-items: center; width: 100%; min-height: var(--sc-fg-icon-size); }
+    .sc-fg__track {
+      position: relative;
+      flex: 1 1 auto;
+      min-width: 0;
+      height: var(--sc-fg-bar-h);
+      background: var(--sc-fg-bar-bg);
+      border-radius: var(--sc-fg-bar-r);
+      overflow: hidden;
+    }
+    .sc-fg__fill {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      inset-inline-start: 0;
+      width: 0;
+      max-width: 100%;
+      background-color: var(--sc-fg-bar-fill);
+      border-radius: var(--sc-fg-bar-r);
+      transition: width .6s cubic-bezier(.25,.8,.25,1), background-color .3s ease;
+    }
+    .sc-fg.is-unlocked .sc-fg__fill { background-color: var(--sc-fg-bar-done); }
+    .sc-fg__fill--stripes {
+      background-image: linear-gradient(45deg, rgba(255,255,255,.18) 25%, transparent 25%, transparent 50%, rgba(255,255,255,.18) 50%, rgba(255,255,255,.18) 75%, transparent 75%, transparent);
+      background-size: 16px 16px;
+      animation: sc-fg-stripes 1s linear infinite;
+    }
+    @keyframes sc-fg-stripes { from { background-position: 0 0; } to { background-position: 16px 0; } }
+
+    .sc-fg__icon {
+      flex: 0 0 auto;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: var(--sc-fg-icon-size);
+      height: var(--sc-fg-icon-size);
+      margin-inline-start: calc(var(--sc-fg-icon-size) * -0.12);
+      position: relative;
+      z-index: 1;
+      border-radius: 50%;
+      border: 2px solid var(--sc-fg-icon-border);
+      background: var(--sc-fg-icon-bg);
+      color: var(--sc-fg-icon);
+      padding: calc(var(--sc-fg-icon-size) * 0.2);
+      overflow: hidden;
+      transition: background-color .3s ease, color .3s ease, border-color .3s ease;
+    }
+    .sc-fg__icon svg, .sc-fg__icon img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      max-width: 100%;
+      object-fit: contain;
+    }
+    .sc-fg__icon--image { padding: 0; }
+    .sc-fg__icon--image img { object-fit: cover; }
+    .sc-fg.is-unlocked .sc-fg__icon {
+      background: var(--sc-fg-icon-done-bg);
+      border-color: var(--sc-fg-icon-done-bg);
+      color: var(--sc-fg-icon-done);
+    }
+    .sc-fg.is-celebrating .sc-fg__icon { animation: sc-fg-pop .6s ease; }
+    @keyframes sc-fg-pop { 0% { transform: scale(1); } 40% { transform: scale(1.18) rotate(-6deg); } 70% { transform: scale(.96) rotate(3deg); } 100% { transform: scale(1); } }
+
+    .sc-fg .sc-fg__notice { margin: 8px 0 0; font-size: calc(var(--sc-fg-m-size) - 1px); color: var(--sc-fg-text); }
+    .sc-fg .sc-fg__notice--error { color: #b3261e; }
+    .sc-fg [hidden] { display: none !important; }
+
+    .sc-fg__gift {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--sc-fg-card-border);
+      text-align: start;
+    }
+    .sc-fg__gift-media {
+      flex: 0 0 auto;
+      width: var(--sc-fg-gift-img);
+      height: var(--sc-fg-gift-img);
+      border-radius: 6px;
+      overflow: hidden;
+      border: 1px solid var(--sc-fg-card-border);
+      background: #f7f7f7;
+      transition: opacity .3s ease, filter .3s ease;
+    }
+    .sc-fg__gift-media img, .sc-fg__gift-media svg { display: block; width: 100%; height: 100%; object-fit: cover; }
+    .sc-fg__gift.is-locked .sc-fg__gift-media { border-style: dashed; border-color: #b5b5b5; opacity: .6; filter: grayscale(1); }
+    .sc-fg__gift-info { flex: 1 1 auto; min-width: 0; }
+    .sc-fg .sc-fg__gift-title {
+      margin: 0 0 2px;
+      color: var(--sc-fg-headline);
+      font-size: var(--sc-fg-m-size);
+      font-weight: 600;
+      line-height: 1.3;
+      overflow-wrap: anywhere;
+    }
+    .sc-fg .sc-fg__gift-price {
+      margin: 0;
+      font-size: calc(var(--sc-fg-m-size) - 1px);
+      color: var(--sc-fg-text);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0 8px;
+      align-items: baseline;
+    }
+    .sc-fg__free { color: var(--sc-fg-free); font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+    .sc-fg__strike { text-decoration: line-through; opacity: .75; }
+    .sc-fg__gift-action { flex: 0 0 auto; }
+    .sc-fg .sc-fg__btn {
+      appearance: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 38px;
+      min-width: 0;
+      margin: 0;
+      padding: 8px 14px;
+      border: 0;
+      border-radius: 6px;
+      background: var(--sc-fg-btn-bg);
+      color: var(--sc-fg-btn-text);
+      font: inherit;
+      font-size: calc(var(--sc-fg-m-size) - 1px);
+      font-weight: 600;
+      line-height: 1.2;
+      letter-spacing: normal;
+      box-shadow: none;
+      cursor: pointer;
+      transition: opacity .2s ease, transform .2s ease;
+    }
+    .sc-fg .sc-fg__btn:hover { opacity: .88; }
+    .sc-fg .sc-fg__btn:active { transform: scale(.98); }
+    .sc-fg .sc-fg__btn:focus-visible { outline: 2px solid var(--sc-fg-btn-bg); outline-offset: 3px; }
+    .sc-fg .sc-fg__btn[disabled] { opacity: .55; cursor: wait; }
+    .sc-fg__status {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: calc(var(--sc-fg-m-size) - 1px);
+      font-weight: 600;
+      color: var(--sc-fg-text);
+      white-space: nowrap;
+    }
+    .sc-fg__status--added { color: var(--sc-fg-success); }
+    .sc-fg__status svg { width: 15px; height: 15px; flex: 0 0 auto; }
+    .sc-fg__sr {
+      position: absolute !important;
+      width: 1px; height: 1px;
+      margin: -1px; padding: 0;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      white-space: nowrap;
+      border: 0;
+    }
+    .sc-fg .sc-fg__editor-note {
+      margin: 10px 0 0;
+      padding: 8px 10px;
+      border-radius: 6px;
+      background: #fff4e5;
+      color: #7a4b00;
+      font-size: 12px;
+      line-height: 1.4;
+      text-align: start;
+    }
+    @media screen and (max-width: 749px) {
+      .sc-fg {
+        --sc-fg-h-size: {{ settings.sc_fg_headline_size_mobile }}px;
+        --sc-fg-m-size: {{ settings.sc_fg_message_size_mobile }}px;
+        --sc-fg-icon-size: {{ settings.sc_fg_icon_size | times: 0.85 | round }}px;
+        --sc-fg-card-p: {{ settings.sc_fg_card_padding | times: 0.8 | round }}px;
+      }
+    }
+    @media screen and (max-width: 420px) {
+      .sc-fg--cart .sc-fg__gift { flex-wrap: wrap; }
+      .sc-fg--cart .sc-fg__gift-action { flex-basis: 100%; }
+      .sc-fg--cart .sc-fg__btn { width: 100%; }
+    }
+    /* Drawer is narrow on every device: use the mobile type scale. */
+    .sc-fg--drawer {
+      --sc-fg-h-size: {{ settings.sc_fg_headline_size_mobile }}px;
+      --sc-fg-m-size: {{ settings.sc_fg_message_size_mobile }}px;
+      --sc-fg-icon-size: {{ settings.sc_fg_icon_size | times: 0.85 | round }}px;
+      --sc-fg-gift-img: {{ settings.sc_fg_gift_image_size | times: 0.85 | round }}px;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .sc-fg__fill, .sc-fg__icon { transition: none; }
+      .sc-fg__fill--stripes, .sc-fg.is-celebrating .sc-fg__icon { animation: none; }
+    }
+  </style>
+
+  <sc-free-gift
+    class="sc-fg sc-fg--{{ placement }}{{ sc_state_class }}"
+    data-placement="{{ placement }}"
+    {% if sc_hidden %}hidden{% endif %}
+  >
+    <div class="sc-fg__card{% if settings.sc_fg_container_style == 'card' %} sc-fg__card--boxed{% endif %}">
+      {%- if settings.sc_fg_headline != blank -%}
+        <p class="sc-fg__headline">{{ settings.sc_fg_headline | escape }}</p>
+      {%- endif -%}
+
+      <p class="sc-fg__message" data-sc-fg-message>{{ sc_message }}</p>
+
+      <div class="sc-fg__progress">
+        <div
+          class="sc-fg__track"
+          role="progressbar"
+          aria-label="{{ settings.sc_fg_headline | default: 'Free gift' | escape }}"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          aria-valuenow="{{ sc_pct }}"
+          aria-valuetext="{{ sc_valuetext | strip_html | escape }}"
+          data-sc-fg-track
+        >
+          <span
+            class="sc-fg__fill{% if settings.sc_fg_bar_stripes %} sc-fg__fill--stripes{% endif %}"
+            style="width: {{ sc_pct }}%;"
+            data-sc-fg-fill
+          ></span>
+        </div>
+        {%- if sc_has_icon -%}
+          <span
+            class="sc-fg__icon{% if sc_icon_type == 'image' %} sc-fg__icon--image{% endif %}"
+            aria-hidden="true"
+            data-sc-fg-icon
+          >
+            {%- case sc_icon_type -%}
+              {%- when 'box' -%}
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" focusable="false" aria-hidden="true"><path d="M21 8 12 3 3 8v8l9 5 9-5V8Z"/><path d="m3 8 9 5 9-5"/><path d="M12 13v8"/><path d="m7.5 5.5 9 5"/></svg>
+              {%- when 'star' -%}
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" focusable="false" aria-hidden="true"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3 6.4 20.2l1.1-6.2L3 9.6l6.2-.9L12 3Z"/></svg>
+              {%- when 'heart' -%}
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" focusable="false" aria-hidden="true"><path d="M12 20.5s-7.5-4.6-9.3-9.3C1.5 8 3.6 4.5 7 4.5c2.1 0 3.6 1.2 5 3 1.4-1.8 2.9-3 5-3 3.4 0 5.5 3.5 4.3 6.7-1.8 4.7-9.3 9.3-9.3 9.3Z"/></svg>
+              {%- when 'image' -%}
+                {{- settings.sc_fg_icon_image | image_url: width: 160 | image_tag: alt: '', loading: 'lazy' -}}
+              {%- else -%}
+                {%- comment -%} Gift icon; for "Custom SVG code" JS swaps in the sanitised SVG. {%- endcomment -%}
+                {{- sc_gift_icon_svg -}}
+            {%- endcase -%}
+          </span>
+        {%- endif -%}
+      </div>
+
+      <p class="sc-fg__notice" data-sc-fg-notice role="status" hidden></p>
+
+      {%- if settings.sc_fg_show_gift -%}
+        <div
+          class="sc-fg__gift{% unless sc_unlocked %} is-locked{% endunless %}"
+          data-sc-fg-gift
+          {% unless sc_show_row %}hidden{% endunless %}
+        >
+          <div class="sc-fg__gift-media">
+            {%- if sc_gift_image != blank -%}
+              {{-
+                sc_gift_image
+                | image_url: width: 240
+                | image_tag: widths: '80, 120, 160, 240', sizes: '120px', loading: 'lazy', alt: sc_gift.title
+              -}}
+            {%- else -%}
+              {{- 'product-1' | placeholder_svg_tag -}}
+            {%- endif -%}
+          </div>
+          <div class="sc-fg__gift-info">
+            <p class="sc-fg__gift-title">{{ sc_gift.title | escape }}</p>
+            <p class="sc-fg__gift-price">
+              {%- if settings.sc_fg_free_label != blank -%}
+                <span class="sc-fg__free" data-sc-fg-free>{{ settings.sc_fg_free_label | escape }}</span>
+              {%- endif -%}
+              {%- if sc_strike_price > 0 -%}
+                <s class="sc-fg__strike" data-sc-fg-strike>
+                  <span class="sc-fg__sr">Regular price</span>
+                  {{- sc_strike_price | money -}}
+                </s>
+              {%- endif -%}
+              <span data-sc-fg-line-price hidden></span>
+            </p>
+          </div>
+          <div class="sc-fg__gift-action">
+            <button
+              type="button"
+              class="sc-fg__btn"
+              data-sc-fg-add
+              {% if sc_unlocked == false or sc_gift_in_cart or sc_gift_available == false %}hidden{% endif %}
+            >
+              {{- settings.sc_fg_add_button_label | default: 'Add free gift' | escape -}}
+            </button>
+            <span
+              class="sc-fg__status sc-fg__status--added"
+              data-sc-fg-added
+              {% unless sc_gift_in_cart and sc_unlocked %}hidden{% endunless %}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>
+              {{- settings.sc_fg_added_label | escape -}}
+            </span>
+            <span class="sc-fg__status" data-sc-fg-locked {% if sc_unlocked %}hidden{% endif %}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+              {{- settings.sc_fg_locked_label | escape -}}
+            </span>
+          </div>
+        </div>
+      {%- endif -%}
+
+      <div class="sc-fg__sr" aria-live="polite" aria-atomic="true" data-sc-fg-live></div>
+
+      {%- if request.design_mode -%}
+        {%- if settings.sc_fg_auto_add or settings.sc_fg_remove_when_ineligible -%}
+          <p class="sc-fg__editor-note">Theme editor only: the gift is never added or removed automatically inside the editor. Preview the store to test.</p>
+        {%- endif -%}
+        {%- if sc_icon_type == 'custom_svg' and sc_custom_svg == blank -%}
+          <p class="sc-fg__editor-note">Theme editor only: paste SVG code that starts with &lt;svg to use a custom icon. Showing the default gift icon.</p>
+        {%- endif -%}
+        {%- if sc_mode == 'automatic_discount' -%}
+          <p class="sc-fg__editor-note">Theme editor only: make sure a Shopify automatic discount makes "{{ sc_gift.title | escape }}" free when the cart reaches the minimum.</p>
+        {%- endif -%}
+      {%- endif -%}
+    </div>
+
+    <script type="application/json" data-sc-fg-config>
+      {
+        "threshold": {{ sc_threshold | json }},
+        "basis": {{ sc_basis | json }},
+        "pricingMode": {{ sc_mode | json }},
+        "giftProductId": {{ sc_gift.id | json }},
+        "giftVariantId": {{ sc_gift_variant.id | json }},
+        "giftTitle": {{ sc_gift.title | json }},
+        "giftAvailable": {{ sc_gift_available | json }},
+        "autoAdd": {{ settings.sc_fg_auto_add | json }},
+        "readdMode": {{ settings.sc_fg_readd_mode | json }},
+        "removeIneligible": {{ settings.sc_fg_remove_when_ineligible | json }},
+        "hideEmpty": {{ settings.sc_fg_hide_when_empty | json }},
+        "showGift": {{ settings.sc_fg_show_gift | json }},
+        "showGiftLocked": {{ settings.sc_fg_show_gift_when_locked | json }},
+        "refresh": {{ settings.sc_fg_cart_refresh | json }},
+        "roundConverted": {{ settings.sc_fg_round_converted | json }},
+        "shopCurrency": {{ shop.currency | json }},
+        "moneyFormat": {{ sc_money_format | json }},
+        "moneyStyle": {{ settings.sc_fg_money_style | json }},
+        "customSvg": {{ sc_custom_svg | json }},
+        "messages": {
+          "locked": {{ settings.sc_fg_locked_message | json }},
+          "unlocked": {{ settings.sc_fg_unlocked_message | json }},
+          "added": {{ settings.sc_fg_added_message | json }},
+          "removed": {{ settings.sc_fg_removed_message | json }},
+          "soldOut": {{ settings.sc_fg_sold_out_message | json }},
+          "error": {{ settings.sc_fg_error_message | json }}
+        }
+      }
+    </script>
+    <script type="application/json" data-sc-fg-cart>{{ cart | json }}</script>
+  </sc-free-gift>
+
+  <script>
+    (function () {
+      'use strict';
+
+      /* ---------------------------------------------------------------
+       * 1. Global cart watcher (installed once per page, shared by all
+       *    sc- features). Emits `sc:cart:changed` after any Ajax cart
+       *    mutation made with fetch or XMLHttpRequest by any script.
+       *    Requests sent with the `X-SC-Internal` header are ignored.
+       * ------------------------------------------------------------- */
+      if (!window.__scCartWatcher) {
+        window.__scCartWatcher = true;
+        var CART_RE = /\/cart\/(add|change|update|clear)(\.js|\.json)?(\?|\/|$)/;
+        var emit = function (url) {
+          document.dispatchEvent(new CustomEvent('sc:cart:changed', { detail: { url: url } }));
+        };
+        var isInternal = function (headers) {
+          if (!headers) return false;
+          try {
+            if (typeof headers.get === 'function') return !!headers.get('X-SC-Internal');
+            return !!(headers['X-SC-Internal'] || headers['x-sc-internal']);
+          } catch (e) { return false; }
+        };
+        if (typeof window.fetch === 'function') {
+          var nativeFetch = window.fetch;
+          window.fetch = function (input, init) {
+            var url = '';
+            try { url = typeof input === 'string' ? input : (input && input.url) || String(input); } catch (e) {}
+            var internal = isInternal(init && init.headers) || (input && typeof input === 'object' && isInternal(input.headers));
+            var promise = nativeFetch.apply(this, arguments);
+            if (!internal && CART_RE.test(url)) promise.then(function () { emit(url); }, function () {});
+            return promise;
+          };
+        }
+        if (window.XMLHttpRequest) {
+          var xhrOpen = XMLHttpRequest.prototype.open;
+          var xhrSend = XMLHttpRequest.prototype.send;
+          var xhrHeader = XMLHttpRequest.prototype.setRequestHeader;
+          XMLHttpRequest.prototype.open = function (method, url) {
+            this.__scUrl = String(url || '');
+            this.__scInternal = false;
+            return xhrOpen.apply(this, arguments);
+          };
+          XMLHttpRequest.prototype.setRequestHeader = function (name) {
+            if (String(name).toLowerCase() === 'x-sc-internal') this.__scInternal = true;
+            return xhrHeader.apply(this, arguments);
+          };
+          XMLHttpRequest.prototype.send = function () {
+            var xhr = this;
+            if (!xhr.__scInternal && CART_RE.test(xhr.__scUrl || '')) {
+              xhr.addEventListener('loadend', function () { emit(xhr.__scUrl); });
+            }
+            return xhrSend.apply(this, arguments);
+          };
+        }
+      }
+
+      if (customElements.get('sc-free-gift')) return;
+
+      /* Shared state for every instance (cart page + drawer, and the fresh
+         instances Dawn creates each time it re-renders the cart HTML). */
+      var G = (window.__scFreeGift = window.__scFreeGift || {
+        busy: false,
+        addFailed: false,
+        actions: [],
+        notice: null
+      });
+
+      /* Loop guard: count automatic gift changes made with no customer cart
+         change in between. Any customer / theme change resets the count. */
+      document.addEventListener('sc:cart:changed', function () { G.actions = []; });
+
+      /* ---------------------------------------------------------------
+       * 2. Helpers
+       * ------------------------------------------------------------- */
+      var SVG_NS = 'http://www.w3.org/2000/svg';
+      var SVG_TAGS = ['svg', 'g', 'path', 'circle', 'ellipse', 'rect', 'line', 'polyline', 'polygon', 'defs', 'lineargradient', 'radialgradient', 'stop', 'clippath', 'mask', 'symbol'];
+      var SVG_ATTRS = /^(viewbox|d|fill|fill-rule|fill-opacity|clip-rule|stroke|stroke-width|stroke-linecap|stroke-linejoin|stroke-miterlimit|stroke-dasharray|stroke-dashoffset|stroke-opacity|opacity|transform|cx|cy|r|rx|ry|x|y|x1|x2|y1|y2|width|height|points|offset|stop-color|stop-opacity|gradientunits|gradienttransform|id|clip-path|mask|preserveaspectratio)$/i;
+
+      /* Rebuilds a merchant SVG from an allow-list of shape elements and
+         presentation attributes. Scripts, event handlers, links, styles,
+         foreignObject and external url() references are all dropped. */
+      function sanitizeSvg(source) {
+        if (!source || typeof DOMParser === 'undefined') return null;
+        var doc;
+        try { doc = new DOMParser().parseFromString(String(source).trim(), 'image/svg+xml'); } catch (e) { return null; }
+        if (!doc || doc.getElementsByTagName('parsererror').length) return null;
+        var root = doc.documentElement;
+        if (!root || root.nodeName.toLowerCase() !== 'svg') return null;
+        function copy(node) {
+          var name = node.nodeName.toLowerCase();
+          if (SVG_TAGS.indexOf(name) === -1) return null;
+          var el = document.createElementNS(SVG_NS, node.nodeName);
+          for (var i = 0; i < node.attributes.length; i++) {
+            var a = node.attributes[i];
+            if (!SVG_ATTRS.test(a.name)) continue;
+            var v = a.value;
+            if (/javascript:|data:|expression\(/i.test(v)) continue;
+            if (/url\(\s*['"]?\s*[^#\s'"]/i.test(v)) continue;
+            el.setAttribute(a.name, v);
+          }
+          for (var c = 0; c < node.childNodes.length; c++) {
+            if (node.childNodes[c].nodeType !== 1) continue;
+            var child = copy(node.childNodes[c]);
+            if (child) el.appendChild(child);
+          }
+          return el;
+        }
+        var svg = copy(root);
+        if (!svg) return null;
+        var w = parseFloat(svg.getAttribute('width'));
+        var h = parseFloat(svg.getAttribute('height'));
+        if (!svg.getAttribute('viewBox') && w > 0 && h > 0) svg.setAttribute('viewBox', '0 0 ' + w + ' ' + h);
+        svg.removeAttribute('width');
+        svg.removeAttribute('height');
+        if (!svg.getAttribute('fill')) svg.setAttribute('fill', 'currentColor');
+        svg.setAttribute('aria-hidden', 'true');
+        svg.setAttribute('focusable', 'false');
+        return svg;
+      }
+
+      function formatWithShopifyFormat(cents, format) {
+        var placeholder = /\{\{\s*(\w+)\s*\}\}/;
+        var match = format.match(placeholder);
+        if (!match) return null;
+        function delimit(number, precision, thousands, decimal) {
+          var parts = (number / 100).toFixed(precision).split('.');
+          var whole = parts[0].replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1' + thousands);
+          return parts[1] ? whole + decimal + parts[1] : whole;
+        }
+        var value;
+        switch (match[1]) {
+          case 'amount_no_decimals': value = delimit(cents, 0, ',', '.'); break;
+          case 'amount_with_comma_separator': value = delimit(cents, 2, '.', ','); break;
+          case 'amount_no_decimals_with_comma_separator': value = delimit(cents, 0, '.', ','); break;
+          case 'amount_with_apostrophe_separator': value = delimit(cents, 2, "'", '.'); break;
+          case 'amount_no_decimals_with_space_separator': value = delimit(cents, 0, ' ', ','); break;
+          case 'amount_with_space_separator': value = delimit(cents, 2, ' ', ','); break;
+          case 'amount_with_period_and_space_separator': value = delimit(cents, 2, ' ', '.'); break;
+          default: value = delimit(cents, 2, ',', '.');
+        }
+        return format.replace(placeholder, value);
+      }
+
+      function sessionGet(key) { try { return window.sessionStorage.getItem(key); } catch (e) { return null; } }
+      function sessionSet(key, val) { try { window.sessionStorage.setItem(key, val); } catch (e) {} }
+      function sessionDel(key) { try { window.sessionStorage.removeItem(key); } catch (e) {} }
+
+      var root = (window.Shopify && window.Shopify.routes && window.Shopify.routes.root) || '/';
+      if (root.slice(-1) !== '/') root += '/';
+
+      function request(path, body) {
+        var opts = {
+          method: body ? 'POST' : 'GET',
+          credentials: 'same-origin',
+          headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-SC-Internal': '1' }
+        };
+        if (body) {
+          opts.headers['Content-Type'] = 'application/json';
+          opts.body = JSON.stringify(body);
+        }
+        return fetch(root + path, opts).then(function (res) {
+          return res.json().then(function (data) {
+            if (!res.ok) {
+              var err = new Error((data && (data.description || data.message)) || 'Cart request failed');
+              err.status = res.status;
+              throw err;
+            }
+            return data;
+          });
+        });
+      }
+
+      function fetchSections(ids) {
+        var batches = [];
+        for (var i = 0; i < ids.length; i += 5) batches.push(ids.slice(i, i + 5));
+        return Promise.all(batches.map(function (batch) {
+          return fetch(root + 'cart?sections=' + encodeURIComponent(batch.join(',')), {
+            credentials: 'same-origin',
+            headers: { Accept: 'application/json', 'X-SC-Internal': '1' }
+          }).then(function (r) {
+            if (!r.ok) throw new Error('Section render failed');
+            return r.json();
+          });
+        })).then(function (results) {
+          return Object.assign.apply(Object, [{}].concat(results));
+        });
+      }
+
+      function parse(html) { return new DOMParser().parseFromString(html, 'text/html'); }
+
+      /* Re-render the theme's cart UI after the gift was added / removed.
+         Dawn: cart drawer (.drawer__inner), cart page sections, header bubble.
+         Other themes: cart sections inside <main> + header elements with a
+         "cart" id, plus a Horizon-style `cart:update` event. */
+      function refreshThemeCart(cart, mode) {
+        document.dispatchEvent(new CustomEvent('sc:free-gift:updated', { detail: { cart: cart } }));
+        if (mode === 'reload') { window.location.reload(); return Promise.resolve(); }
+
+        try {
+          document.dispatchEvent(new CustomEvent('cart:update', {
+            bubbles: true,
+            detail: { resource: cart, sourceId: 'sc-free-gift', data: { source: 'sc-free-gift', itemCount: cart.item_count } }
+          }));
+        } catch (e) {}
+
+        var jobs = [];
+        var ids = [];
+        var empty = cart.item_count === 0;
+
+        /* Dawn cart drawer */
+        var drawerInner = document.querySelector('#CartDrawer .drawer__inner');
+        if (drawerInner) {
+          ids.push('cart-drawer');
+          jobs.push(function (sections) {
+            if (!sections['cart-drawer']) return;
+            var fresh = parse(sections['cart-drawer']).querySelector('.drawer__inner');
+            if (fresh) drawerInner.innerHTML = fresh.innerHTML;
+            document.querySelectorAll('cart-drawer').forEach(function (d) { d.classList.toggle('is-empty', empty); });
+          });
+        }
+
+        /* Header cart icon / count */
+        var bubble = document.getElementById('cart-icon-bubble');
+        if (bubble) {
+          ids.push('cart-icon-bubble');
+          jobs.push(function (sections) {
+            if (!sections['cart-icon-bubble']) return;
+            var doc = parse(sections['cart-icon-bubble']);
+            var fresh = doc.querySelector('.shopify-section') || doc.body;
+            bubble.innerHTML = fresh.innerHTML;
+          });
+        }
+
+        /* Cart page sections (Dawn: main-cart-items + main-cart-footer) */
+        var onCartPage = /\/cart\/?$/.test(window.location.pathname);
+        var scope = document.querySelector('main') || document.body;
+        var pageSections = !onCartPage ? [] : Array.prototype.filter.call(scope.querySelectorAll('[id^="shopify-section-"]'), function (el) {
+          var id = el.id.slice(16);
+          return /cart/i.test(id) || !!el.querySelector('[name^="updates"], [name="checkout"]');
+        });
+        pageSections.forEach(function (el) {
+          var id = el.id.slice(16);
+          ids.push(id);
+          jobs.push(function (sections) {
+            if (!sections[id]) return;
+            var doc = parse(sections[id]);
+            var fresh = doc.getElementById(el.id);
+            el.innerHTML = fresh ? fresh.innerHTML : doc.body.innerHTML;
+          });
+        });
+
+        if (!ids.length) return Promise.resolve();
+        return fetchSections(ids).then(function (sections) {
+          jobs.forEach(function (job) { try { job(sections); } catch (e) {} });
+        }).catch(function () {
+          window.location.reload();
+        });
+      }
+
+      /* ---------------------------------------------------------------
+       * 3. Component
+       * ------------------------------------------------------------- */
+      class ScFreeGift extends HTMLElement {
+        connectedCallback() {
+          if (this.__ready) return;
+          var cfgEl = this.querySelector('[data-sc-fg-config]');
+          var cartEl = this.querySelector('[data-sc-fg-cart]');
+          try { this.cfg = JSON.parse(cfgEl.textContent); } catch (e) { return; }
+          this.__ready = true;
+          var initialCart = null;
+          try { initialCart = JSON.parse(cartEl.textContent); } catch (e) {}
+
+          var q = this.querySelector.bind(this);
+          this.els = {
+            message: q('[data-sc-fg-message]'),
+            track: q('[data-sc-fg-track]'),
+            fill: q('[data-sc-fg-fill]'),
+            icon: q('[data-sc-fg-icon]'),
+            notice: q('[data-sc-fg-notice]'),
+            gift: q('[data-sc-fg-gift]'),
+            add: q('[data-sc-fg-add]'),
+            added: q('[data-sc-fg-added]'),
+            locked: q('[data-sc-fg-locked]'),
+            free: q('[data-sc-fg-free]'),
+            strike: q('[data-sc-fg-strike]'),
+            linePrice: q('[data-sc-fg-line-price]'),
+            live: q('[data-sc-fg-live]')
+          };
+
+          var shop = window.Shopify || {};
+          this.designMode = !!shop.designMode;
+          this.rate = parseFloat(shop.currency && shop.currency.rate) || 1;
+          this.locale = shop.locale || document.documentElement.lang || 'en';
+          this.declinedKey = 'sc-fg-declined:' + this.cfg.giftVariantId;
+          this.lastKey = 'sc-fg-last:' + this.cfg.giftVariantId;
+          this.pending = false;
+
+          /* Last known state, shared across re-renders and page loads. */
+          var last = null;
+          try { last = JSON.parse(sessionGet(this.lastKey) || 'null'); } catch (e) {}
+          this.prev = last;
+
+          this.renderCustomIcon();
+
+          this.onCartChanged = this.scheduleRefresh.bind(this);
+          this.onUpdated = this.handleUpdated.bind(this);
+          this.onPageShow = function (e) { if (e.persisted) this.scheduleRefresh(); }.bind(this);
+          this.onAddClick = this.handleManualAdd.bind(this);
+          document.addEventListener('sc:cart:changed', this.onCartChanged);
+          document.addEventListener('sc:cart:refresh', this.onCartChanged);
+          document.addEventListener('sc:free-gift:updated', this.onUpdated);
+          window.addEventListener('pageshow', this.onPageShow);
+          if (this.els.add) this.els.add.addEventListener('click', this.onAddClick);
+
+          /* A notice from the instance this one replaced (Dawn re-render). */
+          if (G.notice && Date.now() - G.notice.at < 6000) this.showNotice(G.notice.kind, true);
+
+          if (initialCart && initialCart.items) this.process(initialCart, {});
+          else this.scheduleRefresh();
+        }
+
+        disconnectedCallback() {
+          if (!this.__ready) return;
+          this.__ready = false;
+          document.removeEventListener('sc:cart:changed', this.onCartChanged);
+          document.removeEventListener('sc:cart:refresh', this.onCartChanged);
+          document.removeEventListener('sc:free-gift:updated', this.onUpdated);
+          window.removeEventListener('pageshow', this.onPageShow);
+          if (this.els.add) this.els.add.removeEventListener('click', this.onAddClick);
+          clearTimeout(this.timer);
+          clearTimeout(this.noticeTimer);
+          clearTimeout(this.celebrateTimer);
+        }
+
+        renderCustomIcon() {
+          if (!this.cfg.customSvg || !this.els.icon) return;
+          var svg = sanitizeSvg(this.cfg.customSvg);
+          if (!svg) return;
+          this.els.icon.textContent = '';
+          this.els.icon.appendChild(svg);
+        }
+
+        /* ---- money ---- */
+        formatMoney(cents) {
+          cents = Math.max(0, Math.round(cents || 0));
+          var cfg = this.cfg;
+          var cur = this.currency || cfg.shopCurrency;
+          if (cur === cfg.shopCurrency && cfg.moneyFormat) {
+            var fmt = cfg.moneyFormat;
+            if (cfg.moneyStyle === 'amount') {
+              var m = fmt.match(/\{\{\s*\w+\s*\}\}/);
+              fmt = m ? m[0] : '{' + '{amount}' + '}';
+            }
+            var out = formatWithShopifyFormat(cents, fmt);
+            if (out) return out;
+          }
+          try {
+            if (cfg.moneyStyle === 'amount') {
+              return new Intl.NumberFormat(this.locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(cents / 100);
+            }
+            var str = new Intl.NumberFormat(this.locale, { style: 'currency', currency: cur }).format(cents / 100);
+            return cfg.moneyStyle === 'money_with_currency' && str.indexOf(cur) === -1 ? str + ' ' + cur : str;
+          } catch (e) {
+            return (cents / 100).toFixed(2) + ' ' + cur;
+          }
+        }
+
+        /* Minimum in the cart's (presentment) currency. */
+        thresholdFor(cart) {
+          var t = this.cfg.threshold || 0;
+          var converted = cart && cart.currency && cart.currency !== this.cfg.shopCurrency;
+          if (!converted || this.rate === 1) return t;
+          var value = t * this.rate;
+          return this.cfg.roundConverted ? Math.ceil(value / 100) * 100 : Math.round(value);
+        }
+
+        /* ---- state ---- */
+        isGiftLine(line) {
+          if (line.properties && line.properties._sc_free_gift) return true;
+          return this.cfg.pricingMode === 'zero_price' && !!this.cfg.giftProductId && line.product_id === this.cfg.giftProductId;
+        }
+
+        compute(cart) {
+          var cfg = this.cfg;
+          var items = cart.items || [];
+          var giftLines = [];
+          var otherQty = 0, giftValue = 0, giftQty = 0, giftLinePrice = 0;
+          for (var i = 0; i < items.length; i++) {
+            var line = items[i];
+            if (this.isGiftLine(line)) {
+              giftLines.push(line);
+              giftQty += line.quantity;
+              giftLinePrice += line.final_line_price || 0;
+              giftValue += cfg.basis === 'original' ? (line.original_line_price || 0) : (line.final_line_price || 0);
+            } else {
+              otherQty += line.quantity;
+            }
+          }
+          var base;
+          if (cfg.basis === 'original') base = cart.original_total_price;
+          else if (cfg.basis === 'total') base = cart.total_price;
+          else base = cart.items_subtotal_price;
+          var eligible = Math.max(0, (base || 0) - giftValue);
+          var threshold = this.thresholdFor(cart);
+          return {
+            eligible: eligible,
+            threshold: threshold,
+            remaining: Math.max(0, threshold - eligible),
+            pct: threshold > 0 ? Math.min(100, (eligible / threshold) * 100) : 0,
+            unlocked: threshold > 0 && eligible > 0 && eligible >= threshold,
+            giftLines: giftLines,
+            giftQty: giftQty,
+            giftLinePrice: giftLinePrice,
+            inCart: giftLines.length > 0,
+            otherQty: otherQty
+          };
+        }
+
+        process(cart, ctx) {
+          ctx = ctx || {};
+          this.cart = cart;
+          this.currency = cart.currency || this.cfg.shopCurrency;
+          var s = this.compute(cart);
+          var prev = this.prev;
+
+          /* The customer removed the gift themselves while still eligible. */
+          if (prev && prev.inCart && !s.inCart && s.unlocked && !ctx.internal) {
+            sessionSet(this.declinedKey, '1');
+          }
+
+          this.render(s, prev);
+          this.prev = { inCart: s.inCart, unlocked: s.unlocked };
+          sessionSet(this.lastKey, JSON.stringify(this.prev));
+          this.classList.remove('is-pending');
+
+          if (!ctx.noActions && this.decide(s)) this.run(false);
+        }
+
+        decide(s) {
+          var cfg = this.cfg;
+          if (this.designMode || !cfg.giftVariantId) return null;
+
+          if (!s.unlocked && s.inCart && cfg.removeIneligible) {
+            var removeUpdates = {};
+            s.giftLines.forEach(function (l) { removeUpdates[l.key] = 0; });
+            return { type: 'update', updates: removeUpdates, notice: 'removed' };
+          }
+          if (s.unlocked && s.giftQty > 1) {
+            var dedupe = {};
+            s.giftLines.forEach(function (l, i) { dedupe[l.key] = i === 0 ? 1 : 0; });
+            return { type: 'update', updates: dedupe };
+          }
+          if (
+            s.unlocked && !s.inCart && cfg.autoAdd && cfg.giftAvailable && !G.addFailed &&
+            !(cfg.readdMode === 'respect' && sessionGet(this.declinedKey))
+          ) {
+            return { type: 'add', notice: 'added' };
+          }
+          return null;
+        }
+
+        handleManualAdd() {
+          if (G.busy || !this.prev || !this.prev.unlocked || this.prev.inCart) return;
+          sessionDel(this.declinedKey);
+          G.addFailed = false;
+          this.run(true);
+        }
+
+        scheduleRefresh() {
+          if (!this.__ready) return;
+          if (G.busy) { this.pending = true; return; }
+          clearTimeout(this.timer);
+          var self = this;
+          this.timer = setTimeout(function () {
+            request('cart.js').then(function (cart) { if (self.__ready) self.process(cart, {}); }).catch(function () {});
+          }, 200);
+        }
+
+        /* Another instance (or this one) changed the gift: redraw from its cart. */
+        handleUpdated(e) {
+          var cart = e.detail && e.detail.cart;
+          if (!cart || !this.__ready) return;
+          var again = this.pending;
+          this.pending = false;
+          this.process(cart, { internal: true, noActions: !again });
+        }
+
+        /* Every action re-reads the cart first and decides again, under one
+           global lock, so two instances can never add the gift twice. */
+        run(manual) {
+          if (G.busy) { this.pending = true; return; }
+          if (!manual && G.actions.length >= 3) {
+            if (window.console) console.warn('[SC free gift] Stopped: too many automatic cart changes in a short time.');
+            return;
+          }
+
+          var self = this;
+          var cfg = this.cfg;
+          var action = null;
+          G.busy = true;
+          this.setAttribute('aria-busy', 'true');
+          if (this.els.add) this.els.add.disabled = true;
+
+          request('cart.js').then(function (cart) {
+            var s = self.compute(cart);
+            if (manual) {
+              action = s.unlocked && !s.inCart ? { type: 'add', notice: 'added' } : null;
+            } else {
+              action = self.decide(s);
+            }
+            if (!action) return cart;
+            if (!manual) G.actions.push(Date.now());
+            if (action.type === 'add') {
+              return request('cart/add.js', {
+                items: [{ id: cfg.giftVariantId, quantity: 1, properties: { _sc_free_gift: 'true' } }]
+              }).then(function () { return request('cart.js'); });
+            }
+            return request('cart/update.js', { updates: action.updates });
+          }).then(function (cart) {
+            G.busy = false;
+            if (!action) {
+              if (self.__ready) self.process(cart, { internal: true, noActions: true });
+              return;
+            }
+            if (action.notice) G.notice = { kind: action.notice, at: Date.now() };
+            if (self.__ready && action.notice) self.showNotice(action.notice);
+            if (action.type === 'add') {
+              var s = self.compute(cart);
+              if (s.inCart && s.giftLinePrice > 0 && window.console) {
+                console.warn('[SC free gift] The gift line is not free in the cart (' + self.formatMoney(s.giftLinePrice) + '). Check the gift product price or the automatic discount.');
+              }
+            }
+            /* Also tells every other instance (handleUpdated). */
+            return refreshThemeCart(cart, cfg.refresh);
+          }).catch(function (err) {
+            G.busy = false;
+            if (action && action.type === 'add') G.addFailed = true;
+            if (self.__ready) self.showNotice('error');
+            if (window.console) console.warn('[SC free gift]', err && err.message);
+          }).then(function () {
+            if (!self.__ready) return;
+            self.removeAttribute('aria-busy');
+            if (self.els.add) self.els.add.disabled = false;
+            if (self.pending) { self.pending = false; self.scheduleRefresh(); }
+          });
+        }
+
+        /* ---- UI ---- */
+        buildMessage(template, s) {
+          var frag = document.createDocumentFragment();
+          var self = this;
+          String(template || '').split(/(\[amount\]|\[threshold\]|\[gift\])/).forEach(function (part) {
+            if (!part) return;
+            if (part === '[gift]') {
+              frag.appendChild(document.createTextNode(self.cfg.giftTitle || ''));
+            } else if (part === '[amount]' || part === '[threshold]') {
+              var strong = document.createElement('strong');
+              strong.className = 'sc-fg__amount';
+              strong.textContent = self.formatMoney(part === '[amount]' ? s.remaining : s.threshold);
+              frag.appendChild(strong);
+            } else {
+              frag.appendChild(document.createTextNode(part));
+            }
+          });
+          return frag;
+        }
+
+        render(s, prev) {
+          var cfg = this.cfg;
+          var els = this.els;
+          var msgs = cfg.messages;
+          this.state = s;
+
+          this.hidden = !!(cfg.hideEmpty && s.otherQty === 0);
+          this.classList.toggle('is-unlocked', s.unlocked);
+
+          var template = s.unlocked ? (cfg.giftAvailable ? msgs.unlocked : msgs.soldOut) : msgs.locked;
+          if (els.message) {
+            els.message.textContent = '';
+            els.message.appendChild(this.buildMessage(template, s));
+          }
+          if (els.fill) els.fill.style.width = s.pct.toFixed(2) + '%';
+          if (els.track) {
+            els.track.setAttribute('aria-valuenow', String(Math.floor(s.pct)));
+            els.track.setAttribute('aria-valuetext', this.buildMessage(template, s).textContent);
+          }
+
+          if (els.gift) {
+            els.gift.hidden = !s.unlocked && !cfg.showGiftLocked;
+            els.gift.classList.toggle('is-locked', !s.unlocked);
+          }
+          if (els.add) els.add.hidden = !(s.unlocked && !s.inCart && cfg.giftAvailable && cfg.giftVariantId);
+          if (els.added) els.added.hidden = !(s.unlocked && s.inCart);
+          if (els.locked) els.locked.hidden = s.unlocked;
+
+          /* Never claim "Free" if the gift line in the cart actually costs money. */
+          var paid = s.inCart && s.giftLinePrice > 0;
+          if (els.free) els.free.hidden = paid;
+          if (els.strike) els.strike.hidden = paid;
+          if (els.linePrice) {
+            els.linePrice.hidden = !paid;
+            els.linePrice.textContent = paid ? this.formatMoney(s.giftLinePrice) : '';
+          }
+
+          if (s.unlocked && els.notice && els.notice.dataset.kind === 'removed') els.notice.hidden = true;
+
+          /* Announce state changes only (not every amount change). */
+          if (prev && s.unlocked !== prev.unlocked) {
+            if (s.unlocked) this.celebrate();
+            if (els.live) {
+              var text = this.buildMessage(template, s).textContent;
+              var live = els.live;
+              live.textContent = '';
+              setTimeout(function () { live.textContent = text; }, 50);
+            }
+          }
+        }
+
+        celebrate() {
+          var self = this;
+          this.classList.remove('is-celebrating');
+          void this.offsetWidth;
+          this.classList.add('is-celebrating');
+          clearTimeout(this.celebrateTimer);
+          this.celebrateTimer = setTimeout(function () { self.classList.remove('is-celebrating'); }, 700);
+        }
+
+        showNotice(kind, fromPrevious) {
+          var el = this.els.notice;
+          var template = this.cfg.messages[kind];
+          if (!el || !template) return;
+          var s = this.state || { remaining: 0, threshold: this.thresholdFor(this.cart) };
+          if (!this.state) this.currency = this.currency || this.cfg.shopCurrency;
+          el.textContent = '';
+          el.appendChild(this.buildMessage(template, s));
+          el.classList.toggle('sc-fg__notice--error', kind === 'error');
+          el.dataset.kind = kind;
+          el.hidden = false;
+          clearTimeout(this.noticeTimer);
+          if (kind !== 'removed') {
+            var self = this;
+            this.noticeTimer = setTimeout(function () {
+              el.hidden = true;
+              if (G.notice && G.notice.kind === kind) G.notice = null;
+            }, fromPrevious ? 4000 : 6000);
+          }
+        }
+      }
+
+      customElements.define('sc-free-gift', ScFreeGift);
+    })();
+  </script>
+{%- elsif request.design_mode and settings.sc_fg_enable and sc_place_on -%}
+  <div style="margin:12px 0;padding:12px 14px;border:1px dashed #c9a227;border-radius:8px;background:#fffbea;color:#5c4a00;font-size:13px;line-height:1.5;font-family:inherit;text-align:start;">
+    <strong>SC – Free gift</strong> (only visible in the theme editor)<br>
+    {%- if sc_has_threshold == false -%}
+      Theme settings → SC – Free gift: enter a "Free gift minimum amount" greater than 0.
+    {%- elsif sc_gift == blank -%}
+      Theme settings → SC – Free gift: select a gift product to show the free gift bar.
+    {%- elsif sc_price_issue -%}
+      "{{ sc_gift.title | escape }}" costs {{ sc_gift_variant.price | money }}. With "Gift pricing: Gift product priced 0.00" the product must cost 0.00, or switch to "Automatic discount" after creating that discount. The bar stays hidden so customers are never charged for a "free" gift.
+    {%- elsif sc_gift_available == false -%}
+      "{{ sc_gift.title | escape }}" is sold out, so the bar is hidden. Turn off "Hide when the gift is sold out" to keep showing it.
+    {%- endif -%}
+  </div>
+{%- endif -%}
