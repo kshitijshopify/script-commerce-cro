@@ -230,17 +230,7 @@
             "padding_x": 16
           }
         },
-        "description": {
-          "type": "description",
-          "settings": {}
-        },
-        "share": {
-          "type": "share",
-          "settings": {
-            "share_label": "Share"
-          }
-        },
-        "sc_pdp_cross_sell": {
+        "sc_pdp_cross_sell_ExpRQg": {
           "type": "sc_pdp_cross_sell",
           "settings": {
             "enable": true,
@@ -248,8 +238,11 @@
             "cro_up_cross_selling_layout": "slides",
             "cro_up_cross_open_stack": true,
             "reveal_mode": "always",
+            "product_source": "metafield_then_discovery",
+            "discovery_intent": "complementary_then_related",
             "metafield_namespace": "standard",
             "metafield_key": "cro_up_cross_selling",
+            "fallback_collection": "",
             "max_products": 6,
             "sold_out_behavior": "hide",
             "hide_in_cart": false,
@@ -325,9 +318,17 @@
             "cross_selling_space_bottom": 16,
             "cross_selling_space_top_mobile": 16,
             "cross_selling_space_bottom_mobile": 16,
-            "mobile_breakpoint": 750,
-            "product_source": "metafield_then_discovery",
-            "discovery_intent": "complementary_then_related"
+            "mobile_breakpoint": 750
+          }
+        },
+        "description": {
+          "type": "description",
+          "settings": {}
+        },
+        "share": {
+          "type": "share",
+          "settings": {
+            "share_label": "Share"
           }
         }
       },
@@ -339,10 +340,10 @@
         "quantity_selector",
         "sc_inventory_status",
         "buy_buttons",
-        "sc_pdp_cross_sell",
         "sc_payment_icons_bar",
         "sc_store_benefits",
         "sc_social_proof_banner",
+        "sc_pdp_cross_sell_ExpRQg",
         "description",
         "share"
       ],
