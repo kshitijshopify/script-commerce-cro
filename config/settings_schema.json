@@ -1466,5 +1466,608 @@
         "label": "t:settings_schema.customer_accounts.settings.customer_account_menu.label"
       }
     ]
+  },
+  {
+    "name": "SC – Payment icons bar",
+    "settings": [
+      {
+        "type": "paragraph",
+        "content": "Shared payment icons bar for the product page, cart page and cart drawer. On the product page, add the \"SC – Payment icons bar\" block to place it (e.g. below Add to cart)."
+      },
+      {
+        "type": "header",
+        "content": "Visibility"
+      },
+      {
+        "type": "checkbox",
+        "id": "sc_pay_enable",
+        "label": "Show payment icons bar",
+        "default": true,
+        "info": "Master switch for every placement. Use it for A/B tests."
+      },
+      {
+        "type": "checkbox",
+        "id": "sc_pay_ab_keep_markup",
+        "label": "Keep hidden markup for A/B testing",
+        "default": true,
+        "info": "When the bar is switched off it is still output but hidden. Reveal it in a test variant with the CSS: sc-pay-bar.sc-pay-bar[data-sc-ab-hidden] { display: block !important; }"
+      },
+      {
+        "type": "checkbox",
+        "id": "sc_pay_show_pdp",
+        "label": "Show on product pages",
+        "default": true
+      },
+      {
+        "type": "checkbox",
+        "id": "sc_pay_show_cart",
+        "label": "Show on cart page",
+        "default": true
+      },
+      {
+        "type": "checkbox",
+        "id": "sc_pay_show_drawer",
+        "label": "Show in cart drawer",
+        "default": true
+      },
+      {
+        "type": "header",
+        "content": "Heading"
+      },
+      {
+        "type": "checkbox",
+        "id": "sc_pay_show_heading",
+        "label": "Show heading",
+        "default": true
+      },
+      {
+        "type": "text",
+        "id": "sc_pay_heading",
+        "label": "Heading",
+        "default": "We accept"
+      },
+      {
+        "type": "select",
+        "id": "sc_pay_heading_position",
+        "label": "Heading position",
+        "options": [
+          {
+            "value": "above",
+            "label": "Above icons"
+          },
+          {
+            "value": "inline",
+            "label": "Left of icons (desktop)"
+          }
+        ],
+        "default": "above"
+      },
+      {
+        "type": "select",
+        "id": "sc_pay_heading_align",
+        "label": "Heading alignment",
+        "options": [
+          {
+            "value": "left",
+            "label": "Left"
+          },
+          {
+            "value": "center",
+            "label": "Center"
+          },
+          {
+            "value": "right",
+            "label": "Right"
+          }
+        ],
+        "default": "left"
+      },
+      {
+        "type": "range",
+        "id": "sc_pay_heading_size",
+        "label": "Heading size (desktop)",
+        "min": 10,
+        "max": 32,
+        "step": 1,
+        "default": 14,
+        "unit": "px"
+      },
+      {
+        "type": "range",
+        "id": "sc_pay_heading_size_mobile",
+        "label": "Heading size (mobile)",
+        "min": 10,
+        "max": 32,
+        "step": 1,
+        "default": 13,
+        "unit": "px"
+      },
+      {
+        "type": "select",
+        "id": "sc_pay_heading_weight",
+        "label": "Heading weight",
+        "options": [
+          {
+            "value": "400",
+            "label": "Regular"
+          },
+          {
+            "value": "500",
+            "label": "Medium"
+          },
+          {
+            "value": "600",
+            "label": "Semibold"
+          },
+          {
+            "value": "700",
+            "label": "Bold"
+          }
+        ],
+        "default": "600"
+      },
+      {
+        "type": "color",
+        "id": "sc_pay_heading_color",
+        "label": "Heading color"
+      },
+      {
+        "type": "header",
+        "content": "Icons"
+      },
+      {
+        "type": "select",
+        "id": "sc_pay_icon_style",
+        "label": "Icon style",
+        "options": [
+          {
+            "value": "grayscale",
+            "label": "Grayscale"
+          },
+          {
+            "value": "color",
+            "label": "Full colour"
+          }
+        ],
+        "default": "grayscale"
+      },
+      {
+        "type": "range",
+        "id": "sc_pay_gray_opacity",
+        "label": "Grayscale opacity",
+        "min": 30,
+        "max": 100,
+        "step": 5,
+        "default": 100,
+        "unit": "%"
+      },
+      {
+        "type": "checkbox",
+        "id": "sc_pay_hover_color",
+        "label": "Show colour on hover (grayscale style)",
+        "default": true
+      },
+      {
+        "type": "select",
+        "id": "sc_pay_align",
+        "label": "Icon alignment",
+        "options": [
+          {
+            "value": "left",
+            "label": "Left"
+          },
+          {
+            "value": "center",
+            "label": "Center"
+          },
+          {
+            "value": "right",
+            "label": "Right"
+          },
+          {
+            "value": "between",
+            "label": "Distribute (space between)"
+          },
+          {
+            "value": "evenly",
+            "label": "Distribute evenly"
+          }
+        ],
+        "default": "left"
+      },
+      {
+        "type": "range",
+        "id": "sc_pay_icon_width",
+        "label": "Icon width (desktop)",
+        "min": 24,
+        "max": 80,
+        "step": 2,
+        "default": 38,
+        "unit": "px"
+      },
+      {
+        "type": "range",
+        "id": "sc_pay_icon_width_mobile",
+        "label": "Icon width (mobile)",
+        "min": 24,
+        "max": 80,
+        "step": 2,
+        "default": 34,
+        "unit": "px"
+      },
+      {
+        "type": "range",
+        "id": "sc_pay_gap",
+        "label": "Icon spacing (desktop)",
+        "min": 0,
+        "max": 40,
+        "step": 2,
+        "default": 8,
+        "unit": "px"
+      },
+      {
+        "type": "range",
+        "id": "sc_pay_gap_mobile",
+        "label": "Icon spacing (mobile)",
+        "min": 0,
+        "max": 40,
+        "step": 2,
+        "default": 6,
+        "unit": "px"
+      },
+      {
+        "type": "checkbox",
+        "id": "sc_pay_mobile_scroll",
+        "label": "Single swipeable row on mobile",
+        "default": false,
+        "info": "Off = icons wrap onto new lines on small screens."
+      },
+      {
+        "type": "header",
+        "content": "Box"
+      },
+      {
+        "type": "color",
+        "id": "sc_pay_bg",
+        "label": "Background color"
+      },
+      {
+        "type": "select",
+        "id": "sc_pay_border_style",
+        "label": "Border style",
+        "options": [
+          {
+            "value": "square",
+            "label": "Square"
+          },
+          {
+            "value": "rounded",
+            "label": "Rounded"
+          }
+        ],
+        "default": "square"
+      },
+      {
+        "type": "range",
+        "id": "sc_pay_radius",
+        "label": "Corner radius (rounded)",
+        "min": 0,
+        "max": 30,
+        "step": 1,
+        "default": 10,
+        "unit": "px"
+      },
+      {
+        "type": "range",
+        "id": "sc_pay_border_width",
+        "label": "Border width",
+        "min": 0,
+        "max": 5,
+        "step": 1,
+        "default": 0,
+        "unit": "px"
+      },
+      {
+        "type": "color",
+        "id": "sc_pay_border_color",
+        "label": "Border color"
+      },
+      {
+        "type": "range",
+        "id": "sc_pay_padding_y",
+        "label": "Inner padding top/bottom (desktop)",
+        "min": 0,
+        "max": 40,
+        "step": 1,
+        "default": 5,
+        "unit": "px"
+      },
+      {
+        "type": "range",
+        "id": "sc_pay_padding_x",
+        "label": "Inner padding left/right (desktop)",
+        "min": 0,
+        "max": 40,
+        "step": 1,
+        "default": 5,
+        "unit": "px"
+      },
+      {
+        "type": "range",
+        "id": "sc_pay_padding_y_mobile",
+        "label": "Inner padding top/bottom (mobile)",
+        "min": 0,
+        "max": 40,
+        "step": 1,
+        "default": 5,
+        "unit": "px"
+      },
+      {
+        "type": "range",
+        "id": "sc_pay_padding_x_mobile",
+        "label": "Inner padding left/right (mobile)",
+        "min": 0,
+        "max": 40,
+        "step": 1,
+        "default": 5,
+        "unit": "px"
+      },
+      {
+        "type": "range",
+        "id": "sc_pay_margin_top",
+        "label": "Margin top",
+        "min": 0,
+        "max": 60,
+        "step": 2,
+        "default": 10,
+        "unit": "px"
+      },
+      {
+        "type": "range",
+        "id": "sc_pay_margin_bottom",
+        "label": "Margin bottom",
+        "min": 0,
+        "max": 60,
+        "step": 2,
+        "default": 10,
+        "unit": "px"
+      },
+      {
+        "type": "header",
+        "content": "Payment methods"
+      },
+      {
+        "type": "range",
+        "id": "sc_pay_max_icons",
+        "label": "Maximum icons shown",
+        "min": 1,
+        "max": 13,
+        "step": 1,
+        "default": 6,
+        "info": "Recommended: 6 or fewer for a clean single row."
+      },
+      {
+        "type": "checkbox",
+        "id": "sc_pay_only_enabled",
+        "label": "Only show methods enabled in store",
+        "default": true,
+        "info": "Hides ticked methods that are not active in Settings → Payments."
+      },
+      {
+        "type": "checkbox",
+        "id": "sc_pay_m_paypal",
+        "label": "PayPal",
+        "default": true
+      },
+      {
+        "type": "checkbox",
+        "id": "sc_pay_m_master",
+        "label": "Mastercard",
+        "default": true
+      },
+      {
+        "type": "checkbox",
+        "id": "sc_pay_m_visa",
+        "label": "Visa",
+        "default": true
+      },
+      {
+        "type": "checkbox",
+        "id": "sc_pay_m_american_express",
+        "label": "American Express",
+        "default": true
+      },
+      {
+        "type": "checkbox",
+        "id": "sc_pay_m_klarna",
+        "label": "Klarna",
+        "default": true
+      },
+      {
+        "type": "checkbox",
+        "id": "sc_pay_m_apple_pay",
+        "label": "Apple Pay",
+        "default": true
+      },
+      {
+        "type": "checkbox",
+        "id": "sc_pay_m_google_pay",
+        "label": "Google Pay",
+        "default": false
+      },
+      {
+        "type": "checkbox",
+        "id": "sc_pay_m_amazon",
+        "label": "Amazon Pay",
+        "default": false
+      },
+      {
+        "type": "checkbox",
+        "id": "sc_pay_m_klarna_pay_later",
+        "label": "Klarna Pay Later",
+        "default": false
+      },
+      {
+        "type": "checkbox",
+        "id": "sc_pay_m_sofort",
+        "label": "Sofort",
+        "default": false
+      },
+      {
+        "type": "checkbox",
+        "id": "sc_pay_m_bitcoin",
+        "label": "Bitcoin",
+        "default": false
+      },
+      {
+        "type": "checkbox",
+        "id": "sc_pay_m_shopify_pay",
+        "label": "Shop Pay",
+        "default": false
+      },
+      {
+        "type": "checkbox",
+        "id": "sc_pay_m_twint",
+        "label": "TWINT",
+        "default": false,
+        "info": "Only where TWINT is supported (Switzerland)."
+      },
+      {
+        "type": "header",
+        "content": "Instalment message"
+      },
+      {
+        "type": "checkbox",
+        "id": "sc_pay_inst_enable",
+        "label": "Show instalment message",
+        "default": false
+      },
+      {
+        "type": "checkbox",
+        "id": "sc_pay_inst_show_pdp",
+        "label": "Display on product pages",
+        "default": true
+      },
+      {
+        "type": "checkbox",
+        "id": "sc_pay_inst_show_cart",
+        "label": "Display on cart and cart drawer",
+        "default": false
+      },
+      {
+        "type": "select",
+        "id": "sc_pay_inst_provider",
+        "label": "Payment provider",
+        "options": [
+          {
+            "value": "klarna",
+            "label": "Klarna"
+          },
+          {
+            "value": "paypal",
+            "label": "PayPal"
+          }
+        ],
+        "default": "klarna"
+      },
+      {
+        "type": "image_picker",
+        "id": "sc_pay_inst_logo",
+        "label": "Custom provider logo",
+        "info": "Optional. Replaces the built-in Klarna / PayPal logo."
+      },
+      {
+        "type": "select",
+        "id": "sc_pay_inst_logo_style",
+        "label": "Logo style",
+        "options": [
+          {
+            "value": "inherit",
+            "label": "Same as icon style"
+          },
+          {
+            "value": "color",
+            "label": "Full colour"
+          },
+          {
+            "value": "grayscale",
+            "label": "Grayscale"
+          }
+        ],
+        "default": "color"
+      },
+      {
+        "type": "range",
+        "id": "sc_pay_inst_logo_height",
+        "label": "Logo height",
+        "min": 14,
+        "max": 40,
+        "step": 1,
+        "default": 20,
+        "unit": "px"
+      },
+      {
+        "type": "text",
+        "id": "sc_pay_inst_text",
+        "label": "Message",
+        "default": "Pay in [count] interest-free instalments of [amount]",
+        "info": "[amount] = price (PDP) or cart total (cart) divided by the number of instalments. [count] = number of instalments."
+      },
+      {
+        "type": "range",
+        "id": "sc_pay_inst_count",
+        "label": "Number of instalments",
+        "min": 2,
+        "max": 12,
+        "step": 1,
+        "default": 3
+      },
+      {
+        "type": "select",
+        "id": "sc_pay_inst_align",
+        "label": "Alignment",
+        "options": [
+          {
+            "value": "flex-start",
+            "label": "Left"
+          },
+          {
+            "value": "center",
+            "label": "Center"
+          },
+          {
+            "value": "flex-end",
+            "label": "Right"
+          }
+        ],
+        "default": "center"
+      },
+      {
+        "type": "color",
+        "id": "sc_pay_inst_color",
+        "label": "Text color",
+        "default": "#282828"
+      },
+      {
+        "type": "range",
+        "id": "sc_pay_inst_font_size",
+        "label": "Font size (desktop)",
+        "min": 10,
+        "max": 40,
+        "step": 1,
+        "default": 14,
+        "unit": "px"
+      },
+      {
+        "type": "range",
+        "id": "sc_pay_inst_font_size_mobile",
+        "label": "Font size (mobile)",
+        "min": 10,
+        "max": 40,
+        "step": 1,
+        "default": 13,
+        "unit": "px"
+      }
+    ]
   }
 ]

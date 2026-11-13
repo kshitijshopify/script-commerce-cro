@@ -124,6 +124,8 @@
                   {{ content_for_additional_checkout_buttons }}
                 </div>
               {%- endif -%}
+
+              {% render 'sc-payment-icons-bar', placement: 'cart', uid: 'cart-page' %}
           {%- endcase -%}
         {% endfor %}
 

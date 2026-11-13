@@ -689,6 +689,8 @@
                   {% render 'sc-store-benefits', block: block %}
                 {%- when 'sc_inventory_status' -%}
                   {% render 'sc-inventory-status', block: block, product: product, section: section %}
+                {%- when 'sc_payment_icons_bar' -%}
+                  {% render 'sc-payment-icons-bar', placement: 'pdp', product: product, block: block %}
                 {%- when 'icon-with-text' -%}
                   {% render 'icon-with-text', block: block %}
               {%- endcase -%}
@@ -3324,6 +3326,17 @@
           "step": 2,
           "unit": "px",
           "default": 24
+        }
+      ]
+    },
+    {
+      "type": "sc_payment_icons_bar",
+      "name": "SC – Payment icons bar",
+      "limit": 1,
+      "settings": [
+        {
+          "type": "paragraph",
+          "content": "Shows accepted payment methods. Icons, styling, heading and instalment message are global – edit them in Theme settings → SC – Payment icons bar, so the product page and cart always match."
         }
       ]
     },
