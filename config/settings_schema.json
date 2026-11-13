@@ -1585,6 +1585,239 @@
     ]
   },
   {
+    "name": "SC – Optimized cart drawer",
+    "settings": [
+      {
+        "type": "paragraph",
+        "content": "Conversion-optimized cart drawer: dark header, delivery promise, free shipping progress, social proof, savings badges and a secure checkout CTA. Requires Cart > Cart type = Drawer. Totals use \"SC – Cart shipping breakdown\", icons use \"SC – Payment icons bar\"."
+      },
+      {
+        "type": "checkbox",
+        "id": "sc_ocd_enable",
+        "label": "Enable optimized cart drawer",
+        "default": true
+      },
+      {
+        "type": "header",
+        "content": "Header"
+      },
+      {
+        "type": "text",
+        "id": "sc_ocd_title",
+        "label": "Title",
+        "default": "Your cart",
+        "info": "Leave empty to use the theme's default cart title."
+      },
+      {
+        "type": "color",
+        "id": "sc_ocd_header_bg",
+        "label": "Background",
+        "default": "#222222"
+      },
+      {
+        "type": "color",
+        "id": "sc_ocd_header_text",
+        "label": "Text",
+        "default": "#FFFFFF"
+      },
+      {
+        "type": "header",
+        "content": "Delivery promise"
+      },
+      {
+        "type": "checkbox",
+        "id": "sc_ocd_delivery_enable",
+        "label": "Show delivery promise",
+        "default": true
+      },
+      {
+        "type": "text",
+        "id": "sc_ocd_delivery_heading",
+        "label": "Heading",
+        "default": "Great choice!"
+      },
+      {
+        "type": "text",
+        "id": "sc_ocd_delivery_text",
+        "label": "Text",
+        "default": "Your items arrive at your door in 1-3 working days"
+      },
+      {
+        "type": "color",
+        "id": "sc_ocd_accent",
+        "label": "Icon and badge color",
+        "default": "#B5562A"
+      },
+      {
+        "type": "header",
+        "content": "Free shipping progress"
+      },
+      {
+        "type": "checkbox",
+        "id": "sc_ocd_fsb_enable",
+        "label": "Show free shipping progress",
+        "default": true
+      },
+      {
+        "type": "text",
+        "id": "sc_ocd_fsb_threshold",
+        "label": "Free shipping minimum amount",
+        "info": "Numbers only (eg. 50) or CODE:amount pairs (eg. USD:50,EUR:60). Leave empty to use the minimum from \"SC – Cart shipping breakdown\"."
+      },
+      {
+        "type": "text",
+        "id": "sc_ocd_fsb_heading",
+        "label": "Heading (optional)",
+        "info": "Shown above the message until free shipping is reached, eg. \"Almost there\"."
+      },
+      {
+        "type": "text",
+        "id": "sc_ocd_fsb_text",
+        "label": "Progress message",
+        "default": "Only [amount] left until free shipping!",
+        "info": "[amount] is replaced with the remaining amount."
+      },
+      {
+        "type": "text",
+        "id": "sc_ocd_fsb_success",
+        "label": "Success message",
+        "default": "You've unlocked free shipping!"
+      },
+      {
+        "type": "color",
+        "id": "sc_ocd_fsb_bg",
+        "label": "Box background",
+        "default": "#C2AE94"
+      },
+      {
+        "type": "color",
+        "id": "sc_ocd_fsb_color",
+        "label": "Box text",
+        "default": "#FFFFFF"
+      },
+      {
+        "type": "color",
+        "id": "sc_ocd_fsb_bar",
+        "label": "Progress bar",
+        "default": "#222222"
+      },
+      {
+        "type": "color",
+        "id": "sc_ocd_fsb_track",
+        "label": "Progress track",
+        "default": "#FFFFFF"
+      },
+      {
+        "type": "header",
+        "content": "Social proof"
+      },
+      {
+        "type": "checkbox",
+        "id": "sc_ocd_sp_enable",
+        "label": "Show social proof",
+        "default": true
+      },
+      {
+        "type": "image_picker",
+        "id": "sc_ocd_sp_avatar_1",
+        "label": "Customer avatar 1"
+      },
+      {
+        "type": "image_picker",
+        "id": "sc_ocd_sp_avatar_2",
+        "label": "Customer avatar 2"
+      },
+      {
+        "type": "image_picker",
+        "id": "sc_ocd_sp_avatar_3",
+        "label": "Customer avatar 3"
+      },
+      {
+        "type": "text",
+        "id": "sc_ocd_sp_names",
+        "label": "Customer names",
+        "default": "Max, Laura",
+        "info": "Initials are shown in place of avatars that are not uploaded."
+      },
+      {
+        "type": "checkbox",
+        "id": "sc_ocd_sp_verified",
+        "label": "Show verified badge",
+        "default": true
+      },
+      {
+        "type": "text",
+        "id": "sc_ocd_sp_text",
+        "label": "Text",
+        "default": "and 22,000+ others wear our products"
+      },
+      {
+        "type": "header",
+        "content": "Line items"
+      },
+      {
+        "type": "checkbox",
+        "id": "sc_ocd_show_savings",
+        "label": "Show compare-at price and savings badge",
+        "default": true
+      },
+      {
+        "type": "text",
+        "id": "sc_ocd_savings_text",
+        "label": "Savings badge",
+        "default": "You save [amount]",
+        "info": "[amount] is replaced with the saved amount."
+      },
+      {
+        "type": "checkbox",
+        "id": "sc_ocd_show_quantity",
+        "label": "Show quantity selector",
+        "default": true
+      },
+      {
+        "type": "checkbox",
+        "id": "sc_ocd_show_remove",
+        "label": "Show remove button",
+        "default": true
+      },
+      {
+        "type": "header",
+        "content": "Checkout"
+      },
+      {
+        "type": "text",
+        "id": "sc_ocd_cta_label",
+        "label": "Button label",
+        "default": "Checkout securely",
+        "info": "Leave empty to use the theme's default checkout label."
+      },
+      {
+        "type": "checkbox",
+        "id": "sc_ocd_cta_arrow",
+        "label": "Show arrow",
+        "default": true
+      },
+      {
+        "type": "color",
+        "id": "sc_ocd_cta_bg",
+        "label": "Button background",
+        "default": "#222222"
+      },
+      {
+        "type": "color",
+        "id": "sc_ocd_cta_text",
+        "label": "Button text",
+        "default": "#FFFFFF"
+      },
+      {
+        "type": "checkbox",
+        "id": "sc_ocd_show_tax_note",
+        "label": "Show tax and shipping note",
+        "default": false
+      }
+    ]
+  },
+  {
     "name": "t:settings_schema.customer_accounts.name",
     "settings": [
       {

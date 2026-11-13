@@ -1,0 +1,470 @@
+/* ==========================================================================
+   SC – Optimized cart drawer
+   1) Reusable components (theme-independent, `sc-` classes only)
+   2) Dawn drawer skin – only active when <cart-drawer> has `.sc-ocd`
+   ========================================================================== */
+
+/* ---------- 1. Components ---------- */
+
+.sc-ocd-top {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px 0;
+  border-bottom: 1px solid currentColor;
+}
+
+.sc-delivery-promise,
+.sc-social-proof,
+.sc-fsb {
+  box-sizing: border-box;
+}
+
+/* Delivery promise */
+.sc-delivery-promise {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sc-delivery-promise__icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  color: #fff;
+  background: var(--sc-accent, #b5562a);
+  border-radius: 50%;
+}
+
+.sc-delivery-promise__icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.sc-delivery-promise__body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.sc-delivery-promise__heading {
+  font-weight: 800;
+  font-size: 15px;
+}
+
+/* Free shipping bar */
+.sc-fsb {
+  padding: 14px 16px 16px;
+  color: var(--sc-fsb-color, #fff);
+  background: var(--sc-fsb-bg, #c2ae94);
+}
+
+.sc-fsb__heading {
+  margin: 0 0 6px;
+  font-size: 17px;
+  line-height: 1.3;
+}
+
+.sc-fsb__message {
+  margin: 0 0 12px;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.sc-fsb__message strong {
+  font-weight: 700;
+}
+
+.sc-fsb__track {
+  position: relative;
+  height: 6px;
+  overflow: hidden;
+  background: var(--sc-fsb-track, #fff);
+  border-radius: 6px;
+}
+
+.sc-fsb__bar {
+  display: block;
+  height: 100%;
+  max-width: 100%;
+  background: var(--sc-fsb-bar, #222);
+  border-radius: inherit;
+  transition: width 0.4s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sc-fsb__bar {
+    transition: none;
+  }
+}
+
+/* Social proof */
+.sc-social-proof {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sc-social-proof__avatars {
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
+.sc-social-proof__avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  color: #fff;
+  background: #8a7a68;
+  border: 2px solid #fff;
+  border-radius: 50%;
+}
+
+.sc-social-proof__avatar + .sc-social-proof__avatar {
+  margin-left: -10px;
+}
+
+.sc-social-proof__avatar img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.sc-social-proof__avatar--2 {
+  background: #5d6b7a;
+}
+
+.sc-social-proof__avatar--3 {
+  background: #3f3f3f;
+}
+
+.sc-social-proof__text {
+  min-width: 0;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+/* Desktop: keep the delivery text and social proof on a single line */
+@media screen and (min-width: 750px) {
+  .sc-delivery-promise__text,
+  .sc-social-proof__text {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+}
+
+.sc-social-proof__verified {
+  display: inline-block;
+  margin: 0 2px;
+  vertical-align: -3px;
+}
+
+/* Line price */
+.sc-line-price {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  font-size: 15px;
+  line-height: 1.3;
+}
+
+.sc-line-price__compare {
+  opacity: 0.6;
+}
+
+.sc-line-price__badge {
+  display: inline-block;
+  padding: 2px 6px;
+  font-size: 13px;
+  line-height: 1.35;
+  color: #fff;
+  white-space: nowrap;
+  background: var(--sc-accent, #b5562a);
+}
+
+.sc-line-price__sr {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  overflow: hidden !important;
+  clip: rect(0 0 0 0) !important;
+  white-space: nowrap !important;
+}
+
+/* ---------- 2. Dawn drawer skin (scoped to .sc-ocd) ---------- */
+
+.sc-ocd .drawer__inner {
+  width: var(--sc-ocd-width, 470px);
+  padding: 0;
+}
+
+.sc-ocd .tax-note[hidden] {
+  display: none;
+}
+
+/* Header */
+.sc-ocd .drawer__header {
+  padding: 14px 20px;
+  color: var(--sc-ocd-header-text, #fff);
+  background: var(--sc-ocd-header-bg, #222);
+}
+
+.sc-ocd .drawer__heading {
+  margin: 0;
+  font-size: 24px;
+  line-height: 1.2;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: inherit;
+}
+
+.sc-ocd .drawer__header .drawer__close {
+  top: 50%;
+  right: 8px;
+  color: inherit;
+  transform: translateY(-50%);
+}
+
+.sc-ocd .drawer__header .drawer__close .svg-wrapper {
+  width: 2.4rem;
+  height: 2.4rem;
+}
+
+/* Scrollable body */
+.sc-ocd cart-drawer-items {
+  padding: 0 20px;
+}
+
+.sc-ocd .sc-ocd-top {
+  margin: 0 -20px;
+  padding: 16px 20px;
+}
+
+.sc-ocd .cart-items thead {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.sc-ocd .cart-drawer .cart-item {
+  grid-template-columns: 96px minmax(0, 1fr) auto;
+  grid-template-rows: auto 1fr;
+  column-gap: 14px;
+  row-gap: 10px;
+  margin: 0;
+  padding: 20px 0;
+  border-bottom: 1px solid rgba(var(--color-foreground, 18, 18, 18), 0.1);
+}
+
+.sc-ocd .cart-drawer .cart-item:last-child {
+  margin-bottom: 0;
+  border-bottom: 0;
+}
+
+.sc-ocd .cart-drawer .cart-items td,
+.sc-ocd .cart-drawer .cart-item > td + td {
+  padding: 0;
+}
+
+.sc-ocd .cart-drawer .cart-item__media {
+  grid-column: 1;
+  grid-row: 1 / 3;
+}
+
+.sc-ocd .cart-drawer .cart-item__image {
+  width: 96px;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+}
+
+.sc-ocd .cart-drawer .cart-item__details {
+  grid-column: 2 / 4;
+  grid-row: 1;
+}
+
+.sc-ocd .cart-drawer .cart-item__name {
+  font-family: var(--font-heading-family, inherit);
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.25;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  text-decoration: none;
+}
+
+.sc-ocd .cart-drawer .cart-item__details .product-option {
+  margin-top: 4px;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.sc-ocd .cart-drawer .cart-item__details > * + * {
+  margin-top: 4px;
+}
+
+.sc-ocd .cart-drawer .cart-item__totals {
+  grid-column: 2;
+  grid-row: 2;
+  align-self: end;
+  align-items: center;
+  justify-content: flex-start;
+  min-height: 36px;
+}
+
+.sc-ocd .cart-drawer .cart-item .loading__spinner {
+  right: auto;
+  left: 0;
+  padding-top: 0;
+}
+
+.sc-ocd .cart-drawer .cart-items .cart-item__quantity {
+  grid-column: 3;
+  grid-row: 2;
+  align-self: end;
+}
+
+.sc-ocd .cart-drawer .cart-item__quantity-wrapper {
+  align-items: center;
+  gap: 4px;
+}
+
+.sc-ocd .cart-drawer .cart-quantity {
+  width: 108px;
+  min-height: 36px;
+  background: rgba(var(--color-foreground, 18, 18, 18), 0.06);
+  border-radius: 0;
+}
+
+.sc-ocd .cart-drawer .cart-quantity::before,
+.sc-ocd .cart-drawer .cart-quantity::after {
+  display: none;
+}
+
+.sc-ocd .cart-drawer .cart-quantity .quantity__button {
+  width: 36px;
+}
+
+.sc-ocd .cart-drawer .cart-quantity .quantity__input {
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.sc-ocd .cart-drawer cart-remove-button {
+  margin-left: 2px;
+}
+
+.sc-ocd .cart-drawer cart-remove-button .button {
+  min-width: 32px;
+  min-height: 36px;
+  padding: 0;
+  opacity: 0.6;
+}
+
+.sc-ocd .cart-drawer cart-remove-button .button:hover {
+  opacity: 1;
+}
+
+.sc-ocd--no-remove .cart-drawer cart-remove-button,
+.sc-ocd--no-qty .cart-drawer .cart-quantity {
+  display: none;
+}
+
+/* Footer (Dawn keeps it pinned at the bottom of the drawer) */
+.sc-ocd .drawer__footer {
+  padding: 16px 20px 18px;
+  border-top: 1px solid currentColor;
+}
+
+.sc-ocd .cart-drawer__footer > * + * {
+  margin-top: 8px;
+}
+
+.sc-ocd .drawer__footer .sc-csb {
+  margin-bottom: 4px;
+  font-size: 15px;
+}
+
+.sc-ocd .drawer__footer .sc-csb__row--total {
+  padding-top: 0;
+  margin-top: 0;
+  border-top: 0;
+}
+
+.sc-ocd .drawer__footer .sc-csb__total-label,
+.sc-ocd .drawer__footer .sc-csb__total-value {
+  font-family: inherit;
+  font-size: 15px;
+  letter-spacing: 0;
+}
+
+.sc-ocd .drawer__footer .sc-csb__label > span {
+  opacity: 1;
+}
+
+.sc-ocd .cart__ctas {
+  margin-top: 14px;
+}
+
+.sc-ocd .cart__checkout-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  width: 100%;
+  min-height: 52px;
+  font-size: 17px;
+  letter-spacing: 0.02em;
+  color: var(--sc-ocd-cta-text, #fff);
+  background-color: var(--sc-ocd-cta-bg, #222);
+  border-radius: 0;
+  transition: opacity 0.15s ease;
+}
+
+.sc-ocd .cart__checkout-button::before,
+.sc-ocd .cart__checkout-button::after {
+  box-shadow: none;
+}
+
+.sc-ocd .cart__checkout-button:hover {
+  opacity: 0.9;
+}
+
+.sc-ocd-cta__arrow {
+  display: inline-block;
+  width: 9px;
+  height: 14px;
+  flex: 0 0 auto;
+}
+
+@media screen and (max-width: 749px) {
+  .sc-ocd .cart-drawer .cart-item {
+    grid-template-columns: 80px minmax(0, 1fr) auto;
+    column-gap: 12px;
+  }
+
+  .sc-ocd .cart-drawer .cart-item__image {
+    width: 80px;
+  }
+
+  .sc-ocd .drawer__heading {
+    font-size: 22px;
+  }
+}

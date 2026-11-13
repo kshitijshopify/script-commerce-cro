@@ -1,0 +1,63 @@
+{%- comment -%}
+  SC – Free shipping progress bar
+  ----------------------------------------------------------------------------
+  Self-contained: Liquid + classes from sc-cart-drawer.css, no JS, no theme deps.
+  Rendered server-side, so it updates whenever the cart markup is re-rendered.
+  Settings: Theme settings > "SC – Optimized cart drawer" (sc_ocd_fsb_*).
+  Threshold falls back to settings.sc_csb_free_threshold ("SC – Cart shipping breakdown").
+
+  Usage:
+    {% render 'sc-free-shipping-bar' %}
+{%- endcomment -%}
+{%- liquid
+  assign sc_source = settings.sc_ocd_fsb_threshold | strip
+  if sc_source == blank
+    assign sc_source = settings.sc_csb_free_threshold
+  endif
+
+  capture sc_threshold
+    render 'sc-currency-amount', value: sc_source
+  endcapture
+  assign sc_threshold = sc_threshold | strip
+-%}
+{%- if settings.sc_ocd_fsb_enable and sc_threshold != blank -%}
+  {%- liquid
+    assign sc_threshold = sc_threshold | plus: 0
+    assign sc_total = cart.total_price
+    assign sc_remaining = sc_threshold | minus: sc_total
+    assign sc_reached = false
+    if sc_remaining <= 0 or sc_threshold == 0
+      assign sc_reached = true
+      assign sc_percent = 100
+    else
+      assign sc_percent = sc_total | times: 100 | divided_by: sc_threshold
+    endif
+
+    assign sc_amount = sc_remaining | money | prepend: '<strong>' | append: '</strong>'
+    assign sc_heading = settings.sc_ocd_fsb_heading | strip
+    if sc_reached
+      assign sc_message = settings.sc_ocd_fsb_success | escape
+    else
+      assign sc_message = settings.sc_ocd_fsb_text | escape | replace: '[amount]', sc_amount
+    endif
+  -%}
+  <div
+    class="sc-fsb{% if sc_reached %} sc-fsb--reached{% endif %}"
+    style="--sc-fsb-bg: {{ settings.sc_ocd_fsb_bg }}; --sc-fsb-color: {{ settings.sc_ocd_fsb_color }}; --sc-fsb-bar: {{ settings.sc_ocd_fsb_bar }}; --sc-fsb-track: {{ settings.sc_ocd_fsb_track }};"
+  >
+    {%- if sc_heading != blank and sc_reached == false -%}
+      <p class="sc-fsb__heading">{{ sc_heading | escape }}</p>
+    {%- endif -%}
+    <p class="sc-fsb__message" role="status">{{ sc_message }}</p>
+    <div
+      class="sc-fsb__track"
+      role="progressbar"
+      aria-valuemin="0"
+      aria-valuemax="100"
+      aria-valuenow="{{ sc_percent }}"
+      aria-label="{{ settings.sc_ocd_fsb_success | escape }}"
+    >
+      <span class="sc-fsb__bar" style="width: {{ sc_percent }}%;"></span>
+    </div>
+  </div>
+{%- endif -%}
