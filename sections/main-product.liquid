@@ -685,6 +685,8 @@
                   </product-recommendations>
                 {%- when 'sc_social_proof_banner' -%}
                   {% render 'sc-social-proof-banner', block: block %}
+                {%- when 'sc_store_benefits' -%}
+                  {% render 'sc-store-benefits', block: block %}
                 {%- when 'sc_inventory_status' -%}
                   {% render 'sc-inventory-status', block: block, product: product, section: section %}
                 {%- when 'icon-with-text' -%}
@@ -2438,6 +2440,890 @@
           "step": 2,
           "unit": "px",
           "default": 16
+        }
+      ]
+    },
+    {
+      "type": "sc_store_benefits",
+      "name": "SC – Store benefits",
+      "limit": 1,
+      "settings": [
+        {
+          "type": "header",
+          "content": "General"
+        },
+        {
+          "type": "checkbox",
+          "id": "enable",
+          "label": "Show store benefits",
+          "default": true
+        },
+        {
+          "type": "select",
+          "id": "display_style",
+          "label": "Display style",
+          "options": [
+            {
+              "value": "normal",
+              "label": "Normal (grid)"
+            },
+            {
+              "value": "list",
+              "label": "List (one per row)"
+            },
+            {
+              "value": "slider",
+              "label": "Slider (tabs)"
+            }
+          ],
+          "default": "normal"
+        },
+        {
+          "type": "inline_richtext",
+          "id": "heading",
+          "label": "Heading",
+          "info": "Optional. Leave empty to hide."
+        },
+        {
+          "type": "select",
+          "id": "heading_align",
+          "label": "Heading alignment",
+          "options": [
+            {
+              "value": "left",
+              "label": "Left"
+            },
+            {
+              "value": "center",
+              "label": "Center"
+            },
+            {
+              "value": "right",
+              "label": "Right"
+            }
+          ],
+          "default": "left"
+        },
+        {
+          "type": "select",
+          "id": "content_align",
+          "label": "Content alignment",
+          "options": [
+            {
+              "value": "left",
+              "label": "Left"
+            },
+            {
+              "value": "center",
+              "label": "Center"
+            },
+            {
+              "value": "right",
+              "label": "Right"
+            }
+          ],
+          "default": "left"
+        },
+        {
+          "type": "header",
+          "content": "Normal style"
+        },
+        {
+          "type": "select",
+          "id": "item_layout",
+          "label": "Benefit layout",
+          "options": [
+            {
+              "value": "horizontal",
+              "label": "Horizontal (icon beside text)"
+            },
+            {
+              "value": "vertical",
+              "label": "Vertical (icon above text)"
+            }
+          ],
+          "default": "horizontal"
+        },
+        {
+          "type": "select",
+          "id": "icon_valign",
+          "label": "Icon vertical alignment",
+          "info": "Horizontal layout only. Use Top when text wraps onto several lines.",
+          "options": [
+            {
+              "value": "center",
+              "label": "Center"
+            },
+            {
+              "value": "top",
+              "label": "Top"
+            }
+          ],
+          "default": "center"
+        },
+        {
+          "type": "range",
+          "id": "columns_desktop",
+          "label": "Benefits per row (desktop)",
+          "min": 1,
+          "max": 4,
+          "step": 1,
+          "default": 2
+        },
+        {
+          "type": "range",
+          "id": "columns_mobile",
+          "label": "Benefits per row (mobile)",
+          "min": 1,
+          "max": 4,
+          "step": 1,
+          "default": 2
+        },
+        {
+          "type": "checkbox",
+          "id": "show_description_normal",
+          "label": "Show descriptions in normal style",
+          "default": false
+        },
+        {
+          "type": "header",
+          "content": "List style"
+        },
+        {
+          "type": "paragraph",
+          "content": "Simple list: one benefit per row, icon beside the text, no box around each benefit. Use Block background and Block padding for the panel look."
+        },
+        {
+          "type": "range",
+          "id": "list_row_gap",
+          "label": "Space between rows",
+          "min": 0,
+          "max": 40,
+          "step": 1,
+          "unit": "px",
+          "default": 14
+        },
+        {
+          "type": "range",
+          "id": "list_icon_column",
+          "label": "Icon column width",
+          "min": 0,
+          "max": 80,
+          "step": 2,
+          "unit": "px",
+          "default": 0,
+          "info": "Keeps text aligned when icons have different widths. 0 = automatic."
+        },
+        {
+          "type": "checkbox",
+          "id": "list_divider",
+          "label": "Show divider lines between rows",
+          "default": false
+        },
+        {
+          "type": "color",
+          "id": "list_divider_color",
+          "label": "Divider color",
+          "default": "rgba(0,0,0,0.12)"
+        },
+        {
+          "type": "checkbox",
+          "id": "list_show_description",
+          "label": "Show descriptions",
+          "default": false
+        },
+        {
+          "type": "header",
+          "content": "Slider style"
+        },
+        {
+          "type": "checkbox",
+          "id": "show_tab_labels",
+          "label": "Show headline under each tab icon",
+          "info": "Tabs without an icon always show their headline.",
+          "default": false
+        },
+        {
+          "type": "range",
+          "id": "underline_thickness",
+          "label": "Active underline thickness",
+          "min": 1,
+          "max": 10,
+          "step": 1,
+          "unit": "px",
+          "default": 4
+        },
+        {
+          "type": "range",
+          "id": "tab_padding",
+          "label": "Tab top padding",
+          "min": 0,
+          "max": 30,
+          "step": 1,
+          "unit": "px",
+          "default": 10
+        },
+        {
+          "type": "checkbox",
+          "id": "stack_panels",
+          "label": "Keep content height steady",
+          "info": "Reserves the height of the tallest benefit so the page doesn't jump when switching tabs.",
+          "default": true
+        },
+        {
+          "type": "checkbox",
+          "id": "autoplay",
+          "label": "Auto-rotate benefits",
+          "info": "Pauses on hover or focus and stops after a shopper picks a tab.",
+          "default": false
+        },
+        {
+          "type": "range",
+          "id": "autoplay_speed",
+          "label": "Auto-rotate every",
+          "min": 3,
+          "max": 15,
+          "step": 1,
+          "unit": "s",
+          "default": 6
+        },
+        {
+          "type": "text",
+          "id": "tabs_label",
+          "label": "Tabs accessible label",
+          "info": "Read by screen readers.",
+          "default": "Store benefits"
+        },
+        {
+          "type": "header",
+          "content": "Colors"
+        },
+        {
+          "type": "color",
+          "id": "background",
+          "label": "Block background",
+          "default": "rgba(0,0,0,0)"
+        },
+        {
+          "type": "color",
+          "id": "item_bg",
+          "label": "Benefit background",
+          "default": "rgba(0,0,0,0)"
+        },
+        {
+          "type": "color",
+          "id": "item_border_color",
+          "label": "Benefit border",
+          "default": "rgba(0,0,0,0)"
+        },
+        {
+          "type": "color",
+          "id": "text_color",
+          "label": "Text",
+          "default": "#121212"
+        },
+        {
+          "type": "color",
+          "id": "description_color",
+          "label": "Description text",
+          "default": "#555555"
+        },
+        {
+          "type": "color",
+          "id": "icon_color",
+          "label": "SVG icon color",
+          "info": "Applies to SVG code that uses currentColor. Leave empty to match the text color."
+        },
+        {
+          "type": "color",
+          "id": "underline_color",
+          "label": "Active tab underline",
+          "default": "#000000"
+        },
+        {
+          "type": "color",
+          "id": "underline_inactive_color",
+          "label": "Inactive tab underline",
+          "default": "#E5E5E5"
+        },
+        {
+          "type": "header",
+          "content": "Typography"
+        },
+        {
+          "type": "checkbox",
+          "id": "bold_text",
+          "label": "Bold headlines",
+          "default": true
+        },
+        {
+          "type": "range",
+          "id": "heading_size_desktop",
+          "label": "Heading size (desktop)",
+          "min": 12,
+          "max": 40,
+          "step": 1,
+          "unit": "px",
+          "default": 18
+        },
+        {
+          "type": "range",
+          "id": "heading_size_mobile",
+          "label": "Heading size (mobile)",
+          "min": 12,
+          "max": 40,
+          "step": 1,
+          "unit": "px",
+          "default": 16
+        },
+        {
+          "type": "range",
+          "id": "description_size_desktop",
+          "label": "Description / tab label size (desktop)",
+          "min": 10,
+          "max": 30,
+          "step": 1,
+          "unit": "px",
+          "default": 14
+        },
+        {
+          "type": "range",
+          "id": "description_size_mobile",
+          "label": "Description / tab label size (mobile)",
+          "min": 10,
+          "max": 30,
+          "step": 1,
+          "unit": "px",
+          "default": 13
+        },
+        {
+          "type": "range",
+          "id": "line_height",
+          "label": "Line height",
+          "min": 10,
+          "max": 20,
+          "step": 1,
+          "default": 14,
+          "info": "Value ÷ 10 (14 = 1.4)."
+        },
+        {
+          "type": "header",
+          "content": "Spacing & shape"
+        },
+        {
+          "type": "range",
+          "id": "item_padding",
+          "label": "Benefit padding",
+          "min": 0,
+          "max": 50,
+          "step": 1,
+          "unit": "px",
+          "default": 10
+        },
+        {
+          "type": "range",
+          "id": "wrapper_padding",
+          "label": "Block padding",
+          "min": 0,
+          "max": 60,
+          "step": 1,
+          "unit": "px",
+          "default": 0
+        },
+        {
+          "type": "range",
+          "id": "border_radius",
+          "label": "Border radius",
+          "min": 0,
+          "max": 100,
+          "step": 1,
+          "unit": "px",
+          "default": 10
+        },
+        {
+          "type": "range",
+          "id": "item_border_width",
+          "label": "Benefit border width",
+          "min": 0,
+          "max": 5,
+          "step": 1,
+          "unit": "px",
+          "default": 0
+        },
+        {
+          "type": "range",
+          "id": "gap",
+          "label": "Gap between benefits",
+          "min": 0,
+          "max": 60,
+          "step": 1,
+          "unit": "px",
+          "default": 8
+        },
+        {
+          "type": "range",
+          "id": "icon_gap",
+          "label": "Gap between icon and text",
+          "min": 0,
+          "max": 50,
+          "step": 1,
+          "unit": "px",
+          "default": 12
+        },
+        {
+          "type": "range",
+          "id": "margin_top",
+          "label": "Margin top",
+          "min": 0,
+          "max": 60,
+          "step": 1,
+          "unit": "px",
+          "default": 12
+        },
+        {
+          "type": "range",
+          "id": "margin_bottom",
+          "label": "Margin bottom",
+          "min": 0,
+          "max": 60,
+          "step": 1,
+          "unit": "px",
+          "default": 12
+        },
+        {
+          "type": "range",
+          "id": "mobile_breakpoint",
+          "label": "Mobile breakpoint",
+          "min": 480,
+          "max": 1200,
+          "step": 10,
+          "unit": "px",
+          "default": 750,
+          "info": "Screens narrower than this use the mobile settings."
+        },
+        {
+          "type": "header",
+          "content": "First benefit"
+        },
+        {
+          "type": "checkbox",
+          "id": "b1_enabled",
+          "label": "Show this benefit",
+          "default": true
+        },
+        {
+          "type": "image_picker",
+          "id": "b1_icon",
+          "label": "Icon image",
+          "info": "For image-only benefits (payment logos, trust badges) leave the headline empty."
+        },
+        {
+          "type": "html",
+          "id": "b1_svg",
+          "label": "SVG code",
+          "default": "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'><path d='M1 4h14v12H1z'/><path d='M15 8h4l4 4v4h-8z'/><circle cx='5.5' cy='18.5' r='2'/><circle cx='18.5' cy='18.5' r='2'/></svg>",
+          "info": "Overrides the icon image when set. Clear it to use the image."
+        },
+        {
+          "type": "image_picker",
+          "id": "b1_icon_active",
+          "label": "Active icon image",
+          "info": "Slider style only."
+        },
+        {
+          "type": "html",
+          "id": "b1_svg_active",
+          "label": "Active SVG code",
+          "info": "Slider style only. Overrides the active icon image."
+        },
+        {
+          "type": "text",
+          "id": "b1_icon_label",
+          "label": "Icon accessible label",
+          "info": "Used for image-only benefits and as the tab name when there is no headline."
+        },
+        {
+          "type": "inline_richtext",
+          "id": "b1_title",
+          "label": "Headline",
+          "default": "Free shipping on orders over $50"
+        },
+        {
+          "type": "richtext",
+          "id": "b1_text",
+          "label": "Description",
+          "default": "<p>Orders are packed within 24 hours and delivered in 2–5 business days.</p>",
+          "info": "Shown in slider style (and in normal style if enabled above)."
+        },
+        {
+          "type": "url",
+          "id": "b1_link",
+          "label": "Link",
+          "info": "Normal style: the whole benefit is clickable. Slider style: shown as a text link."
+        },
+        {
+          "type": "text",
+          "id": "b1_link_label",
+          "label": "Link label (slider style)",
+          "default": "Learn more"
+        },
+        {
+          "type": "range",
+          "id": "b1_font_size",
+          "label": "Headline size (desktop)",
+          "min": 10,
+          "max": 40,
+          "step": 1,
+          "unit": "px",
+          "default": 15
+        },
+        {
+          "type": "range",
+          "id": "b1_font_size_mobile",
+          "label": "Headline size (mobile)",
+          "min": 10,
+          "max": 40,
+          "step": 1,
+          "unit": "px",
+          "default": 14
+        },
+        {
+          "type": "range",
+          "id": "b1_icon_size",
+          "label": "Icon size (desktop)",
+          "min": 12,
+          "max": 200,
+          "step": 2,
+          "unit": "px",
+          "default": 28
+        },
+        {
+          "type": "range",
+          "id": "b1_icon_size_mobile",
+          "label": "Icon size (mobile)",
+          "min": 12,
+          "max": 200,
+          "step": 2,
+          "unit": "px",
+          "default": 24
+        },
+        {
+          "type": "header",
+          "content": "Second benefit"
+        },
+        {
+          "type": "checkbox",
+          "id": "b2_enabled",
+          "label": "Show this benefit",
+          "default": true
+        },
+        {
+          "type": "image_picker",
+          "id": "b2_icon",
+          "label": "Icon image",
+          "info": "For image-only benefits (payment logos, trust badges) leave the headline empty."
+        },
+        {
+          "type": "html",
+          "id": "b2_svg",
+          "label": "SVG code",
+          "default": "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'><path d='M9 14 4 9l5-5'/><path d='M4 9h10.5a5.5 5.5 0 0 1 0 11H11'/></svg>",
+          "info": "Overrides the icon image when set. Clear it to use the image."
+        },
+        {
+          "type": "image_picker",
+          "id": "b2_icon_active",
+          "label": "Active icon image",
+          "info": "Slider style only."
+        },
+        {
+          "type": "html",
+          "id": "b2_svg_active",
+          "label": "Active SVG code",
+          "info": "Slider style only. Overrides the active icon image."
+        },
+        {
+          "type": "text",
+          "id": "b2_icon_label",
+          "label": "Icon accessible label",
+          "info": "Used for image-only benefits and as the tab name when there is no headline."
+        },
+        {
+          "type": "inline_richtext",
+          "id": "b2_title",
+          "label": "Headline",
+          "default": "30-day free returns"
+        },
+        {
+          "type": "richtext",
+          "id": "b2_text",
+          "label": "Description",
+          "default": "<p>Not the right fit? Send it back within 30 days for a full refund.</p>",
+          "info": "Shown in slider style (and in normal style if enabled above)."
+        },
+        {
+          "type": "url",
+          "id": "b2_link",
+          "label": "Link",
+          "info": "Normal style: the whole benefit is clickable. Slider style: shown as a text link."
+        },
+        {
+          "type": "text",
+          "id": "b2_link_label",
+          "label": "Link label (slider style)",
+          "default": "Learn more"
+        },
+        {
+          "type": "range",
+          "id": "b2_font_size",
+          "label": "Headline size (desktop)",
+          "min": 10,
+          "max": 40,
+          "step": 1,
+          "unit": "px",
+          "default": 15
+        },
+        {
+          "type": "range",
+          "id": "b2_font_size_mobile",
+          "label": "Headline size (mobile)",
+          "min": 10,
+          "max": 40,
+          "step": 1,
+          "unit": "px",
+          "default": 14
+        },
+        {
+          "type": "range",
+          "id": "b2_icon_size",
+          "label": "Icon size (desktop)",
+          "min": 12,
+          "max": 200,
+          "step": 2,
+          "unit": "px",
+          "default": 28
+        },
+        {
+          "type": "range",
+          "id": "b2_icon_size_mobile",
+          "label": "Icon size (mobile)",
+          "min": 12,
+          "max": 200,
+          "step": 2,
+          "unit": "px",
+          "default": 24
+        },
+        {
+          "type": "header",
+          "content": "Third benefit"
+        },
+        {
+          "type": "checkbox",
+          "id": "b3_enabled",
+          "label": "Show this benefit",
+          "default": true
+        },
+        {
+          "type": "image_picker",
+          "id": "b3_icon",
+          "label": "Icon image",
+          "info": "For image-only benefits (payment logos, trust badges) leave the headline empty."
+        },
+        {
+          "type": "html",
+          "id": "b3_svg",
+          "label": "SVG code",
+          "default": "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'><path d='M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z'/><path d='m9 12 2 2 4-4'/></svg>",
+          "info": "Overrides the icon image when set. Clear it to use the image."
+        },
+        {
+          "type": "image_picker",
+          "id": "b3_icon_active",
+          "label": "Active icon image",
+          "info": "Slider style only."
+        },
+        {
+          "type": "html",
+          "id": "b3_svg_active",
+          "label": "Active SVG code",
+          "info": "Slider style only. Overrides the active icon image."
+        },
+        {
+          "type": "text",
+          "id": "b3_icon_label",
+          "label": "Icon accessible label",
+          "info": "Used for image-only benefits and as the tab name when there is no headline."
+        },
+        {
+          "type": "inline_richtext",
+          "id": "b3_title",
+          "label": "Headline",
+          "default": "2-year warranty"
+        },
+        {
+          "type": "richtext",
+          "id": "b3_text",
+          "label": "Description",
+          "default": "<p>Every product is covered against manufacturing defects for two years.</p>",
+          "info": "Shown in slider style (and in normal style if enabled above)."
+        },
+        {
+          "type": "url",
+          "id": "b3_link",
+          "label": "Link",
+          "info": "Normal style: the whole benefit is clickable. Slider style: shown as a text link."
+        },
+        {
+          "type": "text",
+          "id": "b3_link_label",
+          "label": "Link label (slider style)",
+          "default": "Learn more"
+        },
+        {
+          "type": "range",
+          "id": "b3_font_size",
+          "label": "Headline size (desktop)",
+          "min": 10,
+          "max": 40,
+          "step": 1,
+          "unit": "px",
+          "default": 15
+        },
+        {
+          "type": "range",
+          "id": "b3_font_size_mobile",
+          "label": "Headline size (mobile)",
+          "min": 10,
+          "max": 40,
+          "step": 1,
+          "unit": "px",
+          "default": 14
+        },
+        {
+          "type": "range",
+          "id": "b3_icon_size",
+          "label": "Icon size (desktop)",
+          "min": 12,
+          "max": 200,
+          "step": 2,
+          "unit": "px",
+          "default": 28
+        },
+        {
+          "type": "range",
+          "id": "b3_icon_size_mobile",
+          "label": "Icon size (mobile)",
+          "min": 12,
+          "max": 200,
+          "step": 2,
+          "unit": "px",
+          "default": 24
+        },
+        {
+          "type": "header",
+          "content": "Fourth benefit"
+        },
+        {
+          "type": "checkbox",
+          "id": "b4_enabled",
+          "label": "Show this benefit",
+          "default": true
+        },
+        {
+          "type": "image_picker",
+          "id": "b4_icon",
+          "label": "Icon image",
+          "info": "For image-only benefits (payment logos, trust badges) leave the headline empty."
+        },
+        {
+          "type": "html",
+          "id": "b4_svg",
+          "label": "SVG code",
+          "default": "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'><rect x='4' y='10' width='16' height='11' rx='2'/><path d='M8 10V7a4 4 0 0 1 8 0v3'/></svg>",
+          "info": "Overrides the icon image when set. Clear it to use the image."
+        },
+        {
+          "type": "image_picker",
+          "id": "b4_icon_active",
+          "label": "Active icon image",
+          "info": "Slider style only."
+        },
+        {
+          "type": "html",
+          "id": "b4_svg_active",
+          "label": "Active SVG code",
+          "info": "Slider style only. Overrides the active icon image."
+        },
+        {
+          "type": "text",
+          "id": "b4_icon_label",
+          "label": "Icon accessible label",
+          "info": "Used for image-only benefits and as the tab name when there is no headline."
+        },
+        {
+          "type": "inline_richtext",
+          "id": "b4_title",
+          "label": "Headline",
+          "default": "Secure checkout"
+        },
+        {
+          "type": "richtext",
+          "id": "b4_text",
+          "label": "Description",
+          "default": "<p>Pay safely with all major cards and trusted payment providers.</p>",
+          "info": "Shown in slider style (and in normal style if enabled above)."
+        },
+        {
+          "type": "url",
+          "id": "b4_link",
+          "label": "Link",
+          "info": "Normal style: the whole benefit is clickable. Slider style: shown as a text link."
+        },
+        {
+          "type": "text",
+          "id": "b4_link_label",
+          "label": "Link label (slider style)",
+          "default": "Learn more"
+        },
+        {
+          "type": "range",
+          "id": "b4_font_size",
+          "label": "Headline size (desktop)",
+          "min": 10,
+          "max": 40,
+          "step": 1,
+          "unit": "px",
+          "default": 15
+        },
+        {
+          "type": "range",
+          "id": "b4_font_size_mobile",
+          "label": "Headline size (mobile)",
+          "min": 10,
+          "max": 40,
+          "step": 1,
+          "unit": "px",
+          "default": 14
+        },
+        {
+          "type": "range",
+          "id": "b4_icon_size",
+          "label": "Icon size (desktop)",
+          "min": 12,
+          "max": 200,
+          "step": 2,
+          "unit": "px",
+          "default": 28
+        },
+        {
+          "type": "range",
+          "id": "b4_icon_size_mobile",
+          "label": "Icon size (mobile)",
+          "min": 12,
+          "max": 200,
+          "step": 2,
+          "unit": "px",
+          "default": 24
         }
       ]
     },
