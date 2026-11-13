@@ -42,6 +42,10 @@
           "type": "quantity_selector",
           "settings": {}
         },
+        "sc_pdp_quantity_discounts": {
+          "type": "sc_pdp_quantity_discounts",
+          "settings": {}
+        },
         "sc_inventory_status": {
           "type": "sc_inventory_status",
           "settings": {
@@ -398,6 +402,7 @@
         "variant_picker",
         "sc_pdp_variant_cards",
         "quantity_selector",
+        "sc_pdp_quantity_discounts",
         "sc_inventory_status",
         "buy_buttons",
         "sc_pdp_cross_sell",
