@@ -120,6 +120,7 @@
           </aside>
         {%- endif -%}
 
+        {% render 'sc-card-swatches', mode: 'assets', sc_settings: section.settings, section_id: section.id %}
         <div
           class="product-grid-container{% if settings.animations_reveal_on_scroll %} scroll-trigger animate--slide-in{% endif %}"
           id="ProductGridContainer"
@@ -179,7 +180,8 @@
                       skip_styles: skip_card_product_styles,
                       quick_add: section.settings.quick_add,
                       section_id: section.id,
-                      product_view_context: 'collection'
+                      product_view_context: 'collection',
+                      sc_swatches: section.settings
                     %}
                   </li>
                   {%- assign skip_card_product_styles = true -%}
@@ -385,6 +387,406 @@
       "id": "enable_sorting",
       "default": true,
       "label": "t:sections.main-collection-product-grid.settings.enable_sorting.label"
+    },
+    {
+      "type": "header",
+      "content": "Card Color Swatches"
+    },
+    {
+      "type": "checkbox",
+      "id": "sc_swatch_enable",
+      "label": "Show Card Color Swatches",
+      "default": true
+    },
+    {
+      "type": "select",
+      "id": "sc_swatch_shape",
+      "label": "Type",
+      "options": [
+        {
+          "value": "round",
+          "label": "Round"
+        },
+        {
+          "value": "square",
+          "label": "Square"
+        }
+      ],
+      "default": "round"
+    },
+    {
+      "type": "select",
+      "id": "sc_swatch_size",
+      "label": "Size",
+      "options": [
+        {
+          "value": "small",
+          "label": "Small (24px)"
+        },
+        {
+          "value": "medium",
+          "label": "Medium (30px)"
+        },
+        {
+          "value": "large",
+          "label": "Large (45px)"
+        }
+      ],
+      "default": "medium"
+    },
+    {
+      "type": "select",
+      "id": "sc_swatch_size_mobile",
+      "label": "Size on mobile",
+      "options": [
+        {
+          "value": "same",
+          "label": "Same as desktop"
+        },
+        {
+          "value": "small",
+          "label": "Small (24px)"
+        },
+        {
+          "value": "medium",
+          "label": "Medium (30px)"
+        },
+        {
+          "value": "large",
+          "label": "Large (45px)"
+        }
+      ],
+      "default": "same"
+    },
+    {
+      "type": "text",
+      "id": "sc_swatch_option_names",
+      "label": "Group swatches by option",
+      "default": "Color, Colour",
+      "info": "One swatch per value of this option (one per color, not per color + size). Separate names with commas, e.g. Color, Colour, Farbe."
+    },
+    {
+      "type": "select",
+      "id": "sc_swatch_no_option",
+      "label": "Products without that option",
+      "options": [
+        {
+          "value": "variants",
+          "label": "One swatch per variant"
+        },
+        {
+          "value": "hide",
+          "label": "Hide swatches"
+        }
+      ],
+      "default": "variants"
+    },
+    {
+      "type": "range",
+      "id": "sc_swatch_min",
+      "label": "Minimum swatches to show",
+      "min": 1,
+      "max": 5,
+      "step": 1,
+      "default": 2
+    },
+    {
+      "type": "select",
+      "id": "sc_swatch_sold_out",
+      "label": "Sold-out variants",
+      "options": [
+        {
+          "value": "strike",
+          "label": "Show crossed out"
+        },
+        {
+          "value": "show",
+          "label": "Show normally"
+        },
+        {
+          "value": "hide",
+          "label": "Hide"
+        }
+      ],
+      "default": "strike"
+    },
+    {
+      "type": "select",
+      "id": "sc_swatch_default_selection",
+      "label": "Selected by default",
+      "options": [
+        {
+          "value": "first",
+          "label": "First variant"
+        },
+        {
+          "value": "first_available",
+          "label": "First available variant"
+        }
+      ],
+      "default": "first"
+    },
+    {
+      "type": "checkbox",
+      "id": "sc_swatch_sync_on_load",
+      "label": "Show selected variant's image on load",
+      "default": true
+    },
+    {
+      "type": "select",
+      "id": "sc_swatch_click_action",
+      "label": "Swatch click",
+      "options": [
+        {
+          "value": "change_image",
+          "label": "Change card image"
+        },
+        {
+          "value": "navigate",
+          "label": "Go to variant page"
+        }
+      ],
+      "default": "change_image"
+    },
+    {
+      "type": "checkbox",
+      "id": "sc_swatch_update_links",
+      "label": "Link card to selected variant",
+      "default": true,
+      "info": "Clicking the card after choosing a color opens that variant."
+    },
+    {
+      "type": "checkbox",
+      "id": "sc_swatch_sync_hover_image",
+      "label": "Also update hover image",
+      "default": true
+    },
+    {
+      "type": "checkbox",
+      "id": "sc_swatch_hover_preview",
+      "label": "Preview image on swatch hover (desktop)",
+      "default": false
+    },
+    {
+      "type": "select",
+      "id": "sc_swatch_content",
+      "label": "Swatch shows",
+      "options": [
+        {
+          "value": "image",
+          "label": "Variant image, then color"
+        },
+        {
+          "value": "color",
+          "label": "Color, then variant image"
+        }
+      ],
+      "default": "image",
+      "info": "Colors come from Shopify option swatches, the color map, or the color name (e.g. Navy)."
+    },
+    {
+      "type": "textarea",
+      "id": "sc_swatch_color_map",
+      "label": "Color map",
+      "placeholder": "Midnight: #1b2340\nSand: #d8c6a5",
+      "info": "Optional. One per line: Value: color or image URL."
+    },
+    {
+      "type": "range",
+      "id": "sc_swatch_square_radius",
+      "label": "Square corner radius",
+      "min": 0,
+      "max": 12,
+      "step": 1,
+      "default": 6,
+      "unit": "px"
+    },
+    {
+      "type": "range",
+      "id": "sc_swatch_gap",
+      "label": "Space between swatches",
+      "min": 2,
+      "max": 20,
+      "step": 1,
+      "default": 8,
+      "unit": "px"
+    },
+    {
+      "type": "select",
+      "id": "sc_swatch_alignment",
+      "label": "Alignment",
+      "options": [
+        {
+          "value": "inherit",
+          "label": "Match card text"
+        },
+        {
+          "value": "left",
+          "label": "Left"
+        },
+        {
+          "value": "center",
+          "label": "Center"
+        },
+        {
+          "value": "right",
+          "label": "Right"
+        }
+      ],
+      "default": "inherit"
+    },
+    {
+      "type": "range",
+      "id": "sc_swatch_max_visible",
+      "label": "Max swatches before \"+N\"",
+      "min": 0,
+      "max": 20,
+      "step": 1,
+      "default": 0,
+      "info": "0 shows all."
+    },
+    {
+      "type": "select",
+      "id": "sc_swatch_mobile_layout",
+      "label": "Mobile layout",
+      "options": [
+        {
+          "value": "wrap",
+          "label": "Wrap to new lines"
+        },
+        {
+          "value": "scroll",
+          "label": "Single row, swipe"
+        }
+      ],
+      "default": "wrap"
+    },
+    {
+      "type": "checkbox",
+      "id": "sc_swatch_show_tooltip",
+      "label": "Show variant name on hover",
+      "default": true
+    },
+    {
+      "type": "range",
+      "id": "sc_swatch_tooltip_size",
+      "label": "Tooltip text size",
+      "min": 10,
+      "max": 16,
+      "step": 1,
+      "default": 12,
+      "unit": "px"
+    },
+    {
+      "type": "checkbox",
+      "id": "sc_swatch_show_label",
+      "label": "Show selected value below swatches",
+      "default": false,
+      "info": "Helpful on mobile, where there is no hover."
+    },
+    {
+      "type": "range",
+      "id": "sc_swatch_label_size",
+      "label": "Label text size",
+      "min": 10,
+      "max": 18,
+      "step": 1,
+      "default": 13,
+      "unit": "px"
+    },
+    {
+      "type": "color",
+      "id": "sc_swatch_ring_color",
+      "label": "Selected ring",
+      "default": "#222222"
+    },
+    {
+      "type": "color",
+      "id": "sc_swatch_border_color",
+      "label": "Swatch border",
+      "default": "#e1e1e1"
+    },
+    {
+      "type": "color",
+      "id": "sc_swatch_bg",
+      "label": "Swatch background",
+      "default": "#f2f2f2"
+    },
+    {
+      "type": "color",
+      "id": "sc_swatch_text_color",
+      "label": "Text, \"+N\" and sold-out line",
+      "default": "#555555"
+    },
+    {
+      "type": "color",
+      "id": "sc_swatch_tooltip_bg",
+      "label": "Tooltip background",
+      "default": "#222222"
+    },
+    {
+      "type": "color",
+      "id": "sc_swatch_tooltip_text",
+      "label": "Tooltip text",
+      "default": "#ffffff"
+    },
+    {
+      "type": "range",
+      "id": "sc_swatch_margin_top",
+      "label": "Space above",
+      "min": 0,
+      "max": 30,
+      "step": 1,
+      "default": 8,
+      "unit": "px"
+    },
+    {
+      "type": "range",
+      "id": "sc_swatch_margin_bottom",
+      "label": "Space below",
+      "min": 0,
+      "max": 30,
+      "step": 1,
+      "default": 6,
+      "unit": "px"
+    },
+    {
+      "type": "range",
+      "id": "sc_swatch_margin_top_mobile",
+      "label": "Space above on mobile",
+      "min": 0,
+      "max": 30,
+      "step": 1,
+      "default": 6,
+      "unit": "px"
+    },
+    {
+      "type": "range",
+      "id": "sc_swatch_margin_bottom_mobile",
+      "label": "Space below on mobile",
+      "min": 0,
+      "max": 30,
+      "step": 1,
+      "default": 4,
+      "unit": "px"
+    },
+    {
+      "type": "text",
+      "id": "sc_swatch_text_group",
+      "label": "Swatch group label (screen readers)",
+      "default": "Color options"
+    },
+    {
+      "type": "text",
+      "id": "sc_swatch_text_sold_out",
+      "label": "Sold-out label (screen readers)",
+      "default": "Sold out"
+    },
+    {
+      "type": "text",
+      "id": "sc_swatch_text_more",
+      "label": "\"+N\" link label (screen readers)",
+      "default": "View all options"
     },
     {
       "type": "header",

@@ -17,6 +17,7 @@
   @param {string} [placeholder_image] - The placeholder SVG name. Defaults to `product-apparel-2`.
   @param {string} [product_view_context] - The analytics context for the product-card view event, such as `collection`, `search`, or `recommendation`.
   @param {block} [block] - The current section block, used for optional card description content.
+  @param {object} [sc_swatches] - Section settings holding the SC color swatch options (`sc_swatch_*`). When set, variant swatches render below the image.
   @param {object} [section] - The current section context, supplied implicitly when rendered from a section and used by quick-add controls.
 
   @example
@@ -149,6 +150,9 @@
         </div>
         <div class="card__content">
           <div class="card__information">
+            {%- if sc_swatches -%}
+              {% render 'sc-card-swatches', card_product: card_product, sc_settings: sc_swatches, section_id: section_id %}
+            {%- endif -%}
             <h3
               class="card__heading{% if card_product.featured_media or settings.card_style == 'standard' %} h5{% endif %}"
               {% if card_product.featured_media or settings.card_style == 'card' %}
