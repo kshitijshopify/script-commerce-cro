@@ -115,3 +115,43 @@ Suggested metrics: AOV, conversion rate, revenue per visitor, % of carts reachin
 - [ ] Other currency (market) → converted minimum and correct format
 - [ ] Desktop, tablet, mobile – no horizontal scroll
 - [ ] Theme Editor: change minimum, product, messages, icon, colours; enable/disable
+
+## 8. Gift choices, second gift and free shipping milestone
+
+All optional and off by default – with them off the bar works exactly as described above.
+
+**More gift choices (tier 1).** Theme settings → SC – Free gift → *More gift choices*. The
+customer sees every product and can add one of them (one gift per tier). Auto add uses the
+first available product. Each product must be free under the chosen *Gift pricing*
+(0.00 product, or covered by the automatic discount).
+
+**Second free gift (tier 2).** *Second free gift* → enable, set the minimum (higher than the
+first gift's), pick the products, messages, optional icon and auto add.
+- Offered only once a tier-1 gift is in the cart.
+- With *Gift pricing: Automatic discount*, create a second automatic discount in Shopify
+  that makes these products free from this minimum.
+- Lines carry the hidden property `_sc_free_gift: 2`; they are removed when the cart drops
+  below the second minimum (if *Remove gift when cart drops below minimum* is on).
+
+**Free shipping milestone.** *Free shipping milestone* → enable and set the minimum. Make sure
+your shipping rates really are free from this amount. The optimized cart drawer's own free
+shipping bar hides itself while this milestone is shown in the drawer.
+
+**One bar, several markers.** With the second gift or the shipping milestone on, the bar runs
+to the highest minimum and shows a marker at each milestone (truck / gift 1 icon / gift 2).
+Markers turn to the "unlocked" colours when reached. The message always talks about the
+next milestone, so `[amount]` and `[threshold]` refer to that milestone.
+
+**A/B testing.** *Display section* off keeps the markup but hides the bar
+(class `sc-fg--off`); gifts are still handled. Show it in a test variant with
+`.sc-fg--off { display: block !important; }`.
+
+Test additionally:
+- [ ] Tier 1 with several products: add one → the others disappear, "Added" shown
+- [ ] Reach second minimum → tier-2 products appear after a tier-1 gift is in the cart
+- [ ] Drop below second minimum → tier-2 gift removed, tier-1 gift kept
+- [ ] Shipping marker turns green at the free shipping minimum; message moves on to the next gift
+
+### Cart drawer: one bar
+
+When **SC – Optimized cart drawer → Free shipping bar** is on, the drawer shows a single bar: the free shipping bar (`snippets/sc-free-shipping-bar.liquid`) gets a truck marker at the free shipping amount and a gift marker at the free gift minimum (plus the second gift, if enabled). The bar runs to the highest amount and the message is about the next milestone. The free gift component then sits below that bar with only its gift rows (`in_bar: true`); adding and removing gifts work as before. In this mode the drawer uses the cart drawer's free shipping amount, not "Free shipping milestone" from SC – Free gift (that one is still used on the cart page).

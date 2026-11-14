@@ -51,6 +51,19 @@
         assign in_cart = in_cart | append: item.product_id | append: ','
       endfor
 
+      # Never recommend the SC – Free gift products (they are added by the free gift logic).
+      if settings.sc_fg_enable
+        if settings.sc_fg_gift_product != blank
+          assign in_cart = in_cart | append: settings.sc_fg_gift_product.id | append: ','
+        endif
+        for p in settings.sc_fg_gift_products
+          assign in_cart = in_cart | append: p.id | append: ','
+        endfor
+        for p in settings.sc_fg_t2_products
+          assign in_cart = in_cart | append: p.id | append: ','
+        endfor
+      endif
+
       assign picked = ','
       assign count = 0
 

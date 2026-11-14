@@ -1,10 +1,17 @@
 {%- comment -%}
-  SC – Free shipping progress bar
+  SC – Free shipping progress bar (with free gift milestones)
   ----------------------------------------------------------------------------
   Self-contained: Liquid + classes from sc-cart-drawer.css, no JS, no theme deps.
   Rendered server-side, so it updates whenever the cart markup is re-rendered.
   Settings: Theme settings > "SC – Optimized cart drawer" (sc_ocd_fsb_*).
   Threshold falls back to settings.sc_csb_free_threshold ("SC – Cart shipping breakdown").
+
+  Free gift milestones: when Theme settings > "SC – Free gift" is enabled for the
+  drawer, its gift (sc_fg_threshold) and second gift (sc_fg_t2_*) become markers on
+  this same bar. The bar then runs to the highest milestone and the message always
+  talks about the next one. Adding / removing the gift lines stays with
+  snippets/sc-cart-free-gift.liquid (rendered with in_bar: true so it hides its own bar).
+  Gift lines never count towards the amount.
 
   Usage:
     {% render 'sc-free-shipping-bar' %}
@@ -15,49 +22,252 @@
     assign sc_source = settings.sc_csb_free_threshold
   endif
 
-  capture sc_threshold
+  capture sc_ship_threshold
     render 'sc-currency-amount', value: sc_source
   endcapture
-  assign sc_threshold = sc_threshold | strip
+  assign sc_ship_threshold = sc_ship_threshold | strip
+  assign sc_ship_on = false
+  if sc_ship_threshold != blank
+    assign sc_ship_on = true
+    assign sc_ship_threshold = sc_ship_threshold | plus: 0
+  endif
+
+  comment
+    Free gift milestones (same rules as sc-cart-free-gift: the pricing mode must make the gift free).
+  endcomment
+  assign sc_fg_mode = settings.sc_fg_pricing_mode
+  assign sc_gift_ids = ','
+  assign sc_t1_on = false
+  assign sc_t2_on = false
+  assign sc_t1_title = ''
+  assign sc_t2_title = ''
+  if settings.sc_fg_enable and settings.sc_fg_display and settings.sc_fg_show_drawer
+    assign sc_t1_threshold = settings.sc_fg_threshold | default: 0 | times: 100 | round
+    assign sc_gift = settings.sc_fg_gift_product
+    if sc_gift != blank and sc_t1_threshold > 0
+      assign sc_gift_variant = sc_gift.selected_or_first_available_variant
+      if sc_fg_mode == 'automatic_discount' or sc_gift_variant.price == 0
+        if sc_gift_variant.available or settings.sc_fg_hide_when_sold_out == false
+          assign sc_t1_on = true
+          assign sc_t1_title = sc_gift.title
+        endif
+        assign sc_gift_ids = sc_gift_ids | append: sc_gift.id | append: ','
+      endif
+    endif
+    for sc_p in settings.sc_fg_gift_products
+      assign sc_needle = ',' | append: sc_p.id | append: ','
+      if sc_gift_ids contains sc_needle
+        continue
+      endif
+      if sc_fg_mode == 'automatic_discount' or sc_p.selected_or_first_available_variant.price == 0
+        assign sc_gift_ids = sc_gift_ids | append: sc_p.id | append: ','
+      endif
+    endfor
+
+    assign sc_t2_threshold = settings.sc_fg_t2_threshold | default: 0 | times: 100 | round
+    if sc_t1_on and settings.sc_fg_t2_enable and sc_t2_threshold > 0
+      for sc_p in settings.sc_fg_t2_products
+        comment
+          Same rule as sc-cart-free-gift: a product that is already a first gift is not a second gift.
+        endcomment
+        assign sc_needle = ',' | append: sc_p.id | append: ','
+        if sc_gift_ids contains sc_needle
+          continue
+        endif
+        if sc_fg_mode == 'automatic_discount' or sc_p.selected_or_first_available_variant.price == 0
+          assign sc_gift_ids = sc_gift_ids | append: sc_p.id | append: ','
+          if sc_t2_title == blank
+            assign sc_t2_title = sc_p.title
+          endif
+        endif
+      endfor
+      if sc_t2_title != blank
+        assign sc_t2_on = true
+      endif
+    endif
+  endif
 -%}
-{%- if settings.sc_ocd_fsb_enable and sc_threshold != blank -%}
+{%- liquid
+  assign sc_show = false
+  if settings.sc_ocd_fsb_enable
+    if sc_ship_on or sc_t1_on
+      assign sc_show = true
+    endif
+  endif
+-%}
+{%- if sc_show -%}
   {%- liquid
-    assign sc_threshold = sc_threshold | plus: 0
-    assign sc_total = cart.total_price
-    assign sc_remaining = sc_threshold | minus: sc_total
-    assign sc_reached = false
-    if sc_remaining <= 0 or sc_threshold == 0
-      assign sc_reached = true
-      assign sc_percent = 100
-    else
-      assign sc_percent = sc_total | times: 100 | divided_by: sc_threshold
+    # Amount: cart total without the free gift lines.
+    assign sc_gift_value = 0
+    for item in cart.items
+      assign sc_prop = item.properties['_sc_free_gift'] | append: ''
+      assign sc_needle = ',' | append: item.product_id | append: ','
+      if sc_prop != blank
+        assign sc_gift_value = sc_gift_value | plus: item.final_line_price
+      elsif sc_fg_mode == 'zero_price' and sc_gift_ids contains sc_needle
+        assign sc_gift_value = sc_gift_value | plus: item.final_line_price
+      endif
+    endfor
+    assign sc_total = cart.total_price | minus: sc_gift_value | at_least: 0
+
+    assign sc_ship_reached = false
+    if sc_ship_on and sc_total >= sc_ship_threshold
+      assign sc_ship_reached = true
+    endif
+    assign sc_t1_reached = false
+    if sc_t1_on and sc_total >= sc_t1_threshold
+      assign sc_t1_reached = true
+    endif
+    assign sc_t2_reached = false
+    if sc_t2_on and sc_total >= sc_t2_threshold
+      assign sc_t2_reached = true
     endif
 
-    assign sc_amount = sc_remaining | money | prepend: '<strong>' | append: '</strong>'
-    assign sc_heading = settings.sc_ocd_fsb_heading | strip
-    if sc_reached
-      assign sc_message = settings.sc_ocd_fsb_success | escape
+    # The bar runs to the highest milestone; the last one decides the final message.
+    assign sc_max = 0
+    assign sc_last = ''
+    if sc_ship_on
+      assign sc_max = sc_ship_threshold
+      assign sc_last = 'ship'
+    endif
+    if sc_t1_on and sc_t1_threshold >= sc_max
+      assign sc_max = sc_t1_threshold
+      assign sc_last = 't1'
+    endif
+    if sc_t2_on and sc_t2_threshold >= sc_max
+      assign sc_max = sc_t2_threshold
+      assign sc_last = 't2'
+    endif
+
+    # Next milestone still to reach (lowest one first).
+    assign sc_next = ''
+    assign sc_next_threshold = 0
+    if sc_ship_on and sc_ship_reached == false
+      assign sc_next = 'ship'
+      assign sc_next_threshold = sc_ship_threshold
+    endif
+    if sc_t1_on and sc_t1_reached == false
+      if sc_next == blank or sc_t1_threshold < sc_next_threshold
+        assign sc_next = 't1'
+        assign sc_next_threshold = sc_t1_threshold
+      endif
+    endif
+    if sc_t2_on and sc_t2_reached == false
+      if sc_next == blank or sc_t2_threshold < sc_next_threshold
+        assign sc_next = 't2'
+        assign sc_next_threshold = sc_t2_threshold
+      endif
+    endif
+
+    assign sc_reached = false
+    if sc_next == blank
+      assign sc_reached = true
+    endif
+
+    if sc_reached or sc_max == 0
+      assign sc_percent = 100
     else
-      assign sc_message = settings.sc_ocd_fsb_text | escape | replace: '[amount]', sc_amount
+      assign sc_percent = sc_total | times: 100 | divided_by: sc_max | at_most: 100
+    endif
+
+    assign sc_remaining = sc_next_threshold | minus: sc_total | at_least: 0
+    assign sc_amount = sc_remaining | money | prepend: '<strong>' | append: '</strong>'
+    assign sc_threshold_html = sc_next_threshold | money | prepend: '<strong>' | append: '</strong>'
+    assign sc_heading = settings.sc_ocd_fsb_heading | strip
+
+    assign sc_key = sc_next
+    if sc_reached
+      assign sc_key = sc_last | append: '_done'
+    endif
+    assign sc_gift_title = sc_t1_title
+    case sc_key
+      when 'ship'
+        assign sc_template = settings.sc_ocd_fsb_text
+      when 't1'
+        assign sc_template = settings.sc_fg_locked_message
+      when 't2'
+        assign sc_template = settings.sc_fg_t2_locked_message
+        assign sc_gift_title = sc_t2_title
+      when 't1_done'
+        assign sc_template = settings.sc_fg_unlocked_message
+      when 't2_done'
+        assign sc_template = settings.sc_fg_t2_unlocked_message
+        assign sc_gift_title = sc_t2_title
+      else
+        assign sc_template = settings.sc_ocd_fsb_success
+    endcase
+    assign sc_gift_title = sc_gift_title | escape
+    assign sc_message = sc_template | escape | replace: '[amount]', sc_amount | replace: '[threshold]', sc_threshold_html | replace: '[gift]', sc_gift_title
+
+    assign sc_multi = sc_t1_on
+
+    if sc_multi
+      assign sc_truck_svg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" focusable="false" aria-hidden="true"><path d="M2.5 6.5h11v9h-11z"/><path d="M13.5 9.5h4l3 3v3h-7"/><circle cx="6.5" cy="17.5" r="1.8"/><circle cx="16.5" cy="17.5" r="1.8"/></svg>'
+      assign sc_gift_svg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" focusable="false" aria-hidden="true"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M5 12v8a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-8"/><path d="M12 8v13"/><path d="M12 8S10.5 3.5 8 3.5a2.25 2.25 0 0 0 0 4.5h4Z"/><path d="M12 8s1.5-4.5 4-4.5a2.25 2.25 0 0 1 0 4.5h-4Z"/></svg>'
+
+      # Custom icons from "SC – Free gift" (only accepted when they really are SVG code).
+      assign sc_ship_icon = sc_truck_svg
+      assign sc_check = settings.sc_fg_ship_svg | downcase
+      if sc_check contains '<svg'
+        assign sc_ship_icon = settings.sc_fg_ship_svg
+      endif
+      assign sc_t1_icon = sc_gift_svg
+      if settings.sc_fg_icon_type == 'custom_svg'
+        assign sc_check = settings.sc_fg_custom_svg | downcase
+        if sc_check contains '<svg'
+          assign sc_t1_icon = settings.sc_fg_custom_svg
+        endif
+      endif
+      assign sc_t2_icon = sc_gift_svg
+      assign sc_check = settings.sc_fg_t2_svg | downcase
+      if sc_check contains '<svg'
+        assign sc_t2_icon = settings.sc_fg_t2_svg
+      endif
     endif
   -%}
   <div
-    class="sc-fsb{% if sc_reached %} sc-fsb--reached{% endif %}"
+    class="sc-fsb{% if sc_reached %} sc-fsb--reached{% endif %}{% if sc_multi %} sc-fsb--multi{% endif %}"
     style="--sc-fsb-bg: {{ settings.sc_ocd_fsb_bg }}; --sc-fsb-color: {{ settings.sc_ocd_fsb_color }}; --sc-fsb-bar: {{ settings.sc_ocd_fsb_bar }}; --sc-fsb-track: {{ settings.sc_ocd_fsb_track }};"
   >
     {%- if sc_heading != blank and sc_reached == false -%}
       <p class="sc-fsb__heading">{{ sc_heading | escape }}</p>
     {%- endif -%}
     <p class="sc-fsb__message" role="status">{{ sc_message }}</p>
-    <div
-      class="sc-fsb__track"
-      role="progressbar"
-      aria-valuemin="0"
-      aria-valuemax="100"
-      aria-valuenow="{{ sc_percent }}"
-      aria-label="{{ settings.sc_ocd_fsb_success | escape }}"
-    >
-      <span class="sc-fsb__bar" style="width: {{ sc_percent }}%;"></span>
+    <div class="sc-fsb__progress">
+      <div
+        class="sc-fsb__track"
+        role="progressbar"
+        aria-valuemin="0"
+        aria-valuemax="100"
+        aria-valuenow="{{ sc_percent }}"
+        aria-valuetext="{{ sc_message | strip_html | escape }}"
+      >
+        <span class="sc-fsb__bar" style="width: {{ sc_percent }}%;"></span>
+      </div>
+      {%- if sc_multi -%}
+        <div class="sc-fsb__markers" aria-hidden="true">
+          {%- if sc_ship_on -%}
+            {%- assign sc_pos = sc_ship_threshold | times: 100.0 | divided_by: sc_max -%}
+            <span class="sc-fsb__marker{% if sc_ship_reached %} is-reached{% endif %}" style="left: {{ sc_pos }}%;">
+              {{- sc_ship_icon -}}
+            </span>
+          {%- endif -%}
+          {%- assign sc_pos = sc_t1_threshold | times: 100.0 | divided_by: sc_max -%}
+          <span class="sc-fsb__marker{% if sc_t1_reached %} is-reached{% endif %}" style="left: {{ sc_pos }}%;">
+            {%- if settings.sc_fg_icon_type == 'image' and settings.sc_fg_icon_image != blank -%}
+              {{- settings.sc_fg_icon_image | image_url: width: 80 | image_tag: alt: '', loading: 'lazy' -}}
+            {%- else -%}
+              {{- sc_t1_icon -}}
+            {%- endif -%}
+          </span>
+          {%- if sc_t2_on -%}
+            {%- assign sc_pos = sc_t2_threshold | times: 100.0 | divided_by: sc_max -%}
+            <span class="sc-fsb__marker{% if sc_t2_reached %} is-reached{% endif %}" style="left: {{ sc_pos }}%;">
+              {{- sc_t2_icon -}}
+            </span>
+          {%- endif -%}
+        </div>
+      {%- endif -%}
     </div>
   </div>
 {%- endif -%}

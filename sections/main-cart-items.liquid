@@ -84,7 +84,7 @@
               <tbody>
                 {%- for item in cart.items -%}
                   <tr
-                    class="cart-item {% if item.parent_relationship.parent != null %}cart-item__nested-line{% endif %}"
+                    class="cart-item {% if item.parent_relationship.parent != null %}cart-item__nested-line{% endif %}{% if item.properties['_sc_free_gift'] != blank %} sc-cart-item--gift{% endif %}"
                     id="CartItem-{{ item.index | plus: 1 }}"
                     {% if item.parent_relationship.parent != null %}
                       aria-label="{{- 'products.product.nested_label' | t: title: item.product.title, parent_title: item.parent_relationship.parent.title | escape -}}"
@@ -245,6 +245,9 @@
                               >
                                 {{- 'icon-info.svg' | inline_asset_content -}}
                               </button>
+                            {%- endif -%}
+                            {%- if item.properties['_sc_free_gift'] != blank -%}
+                              <span class="sc-cart-gift-qty">{{ 'products.product.quantity.label' | t }}: 1</span>
                             {%- endif -%}
                             <quantity-input class="quantity cart-quantity">
                               {% assign can_update_quantity = item.instructions.can_update_quantity | default: true %}

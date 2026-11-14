@@ -98,8 +98,64 @@
   transition: width 0.4s ease;
 }
 
+/* Free gift milestones on the same bar */
+.sc-fsb__progress {
+  position: relative;
+}
+
+.sc-fsb--multi .sc-fsb__progress {
+  display: flex;
+  align-items: center;
+  min-height: 28px;
+  margin-inline-end: 14px;
+}
+
+.sc-fsb--multi .sc-fsb__track {
+  flex: 1 1 auto;
+}
+
+.sc-fsb__markers {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.sc-fsb__marker {
+  position: absolute;
+  top: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 5px;
+  overflow: hidden;
+  color: var(--sc-fsb-bar, #222);
+  background: var(--sc-fsb-track, #fff);
+  border: 2px solid var(--sc-fsb-track, #fff);
+  border-radius: 50%;
+  box-sizing: border-box;
+  transform: translate(-50%, -50%);
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+.sc-fsb__marker svg,
+.sc-fsb__marker img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.sc-fsb__marker.is-reached {
+  color: var(--sc-fsb-track, #fff);
+  background: var(--sc-fsb-bar, #222);
+  border-color: var(--sc-fsb-track, #fff);
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .sc-fsb__bar {
+  .sc-fsb__bar,
+  .sc-fsb__marker {
     transition: none;
   }
 }

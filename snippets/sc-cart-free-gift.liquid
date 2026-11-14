@@ -13,6 +13,8 @@
 
   Accepts:
   - placement: {String} 'cart' | 'drawer'
+  - in_bar: {Boolean} drawer only: the SC free shipping bar (sc-free-shipping-bar) shows the
+    milestones, so this component hides its own message + bar and keeps the gift rows + logic.
 
   Behaviour:
   - Shows how much more the customer must spend to unlock the gift, with a
@@ -25,6 +27,16 @@
     (gift quantity kept at 1), removal of the gift when the cart drops below
     the minimum. One global lock so the cart page and drawer never both add it.
   - The gift's own value never counts towards the minimum.
+
+  Tiers and milestones (all optional, off by default):
+  - "More gift choices": extra tier-1 products; the customer picks one (one gift per tier).
+  - "Second free gift": own minimum, products, auto add, messages, icon. Offered once a
+    tier-1 gift is in the cart. Lines carry `_sc_free_gift: 2`.
+  - "Free shipping milestone": extra marker + messages on the same bar.
+  - With shipping or tier 2 on, the bar runs to the highest minimum and shows one marker
+    per milestone; the message always talks about the next milestone ([amount]/[threshold]).
+  - "Display section" off keeps the markup hidden for A/B tests (.sc-fg--off).
+  Gift rows: snippets/sc-cart-free-gift-row.liquid.
 
   Gift pricing (setting "Gift pricing", see docs/sc-cart-free-gift-progress-setup.md):
   - zero_price: dedicated gift product priced 0.00. If the selected variant
@@ -104,18 +116,78 @@
         assign sc_base = cart.items_subtotal_price
     endcase
 
+    # ---- Gift tiers: products each tier may add (the pricing mode must make them free) ----
+    assign sc_t1_ids = ','
+    if sc_gift_usable
+      assign sc_t1_ids = sc_t1_ids | append: sc_gift.id | append: ','
+    endif
+    for sc_p in settings.sc_fg_gift_products
+      assign sc_needle = ',' | append: sc_p.id | append: ','
+      if sc_t1_ids contains sc_needle
+        continue
+      endif
+      if sc_mode == 'automatic_discount' or sc_p.selected_or_first_available_variant.price == 0
+        assign sc_t1_ids = sc_t1_ids | append: sc_p.id | append: ','
+      endif
+    endfor
+
+    assign sc_t2_threshold = settings.sc_fg_t2_threshold | default: 0 | times: 100 | round
+    assign sc_t2_ids = ','
+    assign sc_t2_title = ''
+    if settings.sc_fg_t2_enable and sc_t2_threshold > 0
+      for sc_p in settings.sc_fg_t2_products
+        assign sc_needle = ',' | append: sc_p.id | append: ','
+        if sc_t1_ids contains sc_needle or sc_t2_ids contains sc_needle
+          continue
+        endif
+        if sc_mode == 'automatic_discount' or sc_p.selected_or_first_available_variant.price == 0
+          assign sc_t2_ids = sc_t2_ids | append: sc_p.id | append: ','
+          if sc_t2_title == blank
+            assign sc_t2_title = sc_p.title
+          endif
+        endif
+      endfor
+    endif
+    assign sc_t2_on = false
+    if sc_t2_ids != ','
+      assign sc_t2_on = true
+    endif
+
+    assign sc_ship_threshold = settings.sc_fg_ship_threshold | default: 0 | times: 100 | round
+    assign sc_ship_on = false
+    if settings.sc_fg_ship_enable and sc_ship_threshold > 0
+      assign sc_ship_on = true
+    endif
+
+    assign sc_multi = false
+    if sc_ship_on or sc_t2_on
+      assign sc_multi = true
+    endif
+
+    # ---- Cart lines: gift lines per tier never count towards a minimum ----
     assign sc_gift_value = 0
     assign sc_gift_in_cart = false
+    assign sc_t2_in_cart = false
     assign sc_other_qty = 0
     for item in cart.items
-      assign sc_is_gift = false
-      if item.properties['_sc_free_gift'] != blank
-        assign sc_is_gift = true
-      elsif sc_mode == 'zero_price' and item.product_id == sc_gift.id
-        assign sc_is_gift = true
+      assign sc_tier = ''
+      assign sc_needle = ',' | append: item.product_id | append: ','
+      assign sc_prop = item.properties['_sc_free_gift'] | append: ''
+      if sc_prop == '2'
+        assign sc_tier = '2'
+      elsif sc_prop != blank
+        assign sc_tier = '1'
+      elsif sc_mode == 'zero_price' and sc_t1_ids contains sc_needle
+        assign sc_tier = '1'
+      elsif sc_mode == 'zero_price' and sc_t2_ids contains sc_needle
+        assign sc_tier = '2'
       endif
-      if sc_is_gift
-        assign sc_gift_in_cart = true
+      if sc_tier != blank
+        if sc_tier == '2'
+          assign sc_t2_in_cart = true
+        else
+          assign sc_gift_in_cart = true
+        endif
         if sc_basis == 'original'
           assign sc_gift_value = sc_gift_value | plus: item.original_line_price
         else
@@ -127,11 +199,58 @@
     endfor
 
     assign sc_eligible = sc_base | minus: sc_gift_value | at_least: 0
-    assign sc_remaining = sc_threshold | minus: sc_eligible | at_least: 0
-    assign sc_pct = sc_eligible | times: 100 | divided_by: sc_threshold | at_most: 100
     assign sc_unlocked = false
     if sc_eligible >= sc_threshold and sc_eligible > 0
       assign sc_unlocked = true
+    endif
+    assign sc_t2_unlocked = false
+    if sc_t2_on and sc_eligible >= sc_t2_threshold and sc_eligible > 0
+      assign sc_t2_unlocked = true
+    endif
+    assign sc_ship_unlocked = false
+    if sc_ship_on and sc_eligible >= sc_ship_threshold and sc_eligible > 0
+      assign sc_ship_unlocked = true
+    endif
+
+    # The bar runs to the highest milestone.
+    assign sc_max = sc_threshold
+    if sc_ship_on and sc_ship_threshold > sc_max
+      assign sc_max = sc_ship_threshold
+    endif
+    if sc_t2_on and sc_t2_threshold > sc_max
+      assign sc_max = sc_t2_threshold
+    endif
+    assign sc_pct = sc_eligible | times: 100 | divided_by: sc_max | at_most: 100
+    assign sc_all_unlocked = false
+    if sc_eligible >= sc_max and sc_eligible > 0
+      assign sc_all_unlocked = true
+    endif
+
+    # The message talks about the next milestone still to reach.
+    assign sc_next = ''
+    assign sc_next_threshold = 0
+    if sc_unlocked == false
+      assign sc_next = 't1'
+      assign sc_next_threshold = sc_threshold
+    endif
+    if sc_ship_on and sc_ship_unlocked == false
+      if sc_next == blank or sc_ship_threshold < sc_next_threshold
+        assign sc_next = 'ship'
+        assign sc_next_threshold = sc_ship_threshold
+      endif
+    endif
+    if sc_t2_on and sc_t2_unlocked == false
+      if sc_next == blank or sc_t2_threshold < sc_next_threshold
+        assign sc_next = 't2'
+        assign sc_next_threshold = sc_t2_threshold
+      endif
+    endif
+    if sc_next != blank
+      assign sc_remaining = sc_next_threshold | minus: sc_eligible | at_least: 0
+      assign sc_msg_threshold = sc_next_threshold
+    else
+      assign sc_remaining = 0
+      assign sc_msg_threshold = sc_max
     endif
 
     assign sc_same_currency = true
@@ -142,15 +261,15 @@
     case settings.sc_fg_money_style
       when 'money_with_currency'
         assign sc_remaining_money = sc_remaining | money_with_currency
-        assign sc_threshold_money = sc_threshold | money_with_currency
+        assign sc_threshold_money = sc_msg_threshold | money_with_currency
         assign sc_money_format = shop.money_with_currency_format | strip_html
       when 'amount'
         assign sc_remaining_money = sc_remaining | money_without_currency
-        assign sc_threshold_money = sc_threshold | money_without_currency
+        assign sc_threshold_money = sc_msg_threshold | money_without_currency
         assign sc_money_format = shop.money_format | strip_html
       else
         assign sc_remaining_money = sc_remaining | money
-        assign sc_threshold_money = sc_threshold | money
+        assign sc_threshold_money = sc_msg_threshold | money
         assign sc_money_format = shop.money_format | strip_html
     endcase
 
@@ -158,18 +277,11 @@
     if settings.sc_fg_hide_when_empty and sc_other_qty == 0
       assign sc_hidden = true
     endif
-
-    assign sc_gift_image = settings.sc_fg_gift_image
-    if sc_gift_image == blank
-      assign sc_gift_image = sc_gift_variant.featured_image | default: sc_gift.featured_image
-    endif
-
-    assign sc_strike_price = 0
-    if settings.sc_fg_show_original_price
-      if sc_mode == 'automatic_discount'
-        assign sc_strike_price = sc_gift_variant.price
-      elsif sc_gift_variant.compare_at_price > sc_gift_variant.price
-        assign sc_strike_price = sc_gift_variant.compare_at_price
+    assign sc_in_bar = false
+    if placement == 'drawer' and in_bar
+      assign sc_in_bar = true
+      if sc_other_qty == 0
+        assign sc_hidden = true
       endif
     endif
 
@@ -189,36 +301,62 @@
       assign sc_has_icon = false
     endif
 
+    assign sc_ship_svg = ''
+    assign sc_svg_check = settings.sc_fg_ship_svg | downcase
+    if sc_svg_check contains '<svg'
+      assign sc_ship_svg = settings.sc_fg_ship_svg
+    endif
+    assign sc_t2_svg = ''
+    assign sc_svg_check = settings.sc_fg_t2_svg | downcase
+    if sc_svg_check contains '<svg'
+      assign sc_t2_svg = settings.sc_fg_t2_svg
+    endif
+
     assign sc_state_class = ''
-    if sc_unlocked
+    if sc_all_unlocked
       assign sc_state_class = ' is-unlocked'
+    endif
+    if sc_multi
+      assign sc_state_class = sc_state_class | append: ' sc-fg--multi'
     endif
     if sc_same_currency == false
       assign sc_state_class = sc_state_class | append: ' is-pending'
     endif
+    if sc_in_bar
+      assign sc_state_class = sc_state_class | append: ' sc-fg--in-bar'
+    endif
+    unless settings.sc_fg_display
+      assign sc_state_class = sc_state_class | append: ' sc-fg--off'
+    endunless
 
     assign sc_amount_html = '<strong class="sc-fg__amount">' | append: sc_remaining_money | append: '</strong>'
     assign sc_threshold_html = '<strong class="sc-fg__amount">' | append: sc_threshold_money | append: '</strong>'
-    assign sc_gift_title = sc_gift.title | escape
-    if sc_unlocked
-      if sc_gift_available
-        assign sc_message = settings.sc_fg_unlocked_message | escape
-        assign sc_valuetext = settings.sc_fg_unlocked_message
+    assign sc_gift_raw = sc_gift.title
+    case sc_next
+      when 't1'
+        assign sc_template = settings.sc_fg_locked_message
+      when 'ship'
+        assign sc_template = settings.sc_fg_ship_message
+      when 't2'
+        assign sc_template = settings.sc_fg_t2_locked_message
+        assign sc_gift_raw = sc_t2_title
       else
-        assign sc_message = settings.sc_fg_sold_out_message | escape
-        assign sc_valuetext = settings.sc_fg_sold_out_message
-      endif
-    else
-      assign sc_message = settings.sc_fg_locked_message | escape
-      assign sc_valuetext = settings.sc_fg_locked_message
-    endif
-    assign sc_message = sc_message | replace: '[amount]', sc_amount_html | replace: '[threshold]', sc_threshold_html | replace: '[gift]', sc_gift_title
-    assign sc_valuetext = sc_valuetext | replace: '[amount]', sc_remaining_money | replace: '[threshold]', sc_threshold_money | replace: '[gift]', sc_gift.title
+        if sc_t2_on and sc_t2_threshold == sc_max
+          assign sc_template = settings.sc_fg_t2_unlocked_message
+          assign sc_gift_raw = sc_t2_title
+        elsif sc_ship_on and sc_ship_threshold == sc_max and sc_ship_threshold > sc_threshold
+          assign sc_template = settings.sc_fg_ship_unlocked_message
+        elsif sc_gift_available
+          assign sc_template = settings.sc_fg_unlocked_message
+        else
+          assign sc_template = settings.sc_fg_sold_out_message
+        endif
+    endcase
+    assign sc_gift_title = sc_gift_raw | escape
+    assign sc_message = sc_template | escape | replace: '[amount]', sc_amount_html | replace: '[threshold]', sc_threshold_html | replace: '[gift]', sc_gift_title
+    assign sc_valuetext = sc_template | replace: '[amount]', sc_remaining_money | replace: '[threshold]', sc_threshold_money | replace: '[gift]', sc_gift_raw
 
-    assign sc_show_row = settings.sc_fg_show_gift
-    if sc_unlocked == false and settings.sc_fg_show_gift_when_locked == false
-      assign sc_show_row = false
-    endif
+    assign sc_truck_svg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" focusable="false" aria-hidden="true"><path d="M2.5 6.5h11v9h-11z"/><path d="M13.5 9.5h4l3 3v3h-7"/><circle cx="6.5" cy="17.5" r="1.8"/><circle cx="16.5" cy="17.5" r="1.8"/></svg>'
 
     assign sc_gift_icon_svg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" focusable="false" aria-hidden="true"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M5 12v8a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-8"/><path d="M12 8v13"/><path d="M12 8S10.5 3.5 8 3.5a2.25 2.25 0 0 0 0 4.5h4Z"/><path d="M12 8s1.5-4.5 4-4.5a2.25 2.25 0 0 1 0 4.5h-4Z"/></svg>'
   -%}
@@ -260,6 +398,15 @@
     }
     .sc-fg--cart { margin: {{ settings.sc_fg_spacing_cart }}px 0; }
     .sc-fg--drawer { margin: {{ settings.sc_fg_spacing_drawer }}px 0; flex: 0 0 auto; }
+    /* Drawer with the SC free shipping bar: milestones show in that bar, only the gift rows stay here. */
+    .sc-fg.sc-fg--in-bar { margin: 0; }
+    .sc-fg--in-bar .sc-fg__headline, .sc-fg--in-bar .sc-fg__message, .sc-fg--in-bar .sc-fg__progress { display: none !important; }
+    .sc-fg--in-bar .sc-fg__gift:first-child { margin-top: 0; border-top: 0; }
+    .sc-fg--in-bar .sc-fg__gifts { padding-top: 14px; }
+    /* Gift lines in the theme's cart list: fixed quantity 1, no quantity selector. */
+    .sc-cart-item--gift quantity-input,
+    .sc-cart-item--gift .quantity-popover__info-button { display: none !important; }
+    .sc-cart-gift-qty { display: inline-block; margin-inline-end: 8px; font-size: 1.3rem; opacity: .75; white-space: nowrap; }
     .sc-fg[hidden] { display: none !important; }
     .sc-fg *, .sc-fg *::before, .sc-fg *::after { box-sizing: border-box; }
     .sc-fg__card--boxed {
@@ -456,6 +603,46 @@
       line-height: 1.4;
       text-align: start;
     }
+    /* A/B: markup is kept but hidden. Show it in a test with .sc-fg--off { display: block !important; } */
+    .sc-fg.sc-fg--off { display: none; }
+
+    /* Multi-milestone bar: free shipping / gift 1 / gift 2 markers on the track */
+    .sc-fg--multi .sc-fg__progress {
+      position: relative;
+      min-height: var(--sc-fg-icon-size);
+      padding-inline-end: calc(var(--sc-fg-icon-size) / 2);
+    }
+    .sc-fg__markers {
+      position: absolute;
+      top: 50%;
+      left: 0;
+      right: calc(var(--sc-fg-icon-size) / 2);
+      height: 0;
+      pointer-events: none;
+    }
+    .sc-fg .sc-fg__marker {
+      position: absolute;
+      top: 0;
+      margin: 0;
+      transform: translate(-50%, -50%);
+    }
+    .sc-fg .sc-fg__marker.is-reached {
+      background: var(--sc-fg-icon-done-bg);
+      border-color: var(--sc-fg-icon-done-bg);
+      color: var(--sc-fg-icon-done);
+    }
+    .sc-fg.is-celebrating .sc-fg__marker.is-reached { animation: sc-fg-pop-marker .6s ease; }
+    @keyframes sc-fg-pop-marker { 0% { transform: translate(-50%, -50%) scale(1); } 40% { transform: translate(-50%, -50%) scale(1.18); } 100% { transform: translate(-50%, -50%) scale(1); } }
+
+    .sc-fg__tier { margin-top: 4px; }
+    .sc-fg .sc-fg__tier-title {
+      margin: 12px 0 0;
+      color: var(--sc-fg-headline);
+      font-size: var(--sc-fg-m-size);
+      font-weight: 600;
+      line-height: 1.3;
+    }
+
     @media screen and (max-width: 749px) {
       .sc-fg {
         --sc-fg-h-size: {{ settings.sc_fg_headline_size_mobile }}px;
@@ -478,7 +665,7 @@
     }
     @media (prefers-reduced-motion: reduce) {
       .sc-fg__fill, .sc-fg__icon { transition: none; }
-      .sc-fg__fill--stripes, .sc-fg.is-celebrating .sc-fg__icon { animation: none; }
+      .sc-fg__fill--stripes, .sc-fg.is-celebrating .sc-fg__icon, .sc-fg.is-celebrating .sc-fg__marker.is-reached { animation: none; }
     }
   </style>
 
@@ -493,6 +680,22 @@
       {%- endif -%}
 
       <p class="sc-fg__message" data-sc-fg-message>{{ sc_message }}</p>
+
+      {%- capture sc_t1_icon_html -%}
+        {%- case sc_icon_type -%}
+          {%- when 'box' -%}
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" focusable="false" aria-hidden="true"><path d="M21 8 12 3 3 8v8l9 5 9-5V8Z"/><path d="m3 8 9 5 9-5"/><path d="M12 13v8"/><path d="m7.5 5.5 9 5"/></svg>
+          {%- when 'star' -%}
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" focusable="false" aria-hidden="true"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3 6.4 20.2l1.1-6.2L3 9.6l6.2-.9L12 3Z"/></svg>
+          {%- when 'heart' -%}
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" focusable="false" aria-hidden="true"><path d="M12 20.5s-7.5-4.6-9.3-9.3C1.5 8 3.6 4.5 7 4.5c2.1 0 3.6 1.2 5 3 1.4-1.8 2.9-3 5-3 3.4 0 5.5 3.5 4.3 6.7-1.8 4.7-9.3 9.3-9.3 9.3Z"/></svg>
+          {%- when 'image' -%}
+            {{- settings.sc_fg_icon_image | image_url: width: 160 | image_tag: alt: '', loading: 'lazy' -}}
+          {%- else -%}
+            {%- comment -%} Gift icon; for "Custom SVG code" JS swaps in the sanitised SVG. {%- endcomment -%}
+            {{- sc_gift_icon_svg -}}
+        {%- endcase -%}
+      {%- endcapture -%}
 
       <div class="sc-fg__progress">
         <div
@@ -511,25 +714,48 @@
             data-sc-fg-fill
           ></span>
         </div>
-        {%- if sc_has_icon -%}
+        {%- if sc_multi -%}
+          {%- comment -%} One marker per milestone, placed at threshold / highest threshold. {%- endcomment -%}
+          <div class="sc-fg__markers" aria-hidden="true">
+            {%- liquid
+              assign sc_pos_t1 = sc_threshold | times: 100.0 | divided_by: sc_max
+              assign sc_pos_ship = sc_ship_threshold | times: 100.0 | divided_by: sc_max
+              assign sc_pos_t2 = sc_t2_threshold | times: 100.0 | divided_by: sc_max
+            -%}
+            {%- if sc_ship_on -%}
+              <span
+                class="sc-fg__icon sc-fg__marker{% if sc_ship_unlocked %} is-reached{% endif %}"
+                style="left: {{ sc_pos_ship }}%;"
+                data-sc-fg-marker="ship"
+              >
+                {{- sc_truck_svg -}}
+              </span>
+            {%- endif -%}
+            <span
+              class="sc-fg__icon sc-fg__marker{% if sc_icon_type == 'image' %} sc-fg__icon--image{% endif %}{% if sc_unlocked %} is-reached{% endif %}"
+              style="left: {{ sc_pos_t1 }}%;"
+              data-sc-fg-marker="t1"
+              data-sc-fg-icon
+            >
+              {{- sc_t1_icon_html -}}
+            </span>
+            {%- if sc_t2_on -%}
+              <span
+                class="sc-fg__icon sc-fg__marker{% if sc_t2_unlocked %} is-reached{% endif %}"
+                style="left: {{ sc_pos_t2 }}%;"
+                data-sc-fg-marker="t2"
+              >
+                {{- sc_gift_icon_svg -}}
+              </span>
+            {%- endif -%}
+          </div>
+        {%- elsif sc_has_icon -%}
           <span
             class="sc-fg__icon{% if sc_icon_type == 'image' %} sc-fg__icon--image{% endif %}"
             aria-hidden="true"
             data-sc-fg-icon
           >
-            {%- case sc_icon_type -%}
-              {%- when 'box' -%}
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" focusable="false" aria-hidden="true"><path d="M21 8 12 3 3 8v8l9 5 9-5V8Z"/><path d="m3 8 9 5 9-5"/><path d="M12 13v8"/><path d="m7.5 5.5 9 5"/></svg>
-              {%- when 'star' -%}
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" focusable="false" aria-hidden="true"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3 6.4 20.2l1.1-6.2L3 9.6l6.2-.9L12 3Z"/></svg>
-              {%- when 'heart' -%}
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" focusable="false" aria-hidden="true"><path d="M12 20.5s-7.5-4.6-9.3-9.3C1.5 8 3.6 4.5 7 4.5c2.1 0 3.6 1.2 5 3 1.4-1.8 2.9-3 5-3 3.4 0 5.5 3.5 4.3 6.7-1.8 4.7-9.3 9.3-9.3 9.3Z"/></svg>
-              {%- when 'image' -%}
-                {{- settings.sc_fg_icon_image | image_url: width: 160 | image_tag: alt: '', loading: 'lazy' -}}
-              {%- else -%}
-                {%- comment -%} Gift icon; for "Custom SVG code" JS swaps in the sanitised SVG. {%- endcomment -%}
-                {{- sc_gift_icon_svg -}}
-            {%- endcase -%}
+            {{- sc_t1_icon_html -}}
           </span>
         {%- endif -%}
       </div>
@@ -537,59 +763,43 @@
       <p class="sc-fg__notice" data-sc-fg-notice role="status" hidden></p>
 
       {%- if settings.sc_fg_show_gift -%}
-        <div
-          class="sc-fg__gift{% unless sc_unlocked %} is-locked{% endunless %}"
-          data-sc-fg-gift
-          {% unless sc_show_row %}hidden{% endunless %}
-        >
-          <div class="sc-fg__gift-media">
-            {%- if sc_gift_image != blank -%}
-              {{-
-                sc_gift_image
-                | image_url: width: 240
-                | image_tag: widths: '80, 120, 160, 240', sizes: '120px', loading: 'lazy', alt: sc_gift.title
-              -}}
-            {%- else -%}
-              {{- 'product-1' | placeholder_svg_tag -}}
-            {%- endif -%}
-          </div>
-          <div class="sc-fg__gift-info">
-            <p class="sc-fg__gift-title">{{ sc_gift.title | escape }}</p>
-            <p class="sc-fg__gift-price">
-              {%- if settings.sc_fg_free_label != blank -%}
-                <span class="sc-fg__free" data-sc-fg-free>{{ settings.sc_fg_free_label | escape }}</span>
+        <div class="sc-fg__gifts" data-sc-fg-gifts>
+          {%- liquid
+            if sc_gift_usable
+              render 'sc-cart-free-gift-row', product: sc_gift, tier: '1', mode: sc_mode, tier_unlocked: sc_unlocked, tier_in_cart: sc_gift_in_cart, custom_image: settings.sc_fg_gift_image
+            endif
+            for sc_p in settings.sc_fg_gift_products
+              if sc_p.id == sc_gift.id
+                continue
+              endif
+              if sc_mode == 'automatic_discount' or sc_p.selected_or_first_available_variant.price == 0
+                render 'sc-cart-free-gift-row', product: sc_p, tier: '1', mode: sc_mode, tier_unlocked: sc_unlocked, tier_in_cart: sc_gift_in_cart
+              endif
+            endfor
+          -%}
+          {%- if sc_t2_on -%}
+            {%- comment -%} Second gift tier: offered once a tier-1 gift is in the cart. {%- endcomment -%}
+            <div class="sc-fg__tier" data-sc-fg-tier-box="2" {% unless sc_gift_in_cart %}hidden{% endunless %}>
+              {%- if settings.sc_fg_t2_headline != blank -%}
+                <p class="sc-fg__tier-title">{{ settings.sc_fg_t2_headline | escape }}</p>
               {%- endif -%}
-              {%- if sc_strike_price > 0 -%}
-                <s class="sc-fg__strike" data-sc-fg-strike>
-                  <span class="sc-fg__sr">Regular price</span>
-                  {{- sc_strike_price | money -}}
-                </s>
-              {%- endif -%}
-              <span data-sc-fg-line-price hidden></span>
-            </p>
-          </div>
-          <div class="sc-fg__gift-action">
-            <button
-              type="button"
-              class="sc-fg__btn"
-              data-sc-fg-add
-              {% if sc_unlocked == false or sc_gift_in_cart or sc_gift_available == false %}hidden{% endif %}
-            >
-              {{- settings.sc_fg_add_button_label | default: 'Add free gift' | escape -}}
-            </button>
-            <span
-              class="sc-fg__status sc-fg__status--added"
-              data-sc-fg-added
-              {% unless sc_gift_in_cart and sc_unlocked %}hidden{% endunless %}
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>
-              {{- settings.sc_fg_added_label | escape -}}
-            </span>
-            <span class="sc-fg__status" data-sc-fg-locked {% if sc_unlocked %}hidden{% endif %}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
-              {{- settings.sc_fg_locked_label | escape -}}
-            </span>
-          </div>
+              {%- for sc_p in settings.sc_fg_t2_products -%}
+                {%- liquid
+                  assign sc_needle = ',' | append: sc_p.id | append: ','
+                  unless sc_t2_ids contains sc_needle
+                    continue
+                  endunless
+                -%}
+                {%- render 'sc-cart-free-gift-row',
+                  product: sc_p,
+                  tier: '2',
+                  mode: sc_mode,
+                  tier_unlocked: sc_t2_unlocked,
+                  tier_in_cart: sc_t2_in_cart
+                -%}
+              {%- endfor -%}
+            </div>
+          {%- endif -%}
         </div>
       {%- endif -%}
 
@@ -621,6 +831,7 @@
         "readdMode": {{ settings.sc_fg_readd_mode | json }},
         "removeIneligible": {{ settings.sc_fg_remove_when_ineligible | json }},
         "hideEmpty": {{ settings.sc_fg_hide_when_empty | json }},
+        "inBar": {{ sc_in_bar | json }},
         "showGift": {{ settings.sc_fg_show_gift | json }},
         "showGiftLocked": {{ settings.sc_fg_show_gift_when_locked | json }},
         "refresh": {{ settings.sc_fg_cart_refresh | json }},
@@ -629,13 +840,64 @@
         "moneyFormat": {{ sc_money_format | json }},
         "moneyStyle": {{ settings.sc_fg_money_style | json }},
         "customSvg": {{ sc_custom_svg | json }},
+        "shipSvg": {{ sc_ship_svg | json }},
+        "t2Svg": {{ sc_t2_svg | json }},
+        "milestones": [
+          { "key": "t1", "threshold": {{ sc_threshold | json }} }
+          {%- if sc_ship_on -%}, { "key": "ship", "threshold": {{ sc_ship_threshold | json }} }{%- endif -%}
+          {%- if sc_t2_on -%}, { "key": "t2", "threshold": {{ sc_t2_threshold | json }} }{%- endif %}
+        ],
+        "tiers": [
+          {
+            "key": "1",
+            "threshold": {{ sc_threshold | json }},
+            "autoAdd": {{ settings.sc_fg_auto_add | json }},
+            "products": [
+              {%- assign sc_sep = '' -%}
+              {%- if sc_gift_usable -%}
+                { "productId": {{ sc_gift.id | json }}, "variantId": {{ sc_gift_variant.id | json }}, "title": {{ sc_gift.title | json }}, "available": {{ sc_gift_variant.available | json }} }
+                {%- assign sc_sep = ',' -%}
+              {%- endif -%}
+              {%- for sc_p in settings.sc_fg_gift_products -%}
+                {%- if sc_p.id == sc_gift.id -%}{%- continue -%}{%- endif -%}
+                {%- assign sc_pv = sc_p.selected_or_first_available_variant -%}
+                {%- if sc_mode == 'automatic_discount' or sc_pv.price == 0 -%}
+                  {{ sc_sep }}{ "productId": {{ sc_p.id | json }}, "variantId": {{ sc_pv.id | json }}, "title": {{ sc_p.title | json }}, "available": {{ sc_pv.available | json }} }
+                  {%- assign sc_sep = ',' -%}
+                {%- endif -%}
+              {%- endfor -%}
+            ]
+          }
+          {%- if sc_t2_on -%}
+            ,{
+              "key": "2",
+              "threshold": {{ sc_t2_threshold | json }},
+              "autoAdd": {{ settings.sc_fg_t2_auto_add | json }},
+              "products": [
+                {%- assign sc_sep = '' -%}
+                {%- for sc_p in settings.sc_fg_t2_products -%}
+                  {%- assign sc_needle = ',' | append: sc_p.id | append: ',' -%}
+                  {%- if sc_t2_ids contains sc_needle -%}
+                    {%- assign sc_pv = sc_p.selected_or_first_available_variant -%}
+                    {{ sc_sep }}{ "productId": {{ sc_p.id | json }}, "variantId": {{ sc_pv.id | json }}, "title": {{ sc_p.title | json }}, "available": {{ sc_pv.available | json }} }
+                    {%- assign sc_sep = ',' -%}
+                  {%- endif -%}
+                {%- endfor -%}
+              ]
+            }
+          {%- endif %}
+        ],
         "messages": {
           "locked": {{ settings.sc_fg_locked_message | json }},
           "unlocked": {{ settings.sc_fg_unlocked_message | json }},
           "added": {{ settings.sc_fg_added_message | json }},
           "removed": {{ settings.sc_fg_removed_message | json }},
           "soldOut": {{ settings.sc_fg_sold_out_message | json }},
-          "error": {{ settings.sc_fg_error_message | json }}
+          "error": {{ settings.sc_fg_error_message | json }},
+          "shipLocked": {{ settings.sc_fg_ship_message | json }},
+          "shipUnlocked": {{ settings.sc_fg_ship_unlocked_message | json }},
+          "t2Locked": {{ settings.sc_fg_t2_locked_message | json }},
+          "t2Unlocked": {{ settings.sc_fg_t2_unlocked_message | json }}
         }
       }
     </script>
@@ -705,10 +967,12 @@
          instances Dawn creates each time it re-renders the cart HTML). */
       var G = (window.__scFreeGift = window.__scFreeGift || {
         busy: false,
-        addFailed: false,
+        addFailed: {},
         actions: [],
         notice: null
       });
+      /* addFailed is tracked per gift tier ('1' / '2'). */
+      if (!G.addFailed || typeof G.addFailed !== 'object') G.addFailed = {};
 
       /* Loop guard: count automatic gift changes made with no customer cart
          change in between. Any customer / theme change resets the count. */
@@ -819,8 +1083,11 @@
         var batches = [];
         for (var i = 0; i < ids.length; i += 5) batches.push(ids.slice(i, i + 5));
         return Promise.all(batches.map(function (batch) {
-          return fetch(root + 'cart?sections=' + encodeURIComponent(batch.join(',')), {
+          /* The comma must stay a literal comma: an encoded list (%2C) is not split into sections. */
+          var url = root + 'cart?sections=' + batch.map(encodeURIComponent).join(',') + '&_sc=' + Date.now();
+          return fetch(url, {
             credentials: 'same-origin',
+            cache: 'no-store',
             headers: { Accept: 'application/json', 'X-SC-Internal': '1' }
           }).then(function (r) {
             if (!r.ok) throw new Error('Section render failed');
@@ -833,33 +1100,24 @@
 
       function parse(html) { return new DOMParser().parseFromString(html, 'text/html'); }
 
-      /* Re-render the theme's cart UI after the gift was added / removed.
+      /* Theme cart UI to re-render after the gift was added / removed.
          Dawn: cart drawer (.drawer__inner), cart page sections, header bubble.
-         Other themes: cart sections inside <main> + header elements with a
-         "cart" id, plus a Horizon-style `cart:update` event. */
-      function refreshThemeCart(cart, mode) {
-        document.dispatchEvent(new CustomEvent('sc:free-gift:updated', { detail: { cart: cart } }));
-        if (mode === 'reload') { window.location.reload(); return Promise.resolve(); }
-
-        try {
-          document.dispatchEvent(new CustomEvent('cart:update', {
-            bubbles: true,
-            detail: { resource: cart, sourceId: 'sc-free-gift', data: { source: 'sc-free-gift', itemCount: cart.item_count } }
-          }));
-        } catch (e) {}
-
+         Other themes: cart sections inside <main>. Returns { ids, jobs };
+         a job takes (sections, cart) and returns false when its section is missing. */
+      function themeTargets() {
         var jobs = [];
         var ids = [];
-        var empty = cart.item_count === 0;
 
         /* Dawn cart drawer */
         var drawerInner = document.querySelector('#CartDrawer .drawer__inner');
         if (drawerInner) {
           ids.push('cart-drawer');
-          jobs.push(function (sections) {
-            if (!sections['cart-drawer']) return;
+          jobs.push(function (sections, cart) {
+            if (!sections['cart-drawer']) return false;
             var fresh = parse(sections['cart-drawer']).querySelector('.drawer__inner');
-            if (fresh) drawerInner.innerHTML = fresh.innerHTML;
+            if (!fresh) return false;
+            drawerInner.innerHTML = fresh.innerHTML;
+            var empty = cart.item_count === 0;
             document.querySelectorAll('cart-drawer').forEach(function (d) { d.classList.toggle('is-empty', empty); });
           });
         }
@@ -869,7 +1127,7 @@
         if (bubble) {
           ids.push('cart-icon-bubble');
           jobs.push(function (sections) {
-            if (!sections['cart-icon-bubble']) return;
+            if (!sections['cart-icon-bubble']) return false;
             var doc = parse(sections['cart-icon-bubble']);
             var fresh = doc.querySelector('.shopify-section') || doc.body;
             bubble.innerHTML = fresh.innerHTML;
@@ -887,16 +1145,57 @@
           var id = el.id.slice(16);
           ids.push(id);
           jobs.push(function (sections) {
-            if (!sections[id]) return;
+            if (!sections[id]) return false;
             var doc = parse(sections[id]);
             var fresh = doc.getElementById(el.id);
             el.innerHTML = fresh ? fresh.innerHTML : doc.body.innerHTML;
           });
         });
 
-        if (!ids.length) return Promise.resolve();
-        return fetchSections(ids).then(function (sections) {
-          jobs.forEach(function (job) { try { job(sections); } catch (e) {} });
+        return { ids: ids, jobs: jobs };
+      }
+
+      /* Body fields that make /cart/add.js and /cart/update.js return the
+         re-rendered theme sections in the same response, so the cart HTML
+         always matches the cart (as Dawn does). Shopify renders at most 5. */
+      function sectionParams() {
+        var ids = themeTargets().ids;
+        if (!ids.length || ids.length > 5) return {};
+        return { sections: ids.join(','), sections_url: window.location.pathname };
+      }
+
+      /* Re-render the theme's cart UI after the gift was added / removed.
+         `sections`: rendered sections returned by the add / update request, if any. */
+      function refreshThemeCart(cart, mode, sections) {
+        document.dispatchEvent(new CustomEvent('sc:free-gift:updated', { detail: { cart: cart } }));
+        if (mode === 'reload') { window.location.reload(); return Promise.resolve(); }
+
+        try {
+          document.dispatchEvent(new CustomEvent('cart:update', {
+            bubbles: true,
+            detail: { resource: cart, sourceId: 'sc-free-gift', data: { source: 'sc-free-gift', itemCount: cart.item_count } }
+          }));
+        } catch (e) {}
+
+        var targets = themeTargets();
+        if (!targets.ids.length) return Promise.resolve();
+
+        var apply = function (data) {
+          var missed = false;
+          targets.jobs.forEach(function (job) {
+            try { if (job(data || {}, cart) === false) missed = true; } catch (e) { missed = true; }
+          });
+          return missed;
+        };
+
+        /* 1. Sections that came back with the add / update request. */
+        if (sections && targets.ids.every(function (id) { return !!sections[id]; })) {
+          apply(sections);
+          return Promise.resolve();
+        }
+        /* 2. Fallback: render them now (no cache); reload the page if that fails. */
+        return fetchSections(targets.ids).then(function (data) {
+          if (apply(data)) window.location.reload();
         }).catch(function () {
           window.location.reload();
         });
@@ -922,21 +1221,28 @@
             fill: q('[data-sc-fg-fill]'),
             icon: q('[data-sc-fg-icon]'),
             notice: q('[data-sc-fg-notice]'),
-            gift: q('[data-sc-fg-gift]'),
-            add: q('[data-sc-fg-add]'),
-            added: q('[data-sc-fg-added]'),
-            locked: q('[data-sc-fg-locked]'),
-            free: q('[data-sc-fg-free]'),
-            strike: q('[data-sc-fg-strike]'),
-            linePrice: q('[data-sc-fg-line-price]'),
-            live: q('[data-sc-fg-live]')
+            live: q('[data-sc-fg-live]'),
+            /* One row per gift product (tier 1 choices + tier 2 choices). */
+            rows: Array.prototype.slice.call(this.querySelectorAll('[data-sc-fg-gift]')),
+            tier2Box: q('[data-sc-fg-tier-box="2"]'),
+            gifts: q('[data-sc-fg-gifts]'),
+            markers: Array.prototype.slice.call(this.querySelectorAll('[data-sc-fg-marker]'))
           };
+          /* Older config (single gift) → one tier with one product. */
+          if (!this.cfg.tiers || !this.cfg.tiers.length) {
+            this.cfg.tiers = [{
+              key: '1',
+              threshold: this.cfg.threshold,
+              autoAdd: this.cfg.autoAdd,
+              products: this.cfg.giftVariantId ? [{ productId: this.cfg.giftProductId, variantId: this.cfg.giftVariantId, title: this.cfg.giftTitle, available: this.cfg.giftAvailable }] : []
+            }];
+          }
+          if (!this.cfg.milestones || !this.cfg.milestones.length) this.cfg.milestones = [{ key: 't1', threshold: this.cfg.threshold }];
 
           var shop = window.Shopify || {};
           this.designMode = !!shop.designMode;
           this.rate = parseFloat(shop.currency && shop.currency.rate) || 1;
           this.locale = shop.locale || document.documentElement.lang || 'en';
-          this.declinedKey = 'sc-fg-declined:' + this.cfg.giftVariantId;
           this.lastKey = 'sc-fg-last:' + this.cfg.giftVariantId;
           this.pending = false;
 
@@ -950,12 +1256,16 @@
           this.onCartChanged = this.scheduleRefresh.bind(this);
           this.onUpdated = this.handleUpdated.bind(this);
           this.onPageShow = function (e) { if (e.persisted) this.scheduleRefresh(); }.bind(this);
-          this.onAddClick = this.handleManualAdd.bind(this);
+          this.onAddClick = function (e) {
+            var btn = e.target.closest && e.target.closest('[data-sc-fg-add]');
+            var row = btn && btn.closest('[data-sc-fg-gift]');
+            if (row && this.contains(row)) this.handleManualAdd(row);
+          }.bind(this);
           document.addEventListener('sc:cart:changed', this.onCartChanged);
           document.addEventListener('sc:cart:refresh', this.onCartChanged);
           document.addEventListener('sc:free-gift:updated', this.onUpdated);
           window.addEventListener('pageshow', this.onPageShow);
-          if (this.els.add) this.els.add.addEventListener('click', this.onAddClick);
+          this.addEventListener('click', this.onAddClick);
 
           /* A notice from the instance this one replaced (Dawn re-render). */
           if (G.notice && Date.now() - G.notice.at < 6000) this.showNotice(G.notice.kind, true);
@@ -971,18 +1281,33 @@
           document.removeEventListener('sc:cart:refresh', this.onCartChanged);
           document.removeEventListener('sc:free-gift:updated', this.onUpdated);
           window.removeEventListener('pageshow', this.onPageShow);
-          if (this.els.add) this.els.add.removeEventListener('click', this.onAddClick);
+          this.removeEventListener('click', this.onAddClick);
           clearTimeout(this.timer);
           clearTimeout(this.noticeTimer);
           clearTimeout(this.celebrateTimer);
         }
 
         renderCustomIcon() {
-          if (!this.cfg.customSvg || !this.els.icon) return;
-          var svg = sanitizeSvg(this.cfg.customSvg);
-          if (!svg) return;
-          this.els.icon.textContent = '';
-          this.els.icon.appendChild(svg);
+          var self = this;
+          function swap(el, source) {
+            if (!el || !source) return;
+            var svg = sanitizeSvg(source);
+            if (!svg) return;
+            el.textContent = '';
+            el.appendChild(svg);
+          }
+          swap(this.els.icon, this.cfg.customSvg);
+          swap(this.querySelector('[data-sc-fg-marker="ship"]'), this.cfg.shipSvg);
+          swap(this.querySelector('[data-sc-fg-marker="t2"]'), this.cfg.t2Svg);
+          void self;
+        }
+
+        declinedKeyFor(tier) {
+          return tier === '2' ? 'sc-fg-declined:t2' : 'sc-fg-declined:' + this.cfg.giftVariantId;
+        }
+
+        setAddsDisabled(disabled) {
+          this.querySelectorAll('[data-sc-fg-add]').forEach(function (b) { b.disabled = disabled; });
         }
 
         /* ---- money ---- */
@@ -1010,55 +1335,103 @@
           }
         }
 
-        /* Minimum in the cart's (presentment) currency. */
-        thresholdFor(cart) {
-          var t = this.cfg.threshold || 0;
+        /* Amount in the cart's (presentment) currency. */
+        convert(t, cart) {
+          t = t || 0;
           var converted = cart && cart.currency && cart.currency !== this.cfg.shopCurrency;
           if (!converted || this.rate === 1) return t;
           var value = t * this.rate;
           return this.cfg.roundConverted ? Math.ceil(value / 100) * 100 : Math.round(value);
         }
 
+        /* Minimum of the first gift tier in the cart's currency. */
+        thresholdFor(cart) {
+          return this.convert(this.cfg.threshold, cart);
+        }
+
         /* ---- state ---- */
-        isGiftLine(line) {
-          if (line.properties && line.properties._sc_free_gift) return true;
-          return this.cfg.pricingMode === 'zero_price' && !!this.cfg.giftProductId && line.product_id === this.cfg.giftProductId;
+        /* Which gift tier a cart line belongs to: '1', '2' or null (normal product). */
+        tierOf(line) {
+          var prop = line.properties && line.properties._sc_free_gift;
+          if (prop) return String(prop) === '2' ? '2' : '1';
+          if (this.cfg.pricingMode !== 'zero_price') return null;
+          var tiers = this.cfg.tiers || [];
+          for (var i = 0; i < tiers.length; i++) {
+            var hit = tiers[i].products.some(function (p) { return p.productId === line.product_id; });
+            if (hit) return tiers[i].key;
+          }
+          return null;
         }
 
         compute(cart) {
           var cfg = this.cfg;
+          var self = this;
           var items = cart.items || [];
-          var giftLines = [];
-          var otherQty = 0, giftValue = 0, giftQty = 0, giftLinePrice = 0;
-          for (var i = 0; i < items.length; i++) {
-            var line = items[i];
-            if (this.isGiftLine(line)) {
-              giftLines.push(line);
-              giftQty += line.quantity;
-              giftLinePrice += line.final_line_price || 0;
-              giftValue += cfg.basis === 'original' ? (line.original_line_price || 0) : (line.final_line_price || 0);
-            } else {
-              otherQty += line.quantity;
-            }
-          }
+          var tiers = {};
+          (cfg.tiers || []).forEach(function (t) {
+            tiers[t.key] = { key: t.key, cfg: t, lines: [], qty: 0, linePrice: 0 };
+          });
+          var otherQty = 0, giftValue = 0;
+          items.forEach(function (line) {
+            var key = self.tierOf(line);
+            if (!key) { otherQty += line.quantity; return; }
+            giftValue += cfg.basis === 'original' ? (line.original_line_price || 0) : (line.final_line_price || 0);
+            var tier = tiers[key];
+            if (!tier) return;
+            tier.lines.push(line);
+            tier.qty += line.quantity;
+            tier.linePrice += line.final_line_price || 0;
+          });
+
           var base;
           if (cfg.basis === 'original') base = cart.original_total_price;
           else if (cfg.basis === 'total') base = cart.total_price;
           else base = cart.items_subtotal_price;
           var eligible = Math.max(0, (base || 0) - giftValue);
-          var threshold = this.thresholdFor(cart);
+
+          Object.keys(tiers).forEach(function (k) {
+            var t = tiers[k];
+            t.threshold = self.convert(t.cfg.threshold, cart);
+            t.unlocked = t.threshold > 0 && eligible > 0 && eligible >= t.threshold;
+            t.inCart = t.lines.length > 0;
+            t.available = t.cfg.products.some(function (p) { return p.available; });
+          });
+
+          var milestones = (cfg.milestones || []).map(function (m) {
+            var th = self.convert(m.threshold, cart);
+            return { key: m.key, threshold: th, reached: th > 0 && eligible > 0 && eligible >= th };
+          });
+          var max = milestones.reduce(function (a, m) { return Math.max(a, m.threshold); }, 0);
+          var next = milestones.filter(function (m) { return !m.reached; })
+            .sort(function (a, b) { return a.threshold - b.threshold; })[0] || null;
+
+          var t1 = tiers['1'] || { lines: [], qty: 0, linePrice: 0, threshold: 0, unlocked: false, inCart: false };
           return {
             eligible: eligible,
-            threshold: threshold,
-            remaining: Math.max(0, threshold - eligible),
-            pct: threshold > 0 ? Math.min(100, (eligible / threshold) * 100) : 0,
-            unlocked: threshold > 0 && eligible > 0 && eligible >= threshold,
-            giftLines: giftLines,
-            giftQty: giftQty,
-            giftLinePrice: giftLinePrice,
-            inCart: giftLines.length > 0,
+            /* [threshold] / [amount] always refer to the next milestone. */
+            threshold: next ? next.threshold : max,
+            remaining: next ? Math.max(0, next.threshold - eligible) : 0,
+            pct: max > 0 ? Math.min(100, (eligible / max) * 100) : 0,
+            max: max,
+            next: next,
+            milestones: milestones,
+            allReached: !next && max > 0 && eligible > 0,
+            tiers: tiers,
+            /* Tier 1 (the original single-gift fields). */
+            unlocked: t1.unlocked,
+            inCart: t1.inCart,
+            giftLines: t1.lines,
+            giftQty: t1.qty,
+            giftLinePrice: t1.linePrice,
             otherQty: otherQty
           };
+        }
+
+        snapshot(s) {
+          var tiers = {};
+          Object.keys(s.tiers).forEach(function (k) { tiers[k] = { inCart: s.tiers[k].inCart, unlocked: s.tiers[k].unlocked }; });
+          var reached = s.milestones.filter(function (m) { return m.reached; }).map(function (m) { return m.key; }).join(',');
+          return { inCart: s.inCart, unlocked: s.unlocked, tiers: tiers, reached: reached };
         }
 
         process(cart, ctx) {
@@ -1067,48 +1440,87 @@
           this.currency = cart.currency || this.cfg.shopCurrency;
           var s = this.compute(cart);
           var prev = this.prev;
+          var self = this;
 
-          /* The customer removed the gift themselves while still eligible. */
-          if (prev && prev.inCart && !s.inCart && s.unlocked && !ctx.internal) {
-            sessionSet(this.declinedKey, '1');
+          /* The customer removed a gift themselves while still eligible. */
+          if (prev && !ctx.internal) {
+            Object.keys(s.tiers).forEach(function (k) {
+              var before = prev.tiers ? prev.tiers[k] : (k === '1' ? prev : null);
+              var now = s.tiers[k];
+              if (before && before.inCart && !now.inCart && now.unlocked) sessionSet(self.declinedKeyFor(k), '1');
+            });
           }
 
           this.render(s, prev);
-          this.prev = { inCart: s.inCart, unlocked: s.unlocked };
+          this.prev = this.snapshot(s);
           sessionSet(this.lastKey, JSON.stringify(this.prev));
           this.classList.remove('is-pending');
 
           if (!ctx.noActions && this.decide(s)) this.run(false);
         }
 
+        firstAvailable(tier) {
+          var list = (tier.cfg && tier.cfg.products) || [];
+          for (var i = 0; i < list.length; i++) if (list[i].available) return list[i];
+          return null;
+        }
+
         decide(s) {
           var cfg = this.cfg;
-          if (this.designMode || !cfg.giftVariantId) return null;
+          var self = this;
+          if (this.designMode) return null;
+          var keys = Object.keys(s.tiers).sort();
 
-          if (!s.unlocked && s.inCart && cfg.removeIneligible) {
+          /* 1. Remove gifts of tiers the cart no longer qualifies for. */
+          if (cfg.removeIneligible) {
             var removeUpdates = {};
-            s.giftLines.forEach(function (l) { removeUpdates[l.key] = 0; });
-            return { type: 'update', updates: removeUpdates, notice: 'removed' };
+            var removing = false;
+            keys.forEach(function (k) {
+              var t = s.tiers[k];
+              if (!t.unlocked && t.inCart) {
+                t.lines.forEach(function (l) { removeUpdates[l.key] = 0; });
+                removing = true;
+              }
+            });
+            if (removing) return { type: 'update', updates: removeUpdates, notice: 'removed' };
           }
-          if (s.unlocked && s.giftQty > 1) {
-            var dedupe = {};
-            s.giftLines.forEach(function (l, i) { dedupe[l.key] = i === 0 ? 1 : 0; });
-            return { type: 'update', updates: dedupe };
-          }
-          if (
-            s.unlocked && !s.inCart && cfg.autoAdd && cfg.giftAvailable && !G.addFailed &&
-            !(cfg.readdMode === 'respect' && sessionGet(this.declinedKey))
-          ) {
-            return { type: 'add', notice: 'added' };
+
+          /* 2. One gift per tier, quantity 1. */
+          var dedupe = {};
+          var deduping = false;
+          keys.forEach(function (k) {
+            var t = s.tiers[k];
+            if (t.unlocked && t.qty > 1) {
+              t.lines.forEach(function (l, i) { dedupe[l.key] = i === 0 ? 1 : 0; });
+              deduping = true;
+            }
+          });
+          if (deduping) return { type: 'update', updates: dedupe };
+
+          /* 3. Auto add, tier by tier (tier 2 only once a tier-1 gift is in the cart). */
+          for (var i = 0; i < keys.length; i++) {
+            var k = keys[i];
+            var t = s.tiers[k];
+            if (k === '2' && s.tiers['1'] && !s.tiers['1'].inCart) continue;
+            var product = self.firstAvailable(t);
+            if (
+              t.unlocked && !t.inCart && t.cfg.autoAdd && product && !G.addFailed[k] &&
+              !(cfg.readdMode === 'respect' && sessionGet(self.declinedKeyFor(k)))
+            ) {
+              return { type: 'add', tier: k, variantId: product.variantId, notice: 'added' };
+            }
           }
           return null;
         }
 
-        handleManualAdd() {
-          if (G.busy || !this.prev || !this.prev.unlocked || this.prev.inCart) return;
-          sessionDel(this.declinedKey);
-          G.addFailed = false;
-          this.run(true);
+        handleManualAdd(row) {
+          var tier = row.getAttribute('data-tier') || '1';
+          var variantId = Number(row.getAttribute('data-variant-id'));
+          var t = this.state && this.state.tiers[tier];
+          if (G.busy || !t || !t.unlocked || t.inCart || !variantId) return;
+          sessionDel(this.declinedKeyFor(tier));
+          G.addFailed[tier] = false;
+          this.run(true, { tier: tier, variantId: variantId });
         }
 
         scheduleRefresh() {
@@ -1131,8 +1543,8 @@
         }
 
         /* Every action re-reads the cart first and decides again, under one
-           global lock, so two instances can never add the gift twice. */
-        run(manual) {
+           global lock, so two instances can never add a gift twice. */
+        run(manual, target) {
           if (G.busy) { this.pending = true; return; }
           if (!manual && G.actions.length >= 3) {
             if (window.console) console.warn('[SC free gift] Stopped: too many automatic cart changes in a short time.');
@@ -1142,25 +1554,33 @@
           var self = this;
           var cfg = this.cfg;
           var action = null;
+          var sections = null;
           G.busy = true;
           this.setAttribute('aria-busy', 'true');
-          if (this.els.add) this.els.add.disabled = true;
+          this.setAddsDisabled(true);
 
           request('cart.js').then(function (cart) {
             var s = self.compute(cart);
             if (manual) {
-              action = s.unlocked && !s.inCart ? { type: 'add', notice: 'added' } : null;
+              var t = target && s.tiers[target.tier];
+              action = t && t.unlocked && !t.inCart ? { type: 'add', tier: target.tier, variantId: target.variantId, notice: 'added' } : null;
             } else {
               action = self.decide(s);
             }
             if (!action) return cart;
             if (!manual) G.actions.push(Date.now());
             if (action.type === 'add') {
-              return request('cart/add.js', {
-                items: [{ id: cfg.giftVariantId, quantity: 1, properties: { _sc_free_gift: 'true' } }]
-              }).then(function () { return request('cart.js'); });
+              return request('cart/add.js', Object.assign({
+                items: [{ id: action.variantId, quantity: 1, properties: { _sc_free_gift: action.tier === '2' ? '2' : 'true' } }]
+              }, sectionParams())).then(function (res) {
+                sections = res && res.sections;
+                return request('cart.js');
+              });
             }
-            return request('cart/update.js', { updates: action.updates });
+            return request('cart/update.js', Object.assign({ updates: action.updates }, sectionParams())).then(function (cart) {
+              sections = cart && cart.sections;
+              return cart;
+            });
           }).then(function (cart) {
             G.busy = false;
             if (!action) {
@@ -1170,34 +1590,35 @@
             if (action.notice) G.notice = { kind: action.notice, at: Date.now() };
             if (self.__ready && action.notice) self.showNotice(action.notice);
             if (action.type === 'add') {
-              var s = self.compute(cart);
-              if (s.inCart && s.giftLinePrice > 0 && window.console) {
-                console.warn('[SC free gift] The gift line is not free in the cart (' + self.formatMoney(s.giftLinePrice) + '). Check the gift product price or the automatic discount.');
+              var added = self.compute(cart).tiers[action.tier];
+              if (added && added.inCart && added.linePrice > 0 && window.console) {
+                console.warn('[SC free gift] The gift line is not free in the cart (' + self.formatMoney(added.linePrice) + '). Check the gift product price or the automatic discount.');
               }
             }
             /* Also tells every other instance (handleUpdated). */
-            return refreshThemeCart(cart, cfg.refresh);
+            return refreshThemeCart(cart, cfg.refresh, sections);
           }).catch(function (err) {
             G.busy = false;
-            if (action && action.type === 'add') G.addFailed = true;
+            if (action && action.type === 'add') G.addFailed[action.tier] = true;
             if (self.__ready) self.showNotice('error');
             if (window.console) console.warn('[SC free gift]', err && err.message);
           }).then(function () {
             if (!self.__ready) return;
             self.removeAttribute('aria-busy');
-            if (self.els.add) self.els.add.disabled = false;
+            self.setAddsDisabled(false);
             if (self.pending) { self.pending = false; self.scheduleRefresh(); }
           });
         }
 
         /* ---- UI ---- */
-        buildMessage(template, s) {
+        buildMessage(template, s, giftTitle) {
           var frag = document.createDocumentFragment();
           var self = this;
+          var title = giftTitle != null ? giftTitle : (self.cfg.giftTitle || '');
           String(template || '').split(/(\[amount\]|\[threshold\]|\[gift\])/).forEach(function (part) {
             if (!part) return;
             if (part === '[gift]') {
-              frag.appendChild(document.createTextNode(self.cfg.giftTitle || ''));
+              frag.appendChild(document.createTextNode(title));
             } else if (part === '[amount]' || part === '[threshold]') {
               var strong = document.createElement('strong');
               strong.className = 'sc-fg__amount';
@@ -1210,50 +1631,101 @@
           return frag;
         }
 
+        /* Message for the next milestone, or the final one when everything is reached. */
+        messageFor(s) {
+          var msgs = this.cfg.messages;
+          var t1 = s.tiers['1'];
+          var t2 = s.tiers['2'];
+          var t2Title = t2 && t2.cfg.products[0] ? t2.cfg.products[0].title : '';
+          if (s.next) {
+            if (s.next.key === 'ship') return { template: msgs.shipLocked };
+            if (s.next.key === 't2') return { template: msgs.t2Locked, gift: t2Title };
+            return { template: msgs.locked };
+          }
+          var ship = s.milestones.filter(function (m) { return m.key === 'ship'; })[0];
+          if (t2 && t2.threshold === s.max) return { template: msgs.t2Unlocked, gift: t2Title };
+          if (ship && ship.threshold === s.max && t1 && ship.threshold > t1.threshold) return { template: msgs.shipUnlocked };
+          return { template: t1 && t1.available ? msgs.unlocked : msgs.soldOut };
+        }
+
         render(s, prev) {
           var cfg = this.cfg;
           var els = this.els;
-          var msgs = cfg.messages;
+          var self = this;
           this.state = s;
 
-          this.hidden = !!(cfg.hideEmpty && s.otherQty === 0);
-          this.classList.toggle('is-unlocked', s.unlocked);
+          this.hidden = !!((cfg.hideEmpty || cfg.inBar) && s.otherQty === 0);
+          this.classList.toggle('is-unlocked', s.allReached);
 
-          var template = s.unlocked ? (cfg.giftAvailable ? msgs.unlocked : msgs.soldOut) : msgs.locked;
+          var msg = this.messageFor(s);
           if (els.message) {
             els.message.textContent = '';
-            els.message.appendChild(this.buildMessage(template, s));
+            els.message.appendChild(this.buildMessage(msg.template, s, msg.gift));
           }
           if (els.fill) els.fill.style.width = s.pct.toFixed(2) + '%';
           if (els.track) {
             els.track.setAttribute('aria-valuenow', String(Math.floor(s.pct)));
-            els.track.setAttribute('aria-valuetext', this.buildMessage(template, s).textContent);
+            els.track.setAttribute('aria-valuetext', this.buildMessage(msg.template, s, msg.gift).textContent);
           }
 
-          if (els.gift) {
-            els.gift.hidden = !s.unlocked && !cfg.showGiftLocked;
-            els.gift.classList.toggle('is-locked', !s.unlocked);
-          }
-          if (els.add) els.add.hidden = !(s.unlocked && !s.inCart && cfg.giftAvailable && cfg.giftVariantId);
-          if (els.added) els.added.hidden = !(s.unlocked && s.inCart);
-          if (els.locked) els.locked.hidden = s.unlocked;
+          /* Milestone markers (multi-milestone bar only). */
+          els.markers.forEach(function (marker) {
+            var m = s.milestones.filter(function (x) { return x.key === marker.getAttribute('data-sc-fg-marker'); })[0];
+            if (!m) return;
+            marker.classList.toggle('is-reached', m.reached);
+            if (s.max > 0) marker.style.left = ((m.threshold / s.max) * 100).toFixed(3) + '%';
+          });
 
-          /* Never claim "Free" if the gift line in the cart actually costs money. */
-          var paid = s.inCart && s.giftLinePrice > 0;
-          if (els.free) els.free.hidden = paid;
-          if (els.strike) els.strike.hidden = paid;
-          if (els.linePrice) {
-            els.linePrice.hidden = !paid;
-            els.linePrice.textContent = paid ? this.formatMoney(s.giftLinePrice) : '';
-          }
+          /* Tier 2 is offered once a tier-1 gift is in the cart. */
+
+          els.rows.forEach(function (row) {
+            var t = s.tiers[row.getAttribute('data-tier')];
+            if (!t) { row.hidden = true; return; }
+            var productId = Number(row.getAttribute('data-product-id'));
+            var available = row.getAttribute('data-available') === 'true';
+            var line = t.lines.filter(function (l) { return l.product_id === productId; })[0];
+
+            /* Only offered while it can be added: hidden once this tier's gift is in the cart
+               (the cart list shows it) and when sold out; locked rows follow the setting. */
+            row.hidden = t.inCart || (!t.unlocked && !cfg.showGiftLocked) || (t.unlocked && !available);
+            row.classList.toggle('is-locked', !t.unlocked);
+
+            var add = row.querySelector('[data-sc-fg-add]');
+            var added = row.querySelector('[data-sc-fg-added]');
+            var locked = row.querySelector('[data-sc-fg-locked]');
+            if (add) add.hidden = !(t.unlocked && !t.inCart && available);
+            if (added) added.hidden = !(t.unlocked && line);
+            if (locked) locked.hidden = t.unlocked;
+
+            /* Never claim "Free" if the gift line in the cart actually costs money. */
+            var paid = !!(line && line.final_line_price > 0);
+            var free = row.querySelector('[data-sc-fg-free]');
+            var strike = row.querySelector('[data-sc-fg-strike]');
+            var linePrice = row.querySelector('[data-sc-fg-line-price]');
+            if (free) free.hidden = paid;
+            if (strike) strike.hidden = paid;
+            if (linePrice) {
+              linePrice.hidden = !paid;
+              linePrice.textContent = paid ? self.formatMoney(line.final_line_price) : '';
+            }
+          });
+
+          /* Hide the second-gift heading / the whole list when no row is left to show. */
+          var visible = function (box) {
+            return !!box && Array.prototype.some.call(box.querySelectorAll('[data-sc-fg-gift]'), function (r) { return !r.hidden; });
+          };
+          if (els.tier2Box) els.tier2Box.hidden = !(s.tiers['1'] && s.tiers['1'].inCart) || !visible(els.tier2Box);
+          if (els.gifts) els.gifts.hidden = !visible(els.gifts);
 
           if (s.unlocked && els.notice && els.notice.dataset.kind === 'removed') els.notice.hidden = true;
 
-          /* Announce state changes only (not every amount change). */
-          if (prev && s.unlocked !== prev.unlocked) {
-            if (s.unlocked) this.celebrate();
+          /* Announce milestone changes only (not every amount change). */
+          var reached = s.milestones.filter(function (m) { return m.reached; }).map(function (m) { return m.key; }).join(',');
+          var before = prev ? (prev.reached != null ? prev.reached : (prev.unlocked ? 't1' : '')) : null;
+          if (before !== null && reached !== before) {
+            if (reached.length > before.length) this.celebrate();
             if (els.live) {
-              var text = this.buildMessage(template, s).textContent;
+              var text = this.buildMessage(msg.template, s, msg.gift).textContent;
               var live = els.live;
               live.textContent = '';
               setTimeout(function () { live.textContent = text; }, 50);

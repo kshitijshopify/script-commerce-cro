@@ -23,6 +23,12 @@
   assign sc_ocd = settings.sc_ocd_enable
   assign sc_ocd_title = settings.sc_ocd_title | strip
   assign sc_ocd_cta_label = settings.sc_ocd_cta_label | strip
+  # SC – Free gift milestones live inside the free shipping bar when it is shown.
+  assign sc_fg_in_bar = false
+  # Always rendered (also with an empty cart) so its script runs on page load.
+  if sc_ocd and settings.sc_ocd_fsb_enable
+    assign sc_fg_in_bar = true
+  endif
 -%}
 {%- if sc_ocd -%}
   {{ 'sc-cart-drawer.css' | asset_url | stylesheet_tag }}
@@ -97,7 +103,9 @@
           </span>
         </button>
       </div>
-      {%- render 'sc-cart-free-gift', placement: 'drawer' -%}
+      {%- unless sc_fg_in_bar -%}
+        {%- render 'sc-cart-free-gift', placement: 'drawer' -%}
+      {%- endunless -%}
       <cart-drawer-items
         view-event-payload="{{ cart | standard_event_data: 'view', context: 'dialog' | escape }}"
         view-event-trigger="manual"
@@ -114,6 +122,9 @@
           {%- if sc_ocd_top != blank -%}
             <div class="sc-ocd-top">{{ sc_ocd_top }}</div>
           {%- endif -%}
+        {%- endif -%}
+        {%- if sc_fg_in_bar -%}
+          {%- render 'sc-cart-free-gift', placement: 'drawer', in_bar: true -%}
         {%- endif -%}
         <form
           action="{{ routes.cart_url }}"
@@ -156,7 +167,7 @@
                     {%- for item in cart.items -%}
                       <tr
                         id="CartDrawer-Item-{{ item.index | plus: 1 }}"
-                        class="cart-item{% if item.parent_relationship.parent != null %} cart-item__nested-line{% endif %}"
+                        class="cart-item{% if item.parent_relationship.parent != null %} cart-item__nested-line{% endif %}{% if item.properties['_sc_free_gift'] != blank %} sc-cart-item--gift{% endif %}"
                         role="row"
                         {% if item.parent_relationship.parent != null %}
                           aria-label="{{- 'products.product.nested_label' | t: title: item.product.title, parent_title: item.parent_relationship.parent.title | escape -}}"
@@ -331,6 +342,9 @@
                           <quantity-popover>
                             <div class="cart-item__quantity-wrapper quantity-popover-wrapper">
                               <div class="quantity-popover-container{% if has_qty_rules or has_vol_pricing %} quantity-popover-container--hover{% endif %}">
+                                {%- if item.properties['_sc_free_gift'] != blank -%}
+                                  <span class="sc-cart-gift-qty">{{ 'products.product.quantity.label' | t }}: 1</span>
+                                {%- endif -%}
                                 <quantity-input class="quantity cart-quantity">
                                   <button
                                     class="quantity__button"

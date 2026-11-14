@@ -2137,6 +2137,13 @@
       },
       {
         "type": "checkbox",
+        "id": "sc_fg_display",
+        "label": "Display section",
+        "default": true,
+        "info": "Uncheck to hide the bar but keep its markup (gifts are still handled). For an A/B test variant, show it with: .sc-fg--off { display: block !important; }"
+      },
+      {
+        "type": "checkbox",
         "id": "sc_fg_show_cart",
         "label": "Show on cart page",
         "default": true
@@ -2202,6 +2209,13 @@
         "type": "product",
         "id": "sc_fg_gift_product",
         "label": "Gift product"
+      },
+      {
+        "type": "product_list",
+        "id": "sc_fg_gift_products",
+        "label": "More gift choices (optional)",
+        "limit": 6,
+        "info": "The customer can pick one gift. Auto add uses the first available gift product."
       },
       {
         "type": "select",
@@ -2272,6 +2286,100 @@
           }
         ],
         "default": "sections"
+      },
+      {
+        "type": "header",
+        "content": "Free shipping milestone"
+      },
+      {
+        "type": "paragraph",
+        "content": "Adds a free shipping marker to the same bar. Make sure your shipping rates give free shipping from this amount."
+      },
+      {
+        "type": "checkbox",
+        "id": "sc_fg_ship_enable",
+        "label": "Show free shipping milestone",
+        "default": false
+      },
+      {
+        "type": "number",
+        "id": "sc_fg_ship_threshold",
+        "label": "Free shipping minimum amount",
+        "default": 50
+      },
+      {
+        "type": "text",
+        "id": "sc_fg_ship_message",
+        "label": "Message before free shipping",
+        "default": "Only [amount] left until free shipping!"
+      },
+      {
+        "type": "text",
+        "id": "sc_fg_ship_unlocked_message",
+        "label": "Message when free shipping is the last milestone reached",
+        "default": "You've unlocked free shipping!"
+      },
+      {
+        "type": "html",
+        "id": "sc_fg_ship_svg",
+        "label": "Free shipping icon (SVG code)",
+        "info": "Optional. Leave empty for the truck icon."
+      },
+      {
+        "type": "header",
+        "content": "Second free gift"
+      },
+      {
+        "type": "paragraph",
+        "content": "Offered once a first gift is in the cart. Uses the same gift pricing as the first gift: products priced 0.00, or an automatic discount you create in Shopify for this minimum."
+      },
+      {
+        "type": "checkbox",
+        "id": "sc_fg_t2_enable",
+        "label": "Enable second free gift",
+        "default": false
+      },
+      {
+        "type": "number",
+        "id": "sc_fg_t2_threshold",
+        "label": "Second free gift minimum amount",
+        "default": 150
+      },
+      {
+        "type": "product_list",
+        "id": "sc_fg_t2_products",
+        "label": "Second gift products",
+        "limit": 6
+      },
+      {
+        "type": "checkbox",
+        "id": "sc_fg_t2_auto_add",
+        "label": "Auto add second gift",
+        "default": false
+      },
+      {
+        "type": "text",
+        "id": "sc_fg_t2_headline",
+        "label": "Second gift headline",
+        "default": "Choose your second free gift"
+      },
+      {
+        "type": "text",
+        "id": "sc_fg_t2_locked_message",
+        "label": "Message before the second gift",
+        "default": "Add [amount] more to unlock a second free gift!"
+      },
+      {
+        "type": "text",
+        "id": "sc_fg_t2_unlocked_message",
+        "label": "Message when the second gift is unlocked",
+        "default": "Congratulations! You've unlocked a second free gift!"
+      },
+      {
+        "type": "html",
+        "id": "sc_fg_t2_svg",
+        "label": "Second gift icon (SVG code)",
+        "info": "Optional. Leave empty for the gift icon."
       },
       {
         "type": "header",
