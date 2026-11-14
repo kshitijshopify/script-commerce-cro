@@ -1,0 +1,175 @@
+{%- comment -%}
+  SC – Cart upsell ("Perfect match" recommendations below the cart items)
+  ----------------------------------------------------------------------------
+  Self-contained: Liquid + assets/sc-cart-upsell.css + assets/sc-cart-upsell.js.
+  Settings: Theme settings > "SC – Cart upsell" (settings.sc_cu_*).
+
+  Products: product metafield custom.cart_upsell (list of products) of every cart item,
+  de-duplicated, without products already in the cart or sold out. When that yields
+  nothing, settings.sc_cu_products is used. Max settings.sc_cu_max products.
+
+  Single-variant products are added in one click; products with variants open a
+  bottom sheet with option buttons / colour swatches. After adding, the cart drawer
+  and cart page sections are re-rendered (Section Rendering API).
+
+  Usage (inside the cart markup that the theme re-renders on cart changes):
+    {% render 'sc-cart-upsell', placement: 'drawer' %}
+    {% render 'sc-cart-upsell', placement: 'page' %}
+
+  Load assets once outside re-rendered markup (see snippets/cart-drawer.liquid):
+    {% render 'sc-cart-upsell', assets_only: true %}
+
+  Fires `sc:cart-upsell:added` on document: detail { variantId, cart }.
+{%- endcomment -%}
+
+{%- if assets_only -%}
+  {%- if settings.sc_cu_show_drawer or settings.sc_cu_show_page -%}
+    {{ 'sc-cart-upsell.css' | asset_url | stylesheet_tag }}
+    <script src="{{ 'sc-cart-upsell.js' | asset_url }}" defer="defer"></script>
+  {%- endif -%}
+{%- else -%}
+  {%- liquid
+    assign placement = placement | default: 'drawer'
+    assign sc_place_on = false
+    if placement == 'page'
+      if settings.sc_cu_show_page
+        assign sc_place_on = true
+      endif
+    elsif settings.sc_cu_show_drawer
+      assign sc_place_on = true
+    endif
+    if cart.item_count == 0
+      assign sc_place_on = false
+    endif
+  -%}
+
+  {%- if sc_place_on -%}
+    {%- liquid
+      assign max = settings.sc_cu_max | default: 5
+      assign in_cart = ','
+      for item in cart.items
+        assign in_cart = in_cart | append: item.product_id | append: ','
+      endfor
+
+      assign picked = ','
+      assign count = 0
+
+      comment
+        1) Per-product recommendations from the cart items' metafield.
+      endcomment
+      capture cards
+        for item in cart.items
+          if count >= max
+            break
+          endif
+          for p in item.product.metafields.custom.cart_upsell.value
+            if count >= max
+              break
+            endif
+            assign needle = ',' | append: p.id | append: ','
+            if p.available == false or in_cart contains needle or picked contains needle
+              continue
+            endif
+            assign picked = picked | append: p.id | append: ','
+            assign count = count | plus: 1
+            render 'sc-cart-upsell-card', product: p
+          endfor
+        endfor
+      endcapture
+
+      comment
+        2) Fallback list from theme settings.
+      endcomment
+      if count == 0
+        capture cards
+          for p in settings.sc_cu_products
+            if count >= max
+              break
+            endif
+            assign needle = ',' | append: p.id | append: ','
+            if p.available == false or in_cart contains needle or picked contains needle
+              continue
+            endif
+            assign picked = picked | append: p.id | append: ','
+            assign count = count | plus: 1
+            render 'sc-cart-upsell-card', product: p
+          endfor
+        endcapture
+      endif
+
+      assign bg = settings.sc_cu_bg_color
+      if bg == blank or bg.alpha == 0
+        assign bg = 'transparent'
+      endif
+      assign headline = settings.sc_cu_headline | strip
+      assign subheadline = settings.sc_cu_subheadline | strip
+      assign layout = settings.sc_cu_layout | default: 'slider'
+      if count < 2
+        assign layout = 'vertical'
+      endif
+    -%}
+
+    {%- if count > 0 -%}
+      {%- if placement == 'page' -%}
+        {{ 'sc-cart-upsell.css' | asset_url | stylesheet_tag }}
+        <script src="{{ 'sc-cart-upsell.js' | asset_url }}" defer="defer"></script>
+      {%- endif -%}
+
+      <sc-cart-upsell
+        class="sc-cu sc-cu--{{ placement }} sc-cu--{{ layout }}{% unless settings.sc_cu_enable %} sc-cu--off{% endunless %}"
+        data-cart-url="{{ routes.cart_url }}"
+        data-root="{{ routes.root_url }}"
+        style="
+          --sc-cu-text: {{ settings.sc_cu_text_color }};
+          --sc-cu-bg: {{ bg }};
+          --sc-cu-card: {{ settings.sc_cu_card_bg }};
+          --sc-cu-btn: {{ settings.sc_cu_button_bg }};
+          --sc-cu-btn-text: {{ settings.sc_cu_button_text }};
+          --sc-cu-star: {{ settings.sc_cu_star_color }};
+          --sc-cu-save: {{ settings.sc_cu_savings_color }};
+        "
+      >
+        {%- if headline != blank or subheadline != blank or layout == 'slider' -%}
+          <div class="sc-cu__header">
+            <div class="sc-cu__titles">
+              {%- if headline != blank -%}
+                <p class="sc-cu__headline">{{ headline | escape }}</p>
+              {%- endif -%}
+              {%- if subheadline != blank -%}
+                <p class="sc-cu__subheadline">{{ subheadline | escape }}</p>
+              {%- endif -%}
+            </div>
+            {%- if layout == 'slider' -%}
+              <div class="sc-cu__arrows">
+                <button type="button" class="sc-cu__arrow" data-sc-cu-prev aria-label="{{ 'general.slider.previous_slide' | t | escape }}" disabled>
+                  <svg viewBox="0 0 8 12" width="8" height="12" aria-hidden="true" focusable="false"><path d="M6.5 1L1.5 6l5 5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+                <button type="button" class="sc-cu__arrow" data-sc-cu-next aria-label="{{ 'general.slider.next_slide' | t | escape }}">
+                  <svg viewBox="0 0 8 12" width="8" height="12" aria-hidden="true" focusable="false"><path d="M1.5 1l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+              </div>
+            {%- endif -%}
+          </div>
+        {%- endif -%}
+
+        <ul class="sc-cu__list" role="list" data-sc-cu-list>
+          {{- cards -}}
+        </ul>
+
+        <p class="sc-cu__error" data-sc-cu-error role="alert" hidden></p>
+
+        <script type="application/json" data-sc-cu-config>
+          {
+            "moneyFormat": {{ shop.money_format | json }},
+            "labels": {
+              "add": {{ settings.sc_cu_popup_label | json }},
+              "soldOut": {{ settings.sc_cu_soldout_label | json }},
+              "close": {{ 'accessibility.close' | t | json }},
+              "error": {{ 'sections.cart.cart_error' | t | json }}
+            }
+          }
+        </script>
+      </sc-cart-upsell>
+    {%- endif -%}
+  {%- endif -%}
+{%- endif -%}

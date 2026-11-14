@@ -126,6 +126,13 @@
     "show_cart_note": false,
     "cart_drawer_collection": "",
     "cart_color_scheme": "scheme-1",
+    "sc_cu_products": [
+      "selling-plans-ski-wax",
+      "the-collection-snowboard-hydrogen",
+      "the-collection-snowboard-liquid",
+      "the-collection-snowboard-oxygen",
+      "the-multi-location-snowboard"
+    ],
     "customer_account_menu": "customer-account-main-menu",
     "sc_fg_enable": false,
     "sc_fg_gift_product": "free-gift",

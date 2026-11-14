@@ -1818,6 +1818,176 @@
     ]
   },
   {
+    "name": "SC – Cart upsell",
+    "settings": [
+      {
+        "type": "paragraph",
+        "content": "Product recommendations below the cart items. Products come from the product metafield custom.cart_upsell (list of products) of each cart item; if none apply, the fallback list below is used. Products already in the cart and sold-out products are skipped."
+      },
+      {
+        "type": "checkbox",
+        "id": "sc_cu_enable",
+        "label": "Show cart upsell",
+        "default": true,
+        "info": "When off, the markup is still output but hidden. For an A/B test variant, show it with: .sc-cu { display: block !important; }"
+      },
+      {
+        "type": "checkbox",
+        "id": "sc_cu_show_drawer",
+        "label": "Show in cart drawer",
+        "default": true
+      },
+      {
+        "type": "checkbox",
+        "id": "sc_cu_show_page",
+        "label": "Show on cart page",
+        "default": true
+      },
+      {
+        "type": "select",
+        "id": "sc_cu_layout",
+        "label": "Display",
+        "options": [
+          {
+            "value": "slider",
+            "label": "Horizontally (slider)"
+          },
+          {
+            "value": "vertical",
+            "label": "Vertically"
+          }
+        ],
+        "default": "slider"
+      },
+      {
+        "type": "text",
+        "id": "sc_cu_headline",
+        "label": "Headline",
+        "default": "Perfect match"
+      },
+      {
+        "type": "text",
+        "id": "sc_cu_subheadline",
+        "label": "Sub-headline",
+        "default": "8 out of 10 customers also buy"
+      },
+      {
+        "type": "product_list",
+        "id": "sc_cu_products",
+        "label": "Fallback products",
+        "limit": 5
+      },
+      {
+        "type": "range",
+        "id": "sc_cu_max",
+        "label": "Maximum products shown",
+        "min": 1,
+        "max": 10,
+        "step": 1,
+        "default": 5
+      },
+      {
+        "type": "header",
+        "content": "Product details"
+      },
+      {
+        "type": "checkbox",
+        "id": "sc_cu_show_teaser",
+        "label": "Show teaser text",
+        "default": false,
+        "info": "Uses the product metafield custom.teaser, otherwise the start of the description."
+      },
+      {
+        "type": "checkbox",
+        "id": "sc_cu_show_price",
+        "label": "Show price",
+        "default": true
+      },
+      {
+        "type": "checkbox",
+        "id": "sc_cu_show_rating",
+        "label": "Show reviews",
+        "default": false,
+        "info": "Uses the standard reviews.rating and reviews.rating_count metafields filled by most review apps."
+      },
+      {
+        "type": "header",
+        "content": "Labels"
+      },
+      {
+        "type": "text",
+        "id": "sc_cu_add_label",
+        "label": "Add button",
+        "default": "Add"
+      },
+      {
+        "type": "text",
+        "id": "sc_cu_popup_label",
+        "label": "Variant popup button",
+        "default": "Add to cart"
+      },
+      {
+        "type": "text",
+        "id": "sc_cu_soldout_label",
+        "label": "Sold out",
+        "default": "Sold out"
+      },
+      {
+        "type": "text",
+        "id": "sc_cu_savings_label",
+        "label": "Savings text",
+        "default": "You save [amount]",
+        "info": "[amount] is replaced with the saved amount."
+      },
+      {
+        "type": "header",
+        "content": "Colors"
+      },
+      {
+        "type": "color",
+        "id": "sc_cu_text_color",
+        "label": "Text",
+        "default": "#000000"
+      },
+      {
+        "type": "color",
+        "id": "sc_cu_bg_color",
+        "label": "Background",
+        "info": "Leave empty for transparent."
+      },
+      {
+        "type": "color",
+        "id": "sc_cu_card_bg",
+        "label": "Product card",
+        "default": "#F5F5F5"
+      },
+      {
+        "type": "color",
+        "id": "sc_cu_button_bg",
+        "label": "Button",
+        "default": "#000000"
+      },
+      {
+        "type": "color",
+        "id": "sc_cu_button_text",
+        "label": "Button text",
+        "default": "#FFFFFF"
+      },
+      {
+        "type": "color",
+        "id": "sc_cu_star_color",
+        "label": "Review stars",
+        "default": "#FFB400"
+      },
+      {
+        "type": "color",
+        "id": "sc_cu_savings_color",
+        "label": "Savings text",
+        "default": "#31AE2F"
+      }
+    ]
+  },
+  {
     "name": "t:settings_schema.customer_accounts.name",
     "settings": [
       {

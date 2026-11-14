@@ -1,0 +1,93 @@
+{%- comment -%}
+  SC – Cart upsell product card (used by snippets/sc-cart-upsell.liquid)
+
+  Accepts:
+  - product: {Object} product to recommend
+{%- endcomment -%}
+{%- liquid
+  assign variant = product.selected_or_first_available_variant
+  assign has_variants = true
+  if product.has_only_default_variant
+    assign has_variants = false
+  endif
+
+  comment
+    Subscription-only products can't be added without a selling plan – use the first one.
+  endcomment
+  assign selling_plan = ''
+  if product.requires_selling_plan
+    assign selling_plan = variant.selling_plan_allocations.first.selling_plan.id
+  endif
+-%}
+<li class="sc-cu__item">
+  <a class="sc-cu__media" href="{{ product.url }}" tabindex="-1" aria-hidden="true">
+    {%- if product.featured_image != blank -%}
+      {{- product.featured_image | image_url: width: 200 | image_tag: loading: 'lazy', alt: '', width: 80, height: 80 -}}
+    {%- endif -%}
+  </a>
+  <div class="sc-cu__info">
+    <a class="sc-cu__title" href="{{ product.url }}">{{ product.title | escape }}</a>
+
+    {%- if settings.sc_cu_show_teaser -%}
+      {%- liquid
+        assign teaser = product.metafields.custom.teaser.value | default: product.metafields.custom.teaser | strip
+        if teaser == blank
+          assign teaser = product.description | strip_html | truncatewords: 10
+        endif
+      -%}
+      {%- if teaser != blank -%}
+        <p class="sc-cu__teaser">{{ teaser | escape }}</p>
+      {%- endif -%}
+    {%- endif -%}
+
+    {%- if settings.sc_cu_show_rating and product.metafields.reviews.rating.value != blank -%}
+      {%- liquid
+        assign rating = product.metafields.reviews.rating.value
+        assign rating_max = rating.scale_max | default: 5
+        assign rating_pct = rating.rating | times: 100 | divided_by: rating_max
+      -%}
+      <p class="sc-cu__rating">
+        <span class="sc-cu__stars" style="--sc-cu-rating: {{ rating_pct }}%;" role="img" aria-label="{{ rating.rating | round: 1 }} / {{ rating_max }}">
+          <span aria-hidden="true">★★★★★</span>
+        </span>
+        {%- if product.metafields.reviews.rating_count.value != blank -%}
+          <span class="sc-cu__rating-count">({{ product.metafields.reviews.rating_count.value }})</span>
+        {%- endif -%}
+      </p>
+    {%- endif -%}
+
+    {%- if settings.sc_cu_show_price -%}
+      <p class="sc-cu__price">
+        {%- if variant.compare_at_price > variant.price -%}
+          <s class="sc-cu__compare">{{ variant.compare_at_price | money }}</s>
+          <span class="sc-cu__sale">{{ variant.price | money }}</span>
+          {%- assign saved = variant.compare_at_price | minus: variant.price | money -%}
+          {%- assign savings_label = settings.sc_cu_savings_label | escape | replace: '[amount]', saved -%}
+          {%- if savings_label != blank -%}
+            <span class="sc-cu__save">{{ savings_label }}</span>
+          {%- endif -%}
+        {%- else -%}
+          <span>{{ variant.price | money }}</span>
+        {%- endif -%}
+      </p>
+    {%- endif -%}
+
+    <button
+      type="button"
+      class="sc-cu__add"
+      data-sc-cu-add
+      data-variant-id="{{ variant.id }}"
+      data-handle="{{ product.handle }}"
+      {% if selling_plan != blank %}
+        data-selling-plan="{{ selling_plan }}"
+      {% endif %}
+      {% if has_variants %}
+        data-has-variants
+        aria-haspopup="dialog"
+      {% endif %}
+    >
+      {{- settings.sc_cu_add_label | default: 'Add' | escape -}}
+    </button>
+    <p class="sc-cu__item-error" data-sc-cu-item-error role="alert" hidden></p>
+  </div>
+</li>
