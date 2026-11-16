@@ -1,6 +1,6 @@
 # SC – Variant cards: setup guide
 
-This block replaces the normal size/variant buttons on the product page with cards. Each card shows the variant name, the price per kg (or per litre), a "Save 37%" badge and, if you choose, a "Bestseller" label.
+This block replaces the normal size/variant buttons on the product page with cards. Each card shows the variant name, the price per kg, a "Save 37%" badge and, if you choose, a "Bestseller" label.
 
 ---
 
@@ -25,28 +25,26 @@ Open **Online Store → Themes → … → Edit code**.
 3. Drag it to where the variant picker is, above **Buy buttons**.
 4. Keep the theme's own **Variant picker** block. The cards hide it and use it in the background, so the price, images and Add to cart button keep updating.
 
-## Step 3 – Unit prices (price per kg)
+## Step 3 – Price per kg
 
-Pick one of these:
+Fill in each variant's **Shipping weight** (e.g. 7.3 kg). That's all. You can show the price per 100 g, lb or oz instead in the **Weight-based price per** setting.
 
-- **Easiest:** fill in each variant's **Shipping weight** (e.g. 7.3 kg). The block shows the price per kg by default. You can change it to per 100 g, lb or oz in **Unit price → Show weight-based prices per**.
-- **Shopify unit price:** on the variant, tick **Show unit price** and fill in the quantity. The block uses these values first.
-- **Other units (litres, m², pieces):** create a **variant** metafield `custom.unit_quantity` (type *Volume*, *Weight* or *Decimal*) and fill it in on each variant. For *Decimal*, choose the unit in **Unit price → Unit of number metafields**.
+For other units (per litre, per m²), tick **Show unit price** on the variant in Shopify and fill in the quantity. The block uses Shopify's unit price first when it's set.
 
-If a variant has none of these, the card doesn't show a unit price or a savings badge. By default it shows the normal price instead.
+If a variant has neither, its card shows the normal price instead, with no savings badge.
 
 ## Step 4 – Savings badge
 
-The badge compares each card's unit price with a reference variant:
+This needs no setup. The badge compares each card's price per kg with the **first variant's**:
 
-> Savings % = (reference price per unit − this card's price per unit) ÷ reference price per unit × 100
+> Savings % = (first variant's price per kg − this card's price per kg) ÷ first variant's price per kg × 100
 
-The reference is the **first variant** by default (usually the smallest pack). You can change it to the **highest unit price**. Badges below **Minimum savings to show** are hidden. You can also base the badge on the **compare-at price**.
+To hide the badge, clear the **Badge text** setting.
 
-## Step 5 – "Bestseller" label
+## Step 5 – "Bestseller" label (the only metafield needed)
 
 1. Go to **Settings → Custom data → Variants → Add definition**.
 2. Name: `Popular variant`. Namespace and key: `custom.popular_variant`. Type: **True or false**. Save.
 3. Open the product, click the variant (e.g. 7.3 kg), set **Popular variant** to **True**, and save.
 
-The label shows on every variant set to True. Change the text and colours in the block's **Popular variant label** settings.
+The label shows on every variant set to True. Change the text in the block's **Label** setting, or clear it to hide the label.
