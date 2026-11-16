@@ -1,0 +1,904 @@
+{%- comment -%}
+  Theme block entry point (Horizon and other themes whose sections accept @theme blocks).
+  Settings mirror the "sc_pdp_quantity_discounts" block in sections/main-product.liquid – keep them in sync.
+  Place it above the Add to Cart / buy buttons block.
+{%- endcomment -%}
+{%- liquid
+  assign sc_product = closest.product
+  if sc_product == blank
+    assign sc_product = product
+  endif
+-%}
+{% render 'sc-pdp-quantity-discounts', block: block, product: sc_product, section: section %}
+
+{% schema %}
+{
+  "name": "SC – Quantity discounts",
+  "settings": [
+    {
+      "type": "header",
+      "content": "General"
+    },
+    {
+      "type": "paragraph",
+      "content": "Shows the discounted price per tier. The real discount must come from a Shopify automatic discount per tier (Discounts → Amount off products, minimum quantity). See the setup guide."
+    },
+    {
+      "type": "checkbox",
+      "id": "enable",
+      "label": "Enable block",
+      "default": true
+    },
+    {
+      "type": "select",
+      "id": "tier_source",
+      "label": "Tiers come from",
+      "options": [
+        {
+          "value": "settings",
+          "label": "Block settings (tiers below)"
+        },
+        {
+          "value": "metafield",
+          "label": "Product metafield only"
+        },
+        {
+          "value": "metafield_then_settings",
+          "label": "Product metafield, else block settings"
+        }
+      ],
+      "default": "settings"
+    },
+    {
+      "type": "text",
+      "id": "tier_metafield",
+      "label": "Tier metafield (namespace.key)",
+      "default": "custom.quantity_breaks",
+      "info": "Product metafield of type JSON, e.g. [{\"qty\":2,\"discount\":10,\"label\":\"2 units\",\"badge\":\"Popular\"}]"
+    },
+    {
+      "type": "select",
+      "id": "discount_type",
+      "label": "Discount type",
+      "options": [
+        {
+          "value": "percent",
+          "label": "Percentage off"
+        },
+        {
+          "value": "amount",
+          "label": "Fixed amount off each unit"
+        }
+      ],
+      "default": "percent",
+      "info": "Fixed amounts are in your store currency. With several currencies, use percentage."
+    },
+    {
+      "type": "select",
+      "id": "default_tier",
+      "label": "Preselected tier",
+      "options": [
+        {
+          "value": "first",
+          "label": "First tier"
+        },
+        {
+          "value": "badge",
+          "label": "First tier with a badge"
+        },
+        {
+          "value": "2",
+          "label": "Tier 2"
+        },
+        {
+          "value": "3",
+          "label": "Tier 3"
+        },
+        {
+          "value": "4",
+          "label": "Tier 4"
+        },
+        {
+          "value": "last",
+          "label": "Last tier"
+        }
+      ],
+      "default": "badge",
+      "info": "The theme quantity is set to this tier's quantity when the page loads."
+    },
+    {
+      "type": "checkbox",
+      "id": "use_compare_at",
+      "label": "Use compare-at price as the original price",
+      "default": false,
+      "info": "When on, savings and the struck-through price start from the compare-at price."
+    },
+    {
+      "type": "text",
+      "id": "only_tag",
+      "label": "Only show on products tagged",
+      "info": "Leave empty to show on every product."
+    },
+    {
+      "type": "text",
+      "id": "exclude_tag",
+      "label": "Hide on products tagged"
+    },
+    {
+      "type": "header",
+      "content": "Theme quantity selector"
+    },
+    {
+      "type": "checkbox",
+      "id": "hide_theme_quantity",
+      "label": "Hide the theme's quantity selector",
+      "default": true,
+      "info": "The tiers set the quantity in the background. If the theme has no quantity field, a hidden one is added."
+    },
+    {
+      "type": "text",
+      "id": "theme_quantity_selector",
+      "label": "Theme quantity selector (advanced)",
+      "info": "Optional CSS selector of the theme's quantity wrapper. Leave empty for auto-detection."
+    },
+    {
+      "type": "header",
+      "content": "Content"
+    },
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "Heading",
+      "default": "Buy more, save more"
+    },
+    {
+      "type": "select",
+      "id": "heading_align",
+      "label": "Heading alignment",
+      "options": [
+        {
+          "value": "left",
+          "label": "Left"
+        },
+        {
+          "value": "center",
+          "label": "Center"
+        },
+        {
+          "value": "right",
+          "label": "Right"
+        }
+      ],
+      "default": "left"
+    },
+    {
+      "type": "text",
+      "id": "footer_text",
+      "label": "Note below the tiers",
+      "info": "E.g. \"Discount is applied at checkout.\""
+    },
+    {
+      "type": "text",
+      "id": "unavailable_text",
+      "label": "Not enough stock text",
+      "default": "Not enough stock",
+      "info": "Shown on a tier when the variant doesn't have that many units in stock."
+    },
+    {
+      "type": "header",
+      "content": "Tier 1"
+    },
+    {
+      "type": "checkbox",
+      "id": "t1_enable",
+      "label": "Show tier",
+      "default": true
+    },
+    {
+      "type": "number",
+      "id": "t1_qty",
+      "label": "Quantity",
+      "default": 1
+    },
+    {
+      "type": "number",
+      "id": "t1_discount",
+      "label": "Discount (% or amount per unit)",
+      "default": 0
+    },
+    {
+      "type": "text",
+      "id": "t1_label",
+      "label": "Label",
+      "default": "1 unit",
+      "info": "Placeholders: [qty], [percent], [discount], [price], [unit_price], [savings], [original]."
+    },
+    {
+      "type": "text",
+      "id": "t1_subtext",
+      "label": "Sub-text"
+    },
+    {
+      "type": "text",
+      "id": "t1_badge",
+      "label": "Badge"
+    },
+    {
+      "type": "header",
+      "content": "Tier 2"
+    },
+    {
+      "type": "checkbox",
+      "id": "t2_enable",
+      "label": "Show tier",
+      "default": true
+    },
+    {
+      "type": "number",
+      "id": "t2_qty",
+      "label": "Quantity",
+      "default": 2
+    },
+    {
+      "type": "number",
+      "id": "t2_discount",
+      "label": "Discount (% or amount per unit)",
+      "default": 10
+    },
+    {
+      "type": "text",
+      "id": "t2_label",
+      "label": "Label",
+      "default": "2 units, save [percent]%"
+    },
+    {
+      "type": "text",
+      "id": "t2_subtext",
+      "label": "Sub-text"
+    },
+    {
+      "type": "text",
+      "id": "t2_badge",
+      "label": "Badge",
+      "default": "Popular"
+    },
+    {
+      "type": "header",
+      "content": "Tier 3"
+    },
+    {
+      "type": "checkbox",
+      "id": "t3_enable",
+      "label": "Show tier",
+      "default": true
+    },
+    {
+      "type": "number",
+      "id": "t3_qty",
+      "label": "Quantity",
+      "default": 3
+    },
+    {
+      "type": "number",
+      "id": "t3_discount",
+      "label": "Discount (% or amount per unit)",
+      "default": 15
+    },
+    {
+      "type": "text",
+      "id": "t3_label",
+      "label": "Label",
+      "default": "3+ units, save [percent]%"
+    },
+    {
+      "type": "text",
+      "id": "t3_subtext",
+      "label": "Sub-text"
+    },
+    {
+      "type": "text",
+      "id": "t3_badge",
+      "label": "Badge"
+    },
+    {
+      "type": "header",
+      "content": "Tier 4"
+    },
+    {
+      "type": "checkbox",
+      "id": "t4_enable",
+      "label": "Show tier",
+      "default": false
+    },
+    {
+      "type": "number",
+      "id": "t4_qty",
+      "label": "Quantity",
+      "default": 5
+    },
+    {
+      "type": "number",
+      "id": "t4_discount",
+      "label": "Discount (% or amount per unit)",
+      "default": 20
+    },
+    {
+      "type": "text",
+      "id": "t4_label",
+      "label": "Label",
+      "default": "5+ units, save [percent]%"
+    },
+    {
+      "type": "text",
+      "id": "t4_subtext",
+      "label": "Sub-text"
+    },
+    {
+      "type": "text",
+      "id": "t4_badge",
+      "label": "Badge",
+      "default": "Best value"
+    },
+    {
+      "type": "header",
+      "content": "Prices"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_price",
+      "label": "Show price",
+      "default": true
+    },
+    {
+      "type": "select",
+      "id": "price_mode",
+      "label": "Price shown",
+      "options": [
+        {
+          "value": "total",
+          "label": "Total for the tier"
+        },
+        {
+          "value": "unit",
+          "label": "Price per unit"
+        }
+      ],
+      "default": "total"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_original",
+      "label": "Show original price struck through",
+      "default": true
+    },
+    {
+      "type": "checkbox",
+      "id": "show_unit_line",
+      "label": "Show unit price line",
+      "default": false
+    },
+    {
+      "type": "text",
+      "id": "unit_price_text",
+      "label": "Unit price text",
+      "default": "[unit_price] / unit",
+      "info": "Placeholders: [qty], [percent], [discount], [price], [unit_price], [savings], [original]."
+    },
+    {
+      "type": "checkbox",
+      "id": "show_savings_line",
+      "label": "Show savings line",
+      "default": false
+    },
+    {
+      "type": "text",
+      "id": "savings_text",
+      "label": "Savings text",
+      "default": "You save [savings]",
+      "info": "Placeholders: [qty], [percent], [discount], [price], [unit_price], [savings], [original]."
+    },
+    {
+      "type": "header",
+      "content": "Badge"
+    },
+    {
+      "type": "select",
+      "id": "badge_position",
+      "label": "Badge position",
+      "options": [
+        {
+          "value": "top_center",
+          "label": "Top center"
+        },
+        {
+          "value": "top_right",
+          "label": "Top right"
+        },
+        {
+          "value": "inline",
+          "label": "Next to the label"
+        }
+      ],
+      "default": "top_center"
+    },
+    {
+      "type": "color",
+      "id": "badge_bg",
+      "label": "Badge background",
+      "default": "#121212"
+    },
+    {
+      "type": "color",
+      "id": "badge_color",
+      "label": "Badge text",
+      "default": "#ffffff"
+    },
+    {
+      "type": "range",
+      "id": "badge_size",
+      "label": "Badge text size",
+      "min": 10,
+      "max": 18,
+      "step": 1,
+      "unit": "px",
+      "default": 13
+    },
+    {
+      "type": "range",
+      "id": "badge_radius",
+      "label": "Badge corner radius",
+      "min": 0,
+      "max": 30,
+      "step": 1,
+      "unit": "px",
+      "default": 30
+    },
+    {
+      "type": "header",
+      "content": "Add to cart button"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_atc",
+      "label": "Show own Add to cart button",
+      "default": false,
+      "info": "Clicks the theme's Add to cart (so the cart drawer opens as usual). Turn on if you hide the theme's buy buttons or want the button inside the box."
+    },
+    {
+      "type": "text",
+      "id": "atc_text",
+      "label": "Button text",
+      "default": "Add to cart",
+      "info": "Placeholders: [qty], [percent], [discount], [price], [unit_price], [savings], [original]."
+    },
+    {
+      "type": "text",
+      "id": "atc_sold_out_text",
+      "label": "Sold-out text",
+      "default": "Sold out"
+    },
+    {
+      "type": "color",
+      "id": "atc_bg",
+      "label": "Button background",
+      "default": "#121212"
+    },
+    {
+      "type": "color",
+      "id": "atc_color",
+      "label": "Button text color",
+      "default": "#ffffff"
+    },
+    {
+      "type": "range",
+      "id": "atc_size",
+      "label": "Button text size",
+      "min": 12,
+      "max": 22,
+      "step": 1,
+      "unit": "px",
+      "default": 16
+    },
+    {
+      "type": "range",
+      "id": "atc_height",
+      "label": "Button height",
+      "min": 36,
+      "max": 70,
+      "step": 2,
+      "unit": "px",
+      "default": 48
+    },
+    {
+      "type": "range",
+      "id": "atc_radius",
+      "label": "Button corner radius",
+      "min": 0,
+      "max": 30,
+      "step": 1,
+      "unit": "px",
+      "default": 6
+    },
+    {
+      "type": "header",
+      "content": "Layout"
+    },
+    {
+      "type": "select",
+      "id": "layout",
+      "label": "Layout",
+      "options": [
+        {
+          "value": "list",
+          "label": "List (one tier per row)"
+        },
+        {
+          "value": "grid",
+          "label": "Grid (cards side by side)"
+        }
+      ],
+      "default": "list"
+    },
+    {
+      "type": "range",
+      "id": "columns_desktop",
+      "label": "Grid columns on desktop",
+      "min": 1,
+      "max": 4,
+      "step": 1,
+      "default": 3
+    },
+    {
+      "type": "range",
+      "id": "columns_mobile",
+      "label": "Grid columns on mobile",
+      "min": 1,
+      "max": 2,
+      "step": 1,
+      "default": 1
+    },
+    {
+      "type": "range",
+      "id": "gap",
+      "label": "Space between tiers",
+      "min": 0,
+      "max": 30,
+      "step": 1,
+      "unit": "px",
+      "default": 12
+    },
+    {
+      "type": "range",
+      "id": "gap_mobile",
+      "label": "Space between tiers on mobile",
+      "min": 0,
+      "max": 30,
+      "step": 1,
+      "unit": "px",
+      "default": 10
+    },
+    {
+      "type": "checkbox",
+      "id": "show_radio",
+      "label": "Show radio circle",
+      "default": true
+    },
+    {
+      "type": "header",
+      "content": "Box"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_box",
+      "label": "Show box around the block",
+      "default": true
+    },
+    {
+      "type": "color",
+      "id": "box_bg",
+      "label": "Box background",
+      "default": "#ffffff"
+    },
+    {
+      "type": "color",
+      "id": "box_border",
+      "label": "Box border",
+      "default": "#dcdcdc"
+    },
+    {
+      "type": "range",
+      "id": "box_radius",
+      "label": "Box corner radius",
+      "min": 0,
+      "max": 30,
+      "step": 1,
+      "unit": "px",
+      "default": 10
+    },
+    {
+      "type": "range",
+      "id": "box_padding",
+      "label": "Box padding",
+      "min": 0,
+      "max": 50,
+      "step": 2,
+      "unit": "px",
+      "default": 24
+    },
+    {
+      "type": "range",
+      "id": "box_padding_mobile",
+      "label": "Box padding on mobile",
+      "min": 0,
+      "max": 50,
+      "step": 2,
+      "unit": "px",
+      "default": 16
+    },
+    {
+      "type": "header",
+      "content": "Tier cards"
+    },
+    {
+      "type": "color",
+      "id": "card_bg",
+      "label": "Background",
+      "default": "#fafafa"
+    },
+    {
+      "type": "color",
+      "id": "card_border",
+      "label": "Border",
+      "default": "#cfcfcf"
+    },
+    {
+      "type": "color",
+      "id": "hover_border",
+      "label": "Border on hover",
+      "default": "#8a8a8a"
+    },
+    {
+      "type": "color",
+      "id": "selected_bg",
+      "label": "Selected background",
+      "default": "#f2f2f2"
+    },
+    {
+      "type": "color",
+      "id": "selected_border",
+      "label": "Selected border",
+      "default": "#4a4a4a"
+    },
+    {
+      "type": "color",
+      "id": "radio_color",
+      "label": "Radio color",
+      "default": "#4a4a4a"
+    },
+    {
+      "type": "color",
+      "id": "card_text",
+      "label": "Label text",
+      "default": "#3a3a3a"
+    },
+    {
+      "type": "color",
+      "id": "card_muted",
+      "label": "Secondary text",
+      "default": "#6b6b6b"
+    },
+    {
+      "type": "color",
+      "id": "price_color",
+      "label": "Price",
+      "default": "#3a3a3a"
+    },
+    {
+      "type": "color",
+      "id": "savings_color",
+      "label": "Savings text",
+      "default": "#1a7f37"
+    },
+    {
+      "type": "range",
+      "id": "border_width",
+      "label": "Border width",
+      "min": 0,
+      "max": 4,
+      "step": 1,
+      "unit": "px",
+      "default": 1
+    },
+    {
+      "type": "range",
+      "id": "selected_border_width",
+      "label": "Selected border width",
+      "min": 1,
+      "max": 5,
+      "step": 1,
+      "unit": "px",
+      "default": 2
+    },
+    {
+      "type": "range",
+      "id": "card_radius",
+      "label": "Corner radius",
+      "min": 0,
+      "max": 30,
+      "step": 1,
+      "unit": "px",
+      "default": 8
+    },
+    {
+      "type": "range",
+      "id": "card_padding_y",
+      "label": "Vertical padding",
+      "min": 4,
+      "max": 40,
+      "step": 1,
+      "unit": "px",
+      "default": 18
+    },
+    {
+      "type": "range",
+      "id": "card_padding_x",
+      "label": "Horizontal padding",
+      "min": 4,
+      "max": 40,
+      "step": 1,
+      "unit": "px",
+      "default": 24
+    },
+    {
+      "type": "header",
+      "content": "Typography"
+    },
+    {
+      "type": "color",
+      "id": "heading_color",
+      "label": "Heading color",
+      "default": "#3a3a3a"
+    },
+    {
+      "type": "range",
+      "id": "heading_size",
+      "label": "Heading size",
+      "min": 12,
+      "max": 36,
+      "step": 1,
+      "unit": "px",
+      "default": 20
+    },
+    {
+      "type": "range",
+      "id": "heading_size_mobile",
+      "label": "Heading size on mobile",
+      "min": 12,
+      "max": 32,
+      "step": 1,
+      "unit": "px",
+      "default": 18
+    },
+    {
+      "type": "range",
+      "id": "label_size",
+      "label": "Label size",
+      "min": 12,
+      "max": 24,
+      "step": 1,
+      "unit": "px",
+      "default": 16
+    },
+    {
+      "type": "range",
+      "id": "label_size_mobile",
+      "label": "Label size on mobile",
+      "min": 12,
+      "max": 22,
+      "step": 1,
+      "unit": "px",
+      "default": 15
+    },
+    {
+      "type": "select",
+      "id": "label_weight",
+      "label": "Label weight",
+      "options": [
+        {
+          "value": "400",
+          "label": "Regular"
+        },
+        {
+          "value": "500",
+          "label": "Medium"
+        },
+        {
+          "value": "600",
+          "label": "Semi-bold"
+        },
+        {
+          "value": "700",
+          "label": "Bold"
+        }
+      ],
+      "default": "400"
+    },
+    {
+      "type": "range",
+      "id": "price_size",
+      "label": "Price size",
+      "min": 12,
+      "max": 24,
+      "step": 1,
+      "unit": "px",
+      "default": 16
+    },
+    {
+      "type": "range",
+      "id": "price_size_mobile",
+      "label": "Price size on mobile",
+      "min": 12,
+      "max": 22,
+      "step": 1,
+      "unit": "px",
+      "default": 15
+    },
+    {
+      "type": "range",
+      "id": "sub_size",
+      "label": "Sub-text and note size",
+      "min": 10,
+      "max": 18,
+      "step": 1,
+      "unit": "px",
+      "default": 13
+    },
+    {
+      "type": "color",
+      "id": "footer_color",
+      "label": "Note color",
+      "default": "#6b6b6b"
+    },
+    {
+      "type": "header",
+      "content": "Spacing"
+    },
+    {
+      "type": "range",
+      "id": "margin_top",
+      "label": "Top margin",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 8
+    },
+    {
+      "type": "range",
+      "id": "margin_bottom",
+      "label": "Bottom margin",
+      "min": 0,
+      "max": 60,
+      "step": 2,
+      "unit": "px",
+      "default": 20
+    },
+    {
+      "type": "range",
+      "id": "mobile_breakpoint",
+      "label": "Mobile breakpoint",
+      "min": 480,
+      "max": 1000,
+      "step": 10,
+      "unit": "px",
+      "default": 750,
+      "info": "Screens narrower than this use the mobile settings."
+    }
+  ],
+  "presets": [
+    {
+      "name": "SC – Quantity discounts"
+    }
+  ]
+}
+{% endschema %}

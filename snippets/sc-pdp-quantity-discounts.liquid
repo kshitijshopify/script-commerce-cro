@@ -1,0 +1,1179 @@
+{%- comment -%}
+  SC – Quantity discounts (PDP block)
+  ----------------------------------------------------------------------------
+  "Buy more, save more" tier selector for the buy box, e.g.
+    ( ) 1 unit                      € 29.00
+    (•) 2 units, save 10%  Popular  € 52.20
+    ( ) 3+ units, save 15%          € 73.95
+
+  Picking a tier sets the quantity of the theme's product form (or adds a hidden
+  quantity field if the theme has none), so the theme's own Add to cart adds that
+  many units. The block only SHOWS the discounted price – the real discount must
+  come from a Shopify automatic discount (one per tier, "Amount off products" with
+  a minimum quantity). See docs/sc-pdp-quantity-discounts-setup.md.
+
+  Usage (inside any product section's block loop):
+    {%- when 'sc_pdp_quantity_discounts' -%}
+      {% render 'sc-pdp-quantity-discounts', block: block, product: product, section: section %}
+
+  Accepts:
+  - block:   {Object} block whose settings match the "sc_pdp_quantity_discounts" schema
+             (sections/main-product.liquid or blocks/sc-pdp-quantity-discounts.liquid).
+  - product: {Object} product (defaults to the global product).
+  - section: {Object} parent section (used to scope the "hide theme quantity" CSS).
+
+  Tier sources (setting "Tiers come from"):
+  - Block settings: tiers 1–4 below.
+  - Product metafield (JSON), e.g. custom.quantity_breaks:
+      [
+        { "qty": 1, "discount": 0,  "label": "1 unit" },
+        { "qty": 2, "discount": 10, "label": "2 units, save [percent]%", "badge": "Popular" },
+        { "qty": 3, "discount": 15, "label": "3+ units, save [percent]%", "subtext": "Free shipping" }
+      ]
+    "Metafield, else block settings" falls back to the block tiers when the product has none.
+
+  Text placeholders (label, sub-text, unit price, savings, button):
+    [qty] [percent] [discount] [price] [unit_price] [savings] [original]
+
+  Prices are rendered server-side for every variant with the `money` filter (active
+  market currency) and swapped by JS when the variant changes.
+  JS fires document event "sc:quantity-discounts:change" { productId, variantId, quantity, tier, discount }.
+{%- endcomment -%}
+
+{%- liquid
+  assign s = block.settings
+  assign uid = 'sc-qd-' | append: block.id
+  assign p = product
+
+  assign show_block = true
+  if s.enable == false
+    assign show_block = false
+  endif
+  assign tag_note = ''
+  if p != blank
+    assign only_tag = s.only_tag | strip
+    assign exclude_tag = s.exclude_tag | strip
+    if only_tag != blank
+      unless p.tags contains only_tag
+        assign show_block = false
+        assign tag_note = 'this product does not have the tag "' | append: only_tag | append: '", so the block is hidden.'
+      endunless
+    endif
+    if exclude_tag != blank and p.tags contains exclude_tag
+      assign show_block = false
+      assign tag_note = 'this product has the excluded tag "' | append: exclude_tag | append: '", so the block is hidden.'
+    endif
+  endif
+-%}
+
+{%- if p == blank -%}
+  {%- if request.design_mode and s.enable != false -%}
+    <div {{ block.shopify_attributes }} style="padding:10px;font-size:13px;opacity:.6;font-style:italic;">
+      SC – Quantity discounts: add this block to a product section to preview it.
+    </div>
+  {%- endif -%}
+{%- elsif show_block == false -%}
+  {%- if request.design_mode and tag_note != blank -%}
+    <div {{ block.shopify_attributes }} style="padding:10px;font-size:13px;opacity:.6;font-style:italic;">
+      SC – Quantity discounts: {{ tag_note | escape }}
+    </div>
+  {%- endif -%}
+{%- else -%}
+  {%- liquid
+    assign fsep = '~§~'
+    assign tsep = '~¶~'
+    assign discount_type = s.discount_type | default: 'percent'
+
+    # ---------- collect tiers: "qty fsep discount fsep label fsep subtext fsep badge fsep end" ----------
+    assign tiers_raw = ''
+    assign tier_source = s.tier_source | default: 'settings'
+
+    if tier_source != 'settings'
+      assign mf_ns = ''
+      assign mf_key = ''
+      assign parts = s.tier_metafield | strip | split: '.'
+      if parts.size == 2
+        assign mf_ns = parts[0] | strip
+        assign mf_key = parts[1] | strip
+      endif
+      if mf_ns != blank and mf_key != blank
+        assign mf = p.metafields[mf_ns][mf_key]
+        if mf != blank and mf.type == 'json'
+          for t in mf.value
+            assign tq = t.qty | default: t.quantity | plus: 0
+            if tq < 1
+              continue
+            endif
+            assign td = t.discount | default: 0 | times: 1.0
+            assign tl = t.label | default: '' | append: '' | remove: fsep | remove: tsep
+            assign tsub = t.subtext | default: '' | append: '' | remove: fsep | remove: tsep
+            assign tb = t.badge | default: '' | append: '' | remove: fsep | remove: tsep
+            assign tiers_raw = tiers_raw | append: tq | append: fsep | append: td | append: fsep | append: tl | append: fsep | append: tsub | append: fsep | append: tb | append: fsep | append: 'end' | append: tsep
+          endfor
+        endif
+      endif
+    endif
+
+    if tiers_raw == blank and tier_source != 'metafield'
+      for i in (1..4)
+        assign k = 't' | append: i
+        assign k_en = k | append: '_enable'
+        assign k_q = k | append: '_qty'
+        assign k_d = k | append: '_discount'
+        assign k_l = k | append: '_label'
+        assign k_s = k | append: '_subtext'
+        assign k_b = k | append: '_badge'
+        if s[k_en] == false
+          continue
+        endif
+        assign tq = s[k_q] | plus: 0
+        if tq < 1
+          continue
+        endif
+        assign td = s[k_d] | default: 0 | times: 1.0
+        assign tl = s[k_l] | append: '' | remove: fsep | remove: tsep
+        assign tsub = s[k_s] | append: '' | remove: fsep | remove: tsep
+        assign tb = s[k_b] | append: '' | remove: fsep | remove: tsep
+        assign tiers_raw = tiers_raw | append: tq | append: fsep | append: td | append: fsep | append: tl | append: fsep | append: tsub | append: fsep | append: tb | append: fsep | append: 'end' | append: tsep
+      endfor
+    endif
+
+    assign tiers = tiers_raw | split: tsep
+  -%}
+
+  {%- if tiers.size == 0 -%}
+    {%- if request.design_mode -%}
+      <div {{ block.shopify_attributes }} style="padding:10px;font-size:13px;opacity:.6;font-style:italic;">
+        SC – Quantity discounts: no tiers found. Enable at least one tier with a quantity of 1 or more
+        {%- if tier_source != 'settings' %}, or fill in the product metafield "{{ s.tier_metafield | escape }}" (type JSON){% endif -%}.
+      </div>
+    {%- endif -%}
+  {%- else -%}
+    {%- liquid
+      assign current = p.selected_or_first_available_variant
+      assign tpl_sep = '~|~'
+
+      # ---------- default selected tier ----------
+      assign def_index = 0
+      case s.default_tier
+        when 'badge'
+          for tier in tiers
+            assign f = tier | split: fsep
+            assign tb = f[4] | strip
+            if tb != blank
+              assign def_index = forloop.index0
+              break
+            endif
+          endfor
+        when 'last'
+          assign def_index = tiers.size | minus: 1
+        when '2', '3', '4'
+          assign def_index = s.default_tier | plus: 0 | minus: 1
+          if def_index >= tiers.size
+            assign def_index = tiers.size | minus: 1
+          endif
+      endcase
+
+      assign unit_tpl = s.unit_price_text | strip
+      assign save_tpl = s.savings_text | strip
+      assign atc_tpl = s.atc_text | strip
+      if atc_tpl == blank
+        assign atc_tpl = 'Add to cart'
+      endif
+      assign price_field = 'p'
+      assign orig_field = 'o'
+      if s.price_mode == 'unit'
+        assign price_field = 'u'
+        assign orig_field = 'ou'
+      endif
+
+      assign badge_pos = s.badge_position | default: 'top_center'
+      assign has_badge = false
+      assign mobile_bp = s.mobile_breakpoint | default: 750
+      assign mobile_max = mobile_bp | minus: 1
+      assign heading = s.heading | strip | escape
+      assign footer_text = s.footer_text | strip | escape
+      assign unavailable_text = s.unavailable_text | strip | escape
+      assign sold_out_text = s.atc_sold_out_text | strip | default: 'Sold out' | escape
+      assign qty_selector = s.theme_quantity_selector | strip | remove: '<' | remove: '>' | remove: '{' | remove: '}'
+      assign atc_ctx = ''
+      assign tiers_html = ''
+      assign current_tier_ok = true
+    -%}
+
+    {%- capture json_html -%}
+      {
+      {%- for v in p.variants -%}
+        {%- liquid
+          assign base_unit = v.price
+          if s.use_compare_at and v.compare_at_price > v.price
+            assign base_unit = v.compare_at_price
+          endif
+          assign track_stock = false
+          if v.inventory_management == 'shopify' and v.inventory_policy == 'deny'
+            assign track_stock = true
+          endif
+          assign is_current = false
+          if v.id == current.id
+            assign is_current = true
+          endif
+        -%}
+        "{{ v.id }}":{"a":{{ v.available | json }},"t":[
+        {%- for tier in tiers -%}
+          {%- liquid
+            assign f = tier | split: fsep
+            assign q = f[0] | plus: 0
+            assign d = f[1] | times: 1.0
+            if d < 0
+              assign d = 0
+            endif
+
+            if discount_type == 'amount'
+              assign amt = d | times: 100 | round
+              assign unit_after = v.price | minus: amt | at_least: 0
+              assign total = unit_after | times: q
+              assign disc_str = amt | money
+            else
+              if d > 100
+                assign d = 100
+              endif
+              assign keep = 100.0 | minus: d
+              assign total = v.price | times: q | times: keep | divided_by: 100.0 | round
+              assign d_int = d | floor
+              if d_int == d
+                assign disc_str = d_int | append: '%'
+              else
+                assign disc_str = d | round: 2 | append: '%'
+              endif
+            endif
+
+            assign original = base_unit | times: q
+            assign savings = original | minus: total | at_least: 0
+            assign unit = total | times: 1.0 | divided_by: q | round
+            assign pct = 0
+            if original > 0
+              assign pct = savings | times: 100.0 | divided_by: original | round
+            endif
+            assign has_save = false
+            if savings > 0
+              assign has_save = true
+            endif
+            assign ok = v.available
+            if track_stock and v.inventory_quantity < q
+              assign ok = false
+            endif
+
+            assign m_total = total | money
+            assign m_orig = original | money
+            assign m_unit = unit | money
+            assign m_orig_unit = base_unit | money
+            assign m_save = savings | money
+          -%}
+          {"p":{{ m_total | json }},"o":{{ m_orig | json }},"u":{{ m_unit | json }},"ou":{{ m_orig_unit | json }},"s":{{ m_save | json }},"r":{{ pct }},"d":{{ disc_str | json }},"z":{{ has_save }},"ok":{{ ok }}}
+          {%- unless forloop.last -%},{%- endunless -%}
+
+          {%- if is_current -%}
+            {%- liquid
+              assign tb = f[4] | strip | escape
+              if tb != blank
+                assign has_badge = true
+              endif
+              assign selected = false
+              if forloop.index0 == def_index
+                assign selected = true
+                assign current_tier_ok = ok
+              endif
+
+              # one replace chain for every template of this tier
+              assign all_tpl = f[2] | append: tpl_sep | append: f[3] | append: tpl_sep | append: unit_tpl | append: tpl_sep | append: save_tpl | append: tpl_sep | append: atc_tpl | append: tpl_sep | append: 'end'
+              assign all_out = all_tpl | escape | replace: '[qty]', q | replace: '[percent]', pct | replace: '[discount]', disc_str | replace: '[price]', m_total | replace: '[unit_price]', m_unit | replace: '[savings]', m_save | replace: '[original]', m_orig | split: tpl_sep
+              assign label_out = all_out[0] | strip
+              assign sub_out = all_out[1] | strip
+              if label_out == blank
+                assign label_out = q
+              endif
+              if selected
+                assign atc_ctx = all_out[4]
+              endif
+              if s.price_mode == 'unit'
+                assign main_price = m_unit
+                assign main_orig = m_orig_unit
+              else
+                assign main_price = m_total
+                assign main_orig = m_orig
+              endif
+              assign label_tpl = f[2] | strip
+              if label_tpl == blank
+                assign label_tpl = '[qty]'
+              endif
+            -%}
+            {%- capture tier_html -%}
+              <button
+                type="button"
+                role="radio"
+                class="sc-qd__tier{% if selected %} is-selected{% endif %}{% if ok == false %} is-unavailable{% endif %}{% if tb != blank %} has-badge{% endif %}"
+                aria-checked="{{ selected }}"
+                {% if ok == false %}aria-disabled="true"{% endif %}
+                tabindex="{% if selected %}0{% else %}-1{% endif %}"
+                data-sc-qd-tier
+                data-index="{{ forloop.index0 }}"
+                data-qty="{{ q }}"
+              >
+                {%- if tb != blank and badge_pos != 'inline' -%}
+                  <span class="sc-qd__badge sc-qd__badge--float">{{ tb }}</span>
+                {%- endif -%}
+                {%- if s.show_radio -%}
+                  <span class="sc-qd__radio" aria-hidden="true"></span>
+                {%- endif -%}
+                <span class="sc-qd__info">
+                  <span class="sc-qd__label-row">
+                    <span class="sc-qd__label" data-tpl="{{ label_tpl | escape }}">{{ label_out }}</span>
+                    {%- if tb != blank and badge_pos == 'inline' -%}
+                      <span class="sc-qd__badge sc-qd__badge--inline">{{ tb }}</span>
+                    {%- endif -%}
+                  </span>
+                  {%- if sub_out != blank -%}
+                    <span class="sc-qd__sub" data-tpl="{{ f[3] | strip | escape }}">{{ sub_out }}</span>
+                  {%- endif -%}
+                  {%- if unavailable_text != blank -%}
+                    <span class="sc-qd__oos" data-sc-qd-oos{% if ok %} hidden{% endif %}>{{ unavailable_text }}</span>
+                  {%- endif -%}
+                </span>
+                {%- if s.show_price or s.show_unit_line or s.show_savings_line -%}
+                  <span class="sc-qd__prices">
+                    {%- if s.show_price -%}
+                      <span class="sc-qd__price-row">
+                        {%- if s.show_original -%}
+                          <s class="sc-qd__orig" data-f="{{ orig_field }}" data-needs-save{% unless has_save %} hidden{% endunless %}>{{ main_orig }}</s>
+                        {%- endif -%}
+                        <span class="sc-qd__price" data-f="{{ price_field }}">{{ main_price }}</span>
+                      </span>
+                    {%- endif -%}
+                    {%- if s.show_unit_line and unit_tpl != blank -%}
+                      <span class="sc-qd__unit" data-tpl="{{ unit_tpl | escape }}">{{ all_out[2] }}</span>
+                    {%- endif -%}
+                    {%- if s.show_savings_line and save_tpl != blank -%}
+                      <span class="sc-qd__save" data-tpl="{{ save_tpl | escape }}" data-needs-save{% unless has_save %} hidden{% endunless %}>{{ all_out[3] }}</span>
+                    {%- endif -%}
+                  </span>
+                {%- endif -%}
+              </button>
+            {%- endcapture -%}
+            {%- assign tiers_html = tiers_html | append: tier_html -%}
+          {%- endif -%}
+        {%- endfor -%}
+        ]}{%- unless forloop.last -%},{%- endunless -%}
+      {%- endfor -%}
+      }
+    {%- endcapture -%}
+
+    {%- liquid
+      assign pop_space = 0
+      if has_badge and badge_pos != 'inline'
+        assign pop_space = 1
+      endif
+    -%}
+
+    <sc-qty-discounts
+      id="{{ uid }}"
+      class="sc-qd sc-qd--{{ s.layout | default: 'list' }} sc-qd--badge-{{ badge_pos }}{% if pop_space == 1 %} sc-qd--has-float-badge{% endif %}{% if s.show_box %} sc-qd--box{% endif %}{% if s.show_radio %} sc-qd--radio{% endif %}"
+      data-product-id="{{ p.id }}"
+      data-variant-id="{{ current.id }}"
+      data-selected="{{ def_index }}"
+      data-add-url="{{ routes.cart_add_url }}"
+      data-cart-url="{{ routes.cart_url }}"
+      {% if s.hide_theme_quantity %}data-hide-qty="true"{% endif %}
+      {% if qty_selector != blank %}data-qty-selector="{{ qty_selector | escape }}"{% endif %}
+      style="
+        --sc-qd-cols: {{ s.columns_desktop | default: 3 }};
+        --sc-qd-cols-m: {{ s.columns_mobile | default: 1 }};
+        --sc-qd-gap: {{ s.gap | default: 12 }}px;
+        --sc-qd-gap-m: {{ s.gap_mobile | default: 10 }}px;
+        --sc-qd-box-bg: {{ s.box_bg }};
+        --sc-qd-box-border: {{ s.box_border }};
+        --sc-qd-box-radius: {{ s.box_radius }}px;
+        --sc-qd-box-p: {{ s.box_padding }}px;
+        --sc-qd-box-p-m: {{ s.box_padding_mobile }}px;
+        --sc-qd-py: {{ s.card_padding_y }}px;
+        --sc-qd-px: {{ s.card_padding_x }}px;
+        --sc-qd-radius: {{ s.card_radius }}px;
+        --sc-qd-bw: {{ s.border_width | default: 1 }}px;
+        --sc-qd-sbw: {{ s.selected_border_width | default: 2 }}px;
+        --sc-qd-bg: {{ s.card_bg }};
+        --sc-qd-border: {{ s.card_border }};
+        --sc-qd-text: {{ s.card_text }};
+        --sc-qd-muted: {{ s.card_muted }};
+        --sc-qd-sel-bg: {{ s.selected_bg }};
+        --sc-qd-sel-border: {{ s.selected_border }};
+        --sc-qd-hover: {{ s.hover_border }};
+        --sc-qd-radio: {{ s.radio_color }};
+        --sc-qd-price-c: {{ s.price_color }};
+        --sc-qd-save-c: {{ s.savings_color }};
+        --sc-qd-badge-bg: {{ s.badge_bg }};
+        --sc-qd-badge-c: {{ s.badge_color }};
+        --sc-qd-badge-fs: {{ s.badge_size | default: 13 }}px;
+        --sc-qd-badge-r: {{ s.badge_radius }}px;
+        --sc-qd-h-c: {{ s.heading_color }};
+        --sc-qd-h-fs: {{ s.heading_size | default: 20 }}px;
+        --sc-qd-h-fs-m: {{ s.heading_size_mobile | default: 18 }}px;
+        --sc-qd-h-align: {{ s.heading_align | default: 'left' }};
+        --sc-qd-label-fs: {{ s.label_size | default: 16 }}px;
+        --sc-qd-label-fs-m: {{ s.label_size_mobile | default: 15 }}px;
+        --sc-qd-label-fw: {{ s.label_weight | default: 400 }};
+        --sc-qd-price-fs: {{ s.price_size | default: 16 }}px;
+        --sc-qd-price-fs-m: {{ s.price_size_mobile | default: 15 }}px;
+        --sc-qd-sub-fs: {{ s.sub_size | default: 13 }}px;
+        --sc-qd-atc-bg: {{ s.atc_bg }};
+        --sc-qd-atc-c: {{ s.atc_color }};
+        --sc-qd-atc-h: {{ s.atc_height | default: 48 }}px;
+        --sc-qd-atc-r: {{ s.atc_radius }}px;
+        --sc-qd-atc-fs: {{ s.atc_size | default: 16 }}px;
+        --sc-qd-foot-c: {{ s.footer_color }};
+        --sc-qd-mt: {{ s.margin_top }}px;
+        --sc-qd-mb: {{ s.margin_bottom }}px;
+      "
+      {{ block.shopify_attributes }}
+    >
+      <div class="sc-qd__inner">
+        {%- if heading != blank -%}
+          <p class="sc-qd__heading" id="{{ uid }}-label">{{ heading }}</p>
+        {%- endif -%}
+        <div
+          class="sc-qd__tiers"
+          role="radiogroup"
+          {% if heading != blank %}aria-labelledby="{{ uid }}-label"{% else %}aria-label="Quantity"{% endif %}
+        >
+          {{ tiers_html }}
+        </div>
+
+        {%- if s.show_atc -%}
+          <button
+            type="button"
+            class="sc-qd__atc"
+            data-sc-qd-atc
+            data-tpl="{{ atc_tpl | escape }}"
+            data-sold-out="{{ sold_out_text }}"
+            {% unless current.available and current_tier_ok %}disabled{% endunless %}
+          >
+            <span class="sc-qd__atc-text" data-sc-qd-atc-text>
+              {%- if current.available and current_tier_ok -%}{{ atc_ctx }}{%- else -%}{{ sold_out_text }}{%- endif -%}
+            </span>
+          </button>
+          <p class="sc-qd__error" data-sc-qd-error role="alert" hidden></p>
+        {%- endif -%}
+
+        {%- if footer_text != blank -%}
+          <p class="sc-qd__footer">{{ footer_text }}</p>
+        {%- endif -%}
+      </div>
+      <script type="application/json" data-sc-qd-data>{{ json_html | strip_newlines }}</script>
+    </sc-qty-discounts>
+
+    <style>
+      [data-sc-qd-hidden] { display: none !important; }
+      {%- if s.hide_theme_quantity %}
+      {%- comment -%} Pre-hide the theme quantity selector to avoid a flash; JS also hides whatever it detects. {%- endcomment -%}
+      #shopify-section-{{ section.id }} :is(.product-form__quantity, quantity-selector-component):not(quick-add-modal *):not(dialog *) { display: none !important; }
+      {%- if qty_selector != blank %}
+      #shopify-section-{{ section.id }} :is({{ qty_selector }}):not(#{{ uid }}):not(#{{ uid }} *) { display: none !important; }
+      {%- endif -%}
+      {%- endif %}
+
+      #{{ uid }} {
+        display: block;
+        box-sizing: border-box;
+        width: 100%;
+        max-width: 100%;
+        margin: var(--sc-qd-mt) 0 var(--sc-qd-mb);
+        line-height: 1.35;
+        letter-spacing: normal;
+        text-transform: none;
+        --sc-qd-badge-space: calc(var(--sc-qd-badge-fs) * 0.75 + 4px);
+      }
+      #{{ uid }} *,
+      #{{ uid }} *::before,
+      #{{ uid }} *::after { box-sizing: border-box; }
+      #{{ uid }} [hidden] { display: none !important; }
+
+      #{{ uid }}.sc-qd--box .sc-qd__inner {
+        padding: var(--sc-qd-box-p);
+        background: var(--sc-qd-box-bg);
+        border: 1px solid var(--sc-qd-box-border);
+        border-radius: var(--sc-qd-box-radius);
+      }
+
+      #{{ uid }} .sc-qd__heading {
+        margin: 0 0 14px;
+        padding: 0;
+        font-size: var(--sc-qd-h-fs);
+        line-height: 1.3;
+        font-weight: 400;
+        color: var(--sc-qd-h-c);
+        text-align: var(--sc-qd-h-align);
+        overflow-wrap: anywhere;
+      }
+
+      #{{ uid }} .sc-qd__tiers {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        gap: var(--sc-qd-gap);
+        margin: 0;
+        padding: 0;
+      }
+      #{{ uid }}.sc-qd--grid .sc-qd__tiers { grid-template-columns: repeat(var(--sc-qd-cols), minmax(0, 1fr)); }
+      #{{ uid }}.sc-qd--has-float-badge .sc-qd__tiers {
+        padding-top: var(--sc-qd-badge-space);
+        row-gap: calc(var(--sc-qd-gap) + var(--sc-qd-badge-space));
+      }
+
+      #{{ uid }} .sc-qd__tier {
+        -webkit-appearance: none;
+        appearance: none;
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        width: 100%;
+        min-width: 0;
+        height: auto;
+        min-height: 0;
+        margin: 0;
+        padding: var(--sc-qd-py) var(--sc-qd-px);
+        font: inherit;
+        letter-spacing: normal;
+        text-transform: none;
+        text-decoration: none;
+        text-align: left;
+        color: var(--sc-qd-text);
+        background: var(--sc-qd-bg);
+        border: var(--sc-qd-bw) solid var(--sc-qd-border);
+        border-radius: var(--sc-qd-radius);
+        box-shadow: none;
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+        transition: border-color .15s ease, background-color .15s ease, opacity .15s ease;
+      }
+      #{{ uid }} .sc-qd__tier::before { content: none; }
+      /* Selected ring drawn on top of the card, no layout shift. */
+      #{{ uid }} .sc-qd__tier::after {
+        content: '';
+        position: absolute;
+        inset: calc(var(--sc-qd-bw) * -1);
+        border: var(--sc-qd-sbw) solid transparent;
+        border-radius: var(--sc-qd-radius);
+        pointer-events: none;
+        transition: border-color .15s ease;
+      }
+      @media (hover: hover) {
+        #{{ uid }} .sc-qd__tier:not(.is-unavailable):hover { border-color: var(--sc-qd-hover); }
+      }
+      #{{ uid }} .sc-qd__tier.is-selected { background: var(--sc-qd-sel-bg); }
+      #{{ uid }} .sc-qd__tier.is-selected::after { border-color: var(--sc-qd-sel-border); }
+      #{{ uid }} .sc-qd__tier:focus { outline: none; }
+      #{{ uid }} .sc-qd__tier:focus-visible { outline: 2px solid var(--sc-qd-sel-border); outline-offset: 3px; }
+      #{{ uid }} .sc-qd__tier.is-unavailable { cursor: not-allowed; }
+      #{{ uid }} .sc-qd__tier.is-unavailable > :not(.sc-qd__badge) { opacity: .5; }
+
+      #{{ uid }} .sc-qd__radio {
+        position: relative;
+        flex: 0 0 auto;
+        width: 22px;
+        height: 22px;
+        border: 2px solid var(--sc-qd-muted);
+        border-radius: 50%;
+        transition: border-color .15s ease;
+      }
+      #{{ uid }} .sc-qd__radio::after {
+        content: '';
+        position: absolute;
+        inset: 3px;
+        border-radius: 50%;
+        background: var(--sc-qd-radio);
+        transform: scale(0);
+        transition: transform .15s ease;
+      }
+      #{{ uid }} .sc-qd__tier.is-selected .sc-qd__radio { border-color: var(--sc-qd-radio); }
+      #{{ uid }} .sc-qd__tier.is-selected .sc-qd__radio::after { transform: scale(1); }
+
+      #{{ uid }} .sc-qd__info {
+        flex: 1 1 auto;
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        min-width: 0;
+      }
+      #{{ uid }} .sc-qd__label-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px 8px;
+        min-width: 0;
+      }
+      #{{ uid }} .sc-qd__label {
+        font-size: var(--sc-qd-label-fs);
+        font-weight: var(--sc-qd-label-fw);
+        line-height: 1.3;
+        color: var(--sc-qd-text);
+        overflow-wrap: anywhere;
+      }
+      #{{ uid }} .sc-qd__sub,
+      #{{ uid }} .sc-qd__oos {
+        font-size: var(--sc-qd-sub-fs);
+        line-height: 1.35;
+        color: var(--sc-qd-muted);
+        overflow-wrap: anywhere;
+      }
+
+      #{{ uid }} .sc-qd__prices {
+        flex: 0 0 auto;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 2px;
+        max-width: 50%;
+        text-align: right;
+      }
+      #{{ uid }} .sc-qd__price-row {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        align-items: baseline;
+        gap: 2px 8px;
+      }
+      #{{ uid }} .sc-qd__price {
+        font-size: var(--sc-qd-price-fs);
+        font-weight: 500;
+        line-height: 1.3;
+        color: var(--sc-qd-price-c);
+        white-space: nowrap;
+      }
+      #{{ uid }} .sc-qd__orig {
+        font-size: calc(var(--sc-qd-price-fs) * .85);
+        line-height: 1.3;
+        color: var(--sc-qd-muted);
+        white-space: nowrap;
+      }
+      #{{ uid }} .sc-qd__unit,
+      #{{ uid }} .sc-qd__save {
+        font-size: var(--sc-qd-sub-fs);
+        line-height: 1.35;
+        color: var(--sc-qd-muted);
+      }
+      #{{ uid }} .sc-qd__save { color: var(--sc-qd-save-c); font-weight: 500; }
+
+      #{{ uid }} .sc-qd__badge {
+        display: inline-block;
+        max-width: 100%;
+        padding: 3px 12px;
+        font-size: var(--sc-qd-badge-fs);
+        font-weight: 500;
+        line-height: 1.3;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        color: var(--sc-qd-badge-c);
+        background: var(--sc-qd-badge-bg);
+        border-radius: var(--sc-qd-badge-r);
+        pointer-events: none;
+      }
+      #{{ uid }} .sc-qd__badge--inline { padding: 2px 8px; font-size: calc(var(--sc-qd-badge-fs) * .92); }
+      #{{ uid }} .sc-qd__badge--float {
+        position: absolute;
+        top: 0;
+        z-index: 2;
+        max-width: calc(100% - 16px);
+        transform: translateY(-58%);
+      }
+      #{{ uid }}.sc-qd--badge-top_center .sc-qd__badge--float { left: 50%; transform: translate(-50%, -58%); }
+      #{{ uid }}.sc-qd--badge-top_right .sc-qd__badge--float { right: 14px; }
+
+      /* Grid layout: stacked, centred cards */
+      #{{ uid }}.sc-qd--grid .sc-qd__tier {
+        flex-direction: column;
+        justify-content: flex-start;
+        gap: 8px;
+        text-align: center;
+      }
+      #{{ uid }}.sc-qd--grid .sc-qd__info { align-items: center; flex: 0 0 auto; }
+      #{{ uid }}.sc-qd--grid .sc-qd__label-row { justify-content: center; }
+      #{{ uid }}.sc-qd--grid .sc-qd__prices { align-items: center; max-width: 100%; text-align: center; }
+      #{{ uid }}.sc-qd--grid .sc-qd__price-row { justify-content: center; }
+
+      #{{ uid }} .sc-qd__atc {
+        -webkit-appearance: none;
+        appearance: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        min-height: var(--sc-qd-atc-h);
+        margin: 18px 0 0;
+        padding: 8px 20px;
+        font: inherit;
+        font-size: var(--sc-qd-atc-fs);
+        font-weight: 500;
+        line-height: 1.25;
+        letter-spacing: normal;
+        text-transform: none;
+        color: var(--sc-qd-atc-c);
+        background: var(--sc-qd-atc-bg);
+        border: 0;
+        border-radius: var(--sc-qd-atc-r);
+        box-shadow: none;
+        cursor: pointer;
+        transition: opacity .15s ease;
+      }
+      @media (hover: hover) {
+        #{{ uid }} .sc-qd__atc:not(:disabled):hover { opacity: .88; }
+      }
+      #{{ uid }} .sc-qd__atc:focus-visible { outline: 2px solid var(--sc-qd-atc-bg); outline-offset: 3px; }
+      #{{ uid }} .sc-qd__atc:disabled { opacity: .5; cursor: not-allowed; }
+      #{{ uid }} .sc-qd__atc.is-loading { opacity: .7; cursor: progress; }
+      #{{ uid }} .sc-qd__error {
+        margin: 8px 0 0;
+        font-size: 13px;
+        line-height: 1.4;
+        color: #c62828;
+      }
+      #{{ uid }} .sc-qd__footer {
+        margin: 12px 0 0;
+        font-size: var(--sc-qd-sub-fs);
+        line-height: 1.4;
+        color: var(--sc-qd-foot-c);
+        text-align: var(--sc-qd-h-align);
+      }
+
+      @media screen and (max-width: {{ mobile_max }}px) {
+        #{{ uid }}.sc-qd--box .sc-qd__inner { padding: var(--sc-qd-box-p-m); }
+        #{{ uid }} .sc-qd__heading { font-size: var(--sc-qd-h-fs-m); }
+        #{{ uid }} .sc-qd__label { font-size: var(--sc-qd-label-fs-m); }
+        #{{ uid }} .sc-qd__price { font-size: var(--sc-qd-price-fs-m); }
+        #{{ uid }} .sc-qd__orig { font-size: calc(var(--sc-qd-price-fs-m) * .85); }
+        #{{ uid }} .sc-qd__tiers { gap: var(--sc-qd-gap-m); }
+        #{{ uid }}.sc-qd--has-float-badge .sc-qd__tiers { row-gap: calc(var(--sc-qd-gap-m) + var(--sc-qd-badge-space)); }
+        #{{ uid }}.sc-qd--grid .sc-qd__tiers { grid-template-columns: repeat(var(--sc-qd-cols-m), minmax(0, 1fr)); }
+        #{{ uid }} .sc-qd__tier { gap: 10px; padding-left: max(10px, calc(var(--sc-qd-px) * .75)); padding-right: max(10px, calc(var(--sc-qd-px) * .75)); }
+        #{{ uid }} .sc-qd__radio { width: 20px; height: 20px; }
+      }
+      /* Grid with 1 column on mobile: fall back to the row layout, it reads better. */
+      {%- if s.columns_mobile == 1 %}
+      @media screen and (max-width: {{ mobile_max }}px) {
+        #{{ uid }}.sc-qd--grid .sc-qd__tier { flex-direction: row; align-items: center; gap: 10px; text-align: left; }
+        #{{ uid }}.sc-qd--grid .sc-qd__info { align-items: flex-start; flex: 1 1 auto; }
+        #{{ uid }}.sc-qd--grid .sc-qd__label-row { justify-content: flex-start; }
+        #{{ uid }}.sc-qd--grid .sc-qd__prices { align-items: flex-end; max-width: 50%; text-align: right; }
+        #{{ uid }}.sc-qd--grid .sc-qd__price-row { justify-content: flex-end; }
+      }
+      {%- endif %}
+
+      @media (prefers-reduced-motion: reduce) {
+        #{{ uid }} .sc-qd__tier,
+        #{{ uid }} .sc-qd__tier::after,
+        #{{ uid }} .sc-qd__radio,
+        #{{ uid }} .sc-qd__radio::after { transition: none; }
+      }
+    </style>
+
+    <script>
+      (function () {
+        if (!window.customElements || window.customElements.get('sc-qty-discounts')) return;
+
+        /* Common variant-change events across OS 2.0 themes (Dawn, Horizon, Focal, Impulse, Prestige ...) */
+        var VARIANT_EVENTS = [
+          'variant:change', 'variant:changed', 'variant:update', 'variantChange', 'variant-change',
+          'on:variant:change', 'theme:variant:change', 'product:variant-change', 'product:variantChange',
+          'shopify:variant:change'
+        ];
+        var EXCLUDE_CONTAINERS = 'quick-add-modal, dialog, [role="dialog"], cart-drawer';
+        /* Wrappers themes put around their quantity selector. */
+        var QTY_WRAPPERS = '.product-form__quantity, .product-form__input--quantity, quantity-selector-component, .product__quantity, .product-quantity, .quantity-selector, [data-quantity-selector]';
+        var PLACEHOLDERS = /\[(qty|percent|discount|price|unit_price|savings|original)\]/g;
+
+        /* Shared with other SC blocks: themes update ?variant= via replaceState, emit an event for it once. */
+        if (!window.__scInvHistoryPatched && window.history) {
+          window.__scInvHistoryPatched = true;
+          ['pushState', 'replaceState'].forEach(function (fn) {
+            var orig = window.history[fn];
+            if (typeof orig !== 'function') return;
+            window.history[fn] = function () {
+              var result = orig.apply(this, arguments);
+              try { window.dispatchEvent(new Event('sc:urlchange')); } catch (e) {}
+              return result;
+            };
+          });
+        }
+
+        function toArray(list) { return Array.prototype.slice.call(list || []); }
+        function fill(tpl, ctx) {
+          return String(tpl || '').replace(PLACEHOLDERS, function (m, key) { return ctx[key] != null ? ctx[key] : ''; });
+        }
+        function idFromDetail(detail) {
+          if (!detail || typeof detail !== 'object') return null;
+          var v = detail.variant || detail.resource || detail.selectedVariant || detail.currentVariant || detail.newVariant;
+          if (v && typeof v === 'object' && v.id) return String(v.id);
+          if (detail.variantId) return String(detail.variantId);
+          return null;
+        }
+
+        class ScQtyDiscounts extends HTMLElement {
+          connectedCallback() {
+            if (this._connected) return;
+            this._connected = true;
+            var dataEl = this.querySelector('[data-sc-qd-data]');
+            try { this.data = JSON.parse(dataEl ? dataEl.textContent : '{}') || {}; } catch (e) { this.data = {}; }
+            this.tiers = toArray(this.querySelectorAll('[data-sc-qd-tier]'));
+            this.atc = this.querySelector('[data-sc-qd-atc]');
+            this.atcText = this.querySelector('[data-sc-qd-atc-text]');
+            this.errorEl = this.querySelector('[data-sc-qd-error]');
+            this.variant = String(this.dataset.variantId || '');
+            this.index = parseInt(this.dataset.selected, 10) || 0;
+            this.qty = this.tierQty(this.index);
+            this.scope = this.closest('[id^="shopify-section-"]') || this.closest('section, main') || document;
+
+            this._onClick = this.onClick.bind(this);
+            this._onKey = this.onKey.bind(this);
+            this._onEvent = this.onVariantEvent.bind(this);
+            this._onChange = this.onChange.bind(this);
+            this._onSync = this.scheduleSync.bind(this);
+
+            this.addEventListener('click', this._onClick);
+            this.addEventListener('keydown', this._onKey);
+            VARIANT_EVENTS.forEach(function (name) { document.addEventListener(name, this._onEvent); }, this);
+            document.addEventListener('change', this._onChange, true);
+            window.addEventListener('sc:urlchange', this._onSync);
+            window.addEventListener('popstate', this._onSync);
+
+            this.hideQty();
+            this.render();
+            this.applyQty();
+            this.sync();
+            /* The block usually sits above the buy buttons, so the product form may not be parsed yet. */
+            if (document.readyState === 'loading') {
+              document.addEventListener('DOMContentLoaded', this._onSync, { once: true });
+            }
+            this.scheduleSync();
+          }
+
+          disconnectedCallback() {
+            this._connected = false;
+            this.removeEventListener('click', this._onClick);
+            this.removeEventListener('keydown', this._onKey);
+            VARIANT_EVENTS.forEach(function (name) { document.removeEventListener(name, this._onEvent); }, this);
+            document.removeEventListener('change', this._onChange, true);
+            window.removeEventListener('sc:urlchange', this._onSync);
+            window.removeEventListener('popstate', this._onSync);
+            clearTimeout(this._t1); clearTimeout(this._t2);
+          }
+
+          tierQty(i) {
+            var card = this.tiers[i];
+            return card ? (parseInt(card.dataset.qty, 10) || 1) : 1;
+          }
+
+          tierData(i) {
+            var vd = this.data[this.variant];
+            return vd && vd.t ? vd.t[i] : null;
+          }
+
+          /* ---------- user interaction ---------- */
+
+          onClick(event) {
+            var t = event.target;
+            if (!t || !t.closest) return;
+            if (t.closest('[data-sc-qd-atc]')) { event.preventDefault(); this.addToCart(); return; }
+            var card = t.closest('[data-sc-qd-tier]');
+            if (!card || !this.contains(card)) return;
+            event.preventDefault();
+            this.select(this.tiers.indexOf(card), true);
+          }
+
+          onKey(event) {
+            var card = event.target.closest && event.target.closest('[data-sc-qd-tier]');
+            if (!card) return;
+            var n = this.tiers.length;
+            var i = this.tiers.indexOf(card);
+            var dir = 0;
+            switch (event.key) {
+              case 'ArrowRight': case 'ArrowDown': dir = 1; break;
+              case 'ArrowLeft': case 'ArrowUp': dir = -1; break;
+              case 'Home': i = -1; dir = 1; break;
+              case 'End': i = n; dir = -1; break;
+              default: return;
+            }
+            event.preventDefault();
+            for (var step = 0; step < n; step++) {
+              i = (i + dir + n) % n;
+              if (!this.tiers[i].classList.contains('is-unavailable')) break;
+            }
+            this.tiers[i].focus({ preventScroll: true });
+            this.select(i, true);
+          }
+
+          select(i, fromUser) {
+            var card = this.tiers[i];
+            if (!card || card.classList.contains('is-unavailable')) return;
+            this.index = i;
+            this.qty = this.tierQty(i);
+            this.paintSelection();
+            this.applyQty();
+            if (fromUser) {
+              var t = this.tierData(i) || {};
+              try {
+                document.dispatchEvent(new CustomEvent('sc:quantity-discounts:change', {
+                  detail: { productId: this.dataset.productId, variantId: this.variant, quantity: this.qty, tier: i + 1, discount: t.d || '' }
+                }));
+              } catch (e) {}
+            }
+          }
+
+          /* ---------- rendering ---------- */
+
+          ctx(i) {
+            var t = this.tierData(i);
+            if (!t) return null;
+            return { qty: this.tierQty(i), percent: t.r, discount: t.d, price: t.p, unit_price: t.u, savings: t.s, original: t.o };
+          }
+
+          render() {
+            var vd = this.data[this.variant];
+            if (!vd) return;
+            this.tiers.forEach(function (card, i) {
+              var t = vd.t[i];
+              if (!t) return;
+              var c = this.ctx(i);
+              toArray(card.querySelectorAll('[data-tpl]')).forEach(function (el) { el.textContent = fill(el.getAttribute('data-tpl'), c); });
+              toArray(card.querySelectorAll('[data-f]')).forEach(function (el) { el.textContent = t[el.getAttribute('data-f')] || ''; });
+              toArray(card.querySelectorAll('[data-needs-save]')).forEach(function (el) { el.hidden = !t.z; });
+              var oos = card.querySelector('[data-sc-qd-oos]');
+              if (oos) oos.hidden = !!t.ok || !vd.a;
+              card.classList.toggle('is-unavailable', !t.ok);
+              if (t.ok) card.removeAttribute('aria-disabled'); else card.setAttribute('aria-disabled', 'true');
+            }, this);
+
+            /* Selected tier not possible for this variant (stock): fall back to the biggest possible tier below it. */
+            var cur = vd.t[this.index];
+            if (vd.a && cur && !cur.ok) {
+              var best = -1;
+              var max = this.tierQty(this.index);
+              this.tiers.forEach(function (card, i) {
+                var t = vd.t[i];
+                if (t && t.ok && this.tierQty(i) <= max && (best < 0 || this.tierQty(i) > this.tierQty(best))) best = i;
+              }, this);
+              if (best > -1) { this.index = best; this.qty = this.tierQty(best); this.applyQty(); }
+            }
+            this.paintSelection();
+          }
+
+          paintSelection() {
+            var found = false;
+            this.tiers.forEach(function (card, i) {
+              var on = i === this.index;
+              if (on) found = true;
+              card.classList.toggle('is-selected', on);
+              card.setAttribute('aria-checked', on ? 'true' : 'false');
+              card.tabIndex = on ? 0 : -1;
+            }, this);
+            if (!found && this.tiers.length) this.tiers[0].tabIndex = 0;
+            this.paintAtc();
+          }
+
+          paintAtc() {
+            if (!this.atc) return;
+            var vd = this.data[this.variant];
+            var t = this.tierData(this.index);
+            var ok = !!(vd && vd.a && (!t || t.ok));
+            this.atc.disabled = !ok;
+            var c = this.ctx(this.index);
+            var text = ok ? (c ? fill(this.atc.getAttribute('data-tpl'), c) : this.atc.getAttribute('data-tpl').replace(PLACEHOLDERS, '')) : this.atc.getAttribute('data-sold-out');
+            if (this.atcText) this.atcText.textContent = text;
+          }
+
+          /* ---------- product form / quantity ---------- */
+
+          belongsToUs(node) {
+            if (!node || !node.closest) return true;
+            var form = node.closest('form') || node.form;
+            var pid = form && form.querySelector('[name="product-id"]');
+            return !pid || !pid.value || pid.value === this.dataset.productId;
+          }
+
+          productForms() {
+            var self = this;
+            return toArray(document.querySelectorAll('form[action*="/cart/add"]')).filter(function (form) {
+              if (form.closest(EXCLUDE_CONTAINERS)) return false;
+              if (/installment/i.test(form.id || '')) return false;
+              var pid = form.querySelector('[name="product-id"]');
+              if (pid && pid.value) return pid.value === self.dataset.productId;
+              return self.scope !== document && self.scope.contains(form);
+            });
+          }
+
+          /* Theme quantity inputs of our product form(s); adds a hidden one where a form has none. */
+          qtyFields(create) {
+            var fields = [];
+            this.productForms().forEach(function (form) {
+              var f = form.elements ? form.elements.namedItem('quantity') : null;
+              var list = !f ? [] : (f.tagName ? [f] : toArray(f));
+              list = list.filter(function (el) { return !(el.closest && el.closest(EXCLUDE_CONTAINERS)); });
+              if (!list.length && create) {
+                var hidden = document.createElement('input');
+                hidden.type = 'hidden';
+                hidden.name = 'quantity';
+                hidden.setAttribute('data-sc-qd-qty', '');
+                form.appendChild(hidden);
+                list = [hidden];
+              }
+              fields = fields.concat(list);
+            });
+            return fields;
+          }
+
+          applyQty() {
+            var value = String(this.qty);
+            this._setting = true;
+            try {
+              this.qtyFields(true).forEach(function (f) {
+                if (String(f.value) === value) return;
+                f.value = value;
+                if (f.hasAttribute('data-sc-qd-qty')) return;
+                f.dispatchEvent(new Event('input', { bubbles: true }));
+                f.dispatchEvent(new Event('change', { bubbles: true }));
+              });
+            } finally {
+              this._setting = false;
+            }
+          }
+
+          hideQty() {
+            if (this.dataset.hideQty !== 'true') return;
+            var self = this;
+            var custom = this.dataset.qtySelector;
+            var targets = [];
+            if (custom) {
+              try { targets = toArray(this.scope.querySelectorAll(custom)); } catch (e) { targets = []; }
+            }
+            this.qtyFields(false).forEach(function (f) {
+              if (f.hasAttribute('data-sc-qd-qty')) return;
+              var w = f.closest(QTY_WRAPPERS) || f.closest('quantity-input, quantity-selector');
+              if (w) targets.push(w);
+            });
+            targets.forEach(function (el) {
+              if (el.contains(self) || self.contains(el)) return;
+              if (!el.hasAttribute('data-sc-qd-hidden')) el.setAttribute('data-sc-qd-hidden', '');
+            });
+          }
+
+          /* User changed the theme's quantity (if still visible): highlight the matching tier. */
+          onUserQty(value) {
+            var n = parseInt(value, 10);
+            if (!n || n < 1) return;
+            this.qty = n;
+            var vd = this.data[this.variant];
+            var best = -1;
+            this.tiers.forEach(function (card, i) {
+              var t = vd && vd.t[i];
+              var q = this.tierQty(i);
+              if ((!t || t.ok) && q <= n && (best < 0 || q > this.tierQty(best))) best = i;
+            }, this);
+            this.index = best;
+            this.paintSelection();
+          }
+
+          readVariantId() {
+            var forms = this.productForms();
+            for (var i = 0; i < forms.length; i++) {
+              var field = forms[i].elements ? forms[i].elements.namedItem('id') : null;
+              if (field && !field.tagName && field.length) field = field[0];
+              if (field && field.value) return String(field.value);
+            }
+            try {
+              var fromUrl = new URL(window.location.href).searchParams.get('variant');
+              if (fromUrl) return fromUrl;
+            } catch (e) {}
+            return null;
+          }
+
+          /* ---------- keeping in sync ---------- */
+
+          onVariantEvent(event) {
+            if (event.target && event.target !== document && event.target.closest && !this.belongsToUs(event.target)) return;
+            var id = idFromDetail(event.detail);
+            if (id) this.setVariant(id);
+            this.scheduleSync();
+          }
+
+          onChange(event) {
+            var t = event.target;
+            if (this._setting || !t || this.contains(t) || !this.belongsToUs(t)) return;
+            if (t.closest && t.closest(EXCLUDE_CONTAINERS)) return;
+            if (t.name === 'quantity') { this.onUserQty(t.value); return; }
+            if (t.name === 'id' && t.form && t.form.matches('form[action*="/cart/add"]')) this.setVariant(t.value);
+            this.scheduleSync();
+          }
+
+          scheduleSync() {
+            var self = this;
+            clearTimeout(this._t1); clearTimeout(this._t2);
+            this._t1 = setTimeout(function () { self.sync(); }, 80);
+            this._t2 = setTimeout(function () { self.sync(); }, 600);
+          }
+
+          /* Themes often re-render the product form on variant change: re-read the variant, re-hide, re-apply the quantity. */
+          sync() {
+            this.hideQty();
+            var id = this.readVariantId();
+            if (id) this.setVariant(id);
+            this.applyQty();
+          }
+
+          setVariant(id) {
+            id = String(id || '');
+            if (!id || id === this.variant || !this.data[id]) return;
+            this.variant = id;
+            this.render();
+          }
+
+          /* ---------- own Add to cart button ---------- */
+
+          addToCart() {
+            if (!this.atc || this.atc.disabled) return;
+            this.showError('');
+            this.applyQty();
+            var btn = null;
+            this.productForms().some(function (form) {
+              var b = form.querySelector('button[type="submit"], input[type="submit"]') ||
+                (form.id ? document.querySelector('button[type="submit"][form="' + form.id + '"]') : null);
+              if (b && !b.disabled) { btn = b; return true; }
+              return false;
+            });
+            if (btn) { btn.click(); return; }
+
+            /* No usable theme form/button: add via the Ajax API, then open the cart. */
+            var self = this;
+            this.atc.classList.add('is-loading');
+            fetch((this.dataset.addUrl || '/cart/add') + '.js', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+              body: JSON.stringify({ items: [{ id: Number(this.variant), quantity: this.qty }] })
+            })
+              .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+              .then(function (res) {
+                if (!res.ok) throw new Error((res.j && (res.j.description || res.j.message)) || 'Could not add to cart.');
+                window.location.href = self.dataset.cartUrl || '/cart';
+              })
+              .catch(function (e) { self.showError(e.message); })
+              .then(function () { self.atc.classList.remove('is-loading'); });
+          }
+
+          showError(msg) {
+            if (!this.errorEl) return;
+            this.errorEl.textContent = msg || '';
+            this.errorEl.hidden = !msg;
+          }
+        }
+
+        window.customElements.define('sc-qty-discounts', ScQtyDiscounts);
+      })();
+    </script>
+  {%- endif -%}
+{%- endif -%}

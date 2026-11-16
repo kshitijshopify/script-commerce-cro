@@ -1,0 +1,740 @@
+{%- comment -%}
+  SC – Sub-collection bubbles
+  ScriptCommerce CRO section. Self-contained, theme-independent (Dawn, Horizon, any OS 2.0 theme).
+
+  A row of linked collection "bubbles" (image + label), meant to sit right below the hero / press-logo bar.
+  - Each block: collection picker + optional image / label / link overrides, badge, bubble colour.
+  - Defaults come from the picked collection (featured image, title, URL).
+  - Circle or square images, desktop/mobile sizes, wrap or horizontal scroll per breakpoint.
+  - Alignment Left | Center (desktop + optional mobile override).
+  - Positioning Static | Absolute.
+      Absolute = the section takes no height and its bubble row is anchored to the boundary with the
+      section placed directly ABOVE it in the editor (e.g. the hero). It is either fully inside the bottom
+      of that section ("inside", offset from the boundary) or straddles the boundary ("straddle").
+      This only relies on Shopify's own section wrapper (#shopify-section-<id>), never on hero selectors.
+      If the section is the first on the page it falls back to Static. Mobile can fall back to Static.
+  - Data attributes on every link for analytics, optional dataLayer / Shopify.analytics click events.
+{%- endcomment -%}
+
+{%- liquid
+  assign s = section.settings
+  assign sid = section.id
+  assign root = '#ScSb-' | append: sid
+  assign wrap_sel = '#shopify-section-' | append: sid
+
+  assign is_absolute = false
+  if s.positioning == 'absolute' and section.index != 1
+    assign is_absolute = true
+  endif
+
+  assign align_d = s.alignment
+  assign align_m = s.alignment_mobile
+  if align_m == 'same'
+    assign align_m = align_d
+  endif
+
+  assign justify_d = 'flex-start'
+  if align_d == 'center'
+    assign justify_d = 'center'
+  endif
+  assign justify_m = 'flex-start'
+  if align_m == 'center'
+    assign justify_m = 'center'
+  endif
+
+  case s.text_align
+    when 'left'
+      assign item_align = 'flex-start'
+    when 'right'
+      assign item_align = 'flex-end'
+    else
+      assign item_align = 'center'
+  endcase
+
+  assign radius = '50%'
+  if s.image_shape == 'square'
+    assign radius = s.square_radius | append: 'px'
+  endif
+
+  assign loading = 'lazy'
+  if s.lazy_load == 'eager'
+    assign loading = 'eager'
+  elsif s.lazy_load == 'auto' and section.index != nil and section.index <= 2
+    assign loading = 'eager'
+  endif
+
+  assign sizes = '(min-width: 750px) ' | append: s.image_size_d | append: 'px, ' | append: s.image_size_m | append: 'px'
+
+  assign heading = s.heading | strip
+  assign nav_label = s.nav_label | strip
+  if nav_label == blank
+    assign nav_label = heading | default: 'Shop by collection'
+  endif
+
+  assign is_collection_page = false
+  if template.name == 'collection' and collection
+    assign is_collection_page = true
+  endif
+-%}
+
+{%- capture sc_items -%}
+  {%- assign sc_count = 0 -%}
+  {%- for block in section.blocks -%}
+    {%- liquid
+      assign b = block.settings
+      assign c = b.collection
+      assign render_it = true
+      if b.enabled == false
+        assign render_it = false
+      endif
+
+      assign label = b.label | strip
+      if label == blank and c != blank
+        assign label = c.title
+      endif
+
+      assign img = b.image
+      if img == blank and c != blank
+        assign img = c.featured_image
+      endif
+
+      assign url = b.link
+      if url == blank and c != blank
+        assign url = c.url
+      endif
+
+      assign is_placeholder = false
+      if label == blank and img == blank
+        if request.design_mode
+          assign is_placeholder = true
+          assign label = 'Collection title'
+        else
+          assign render_it = false
+        endif
+      endif
+
+      assign is_active = false
+      if s.highlight_active and is_collection_page and c != blank and collection.handle == c.handle
+        assign is_active = true
+      elsif s.highlight_active and url != blank and request.path == url
+        assign is_active = true
+      endif
+
+      assign badge = b.badge | strip
+      assign ph_index = forloop.index0 | modulo: 6 | plus: 1
+    -%}
+    {%- if render_it -%}
+      {%- assign sc_count = sc_count | plus: 1 -%}
+      {%- if url != blank -%}{%- assign tag = 'a' -%}{%- else -%}{%- assign tag = 'div' -%}{%- endif -%}
+      <li class="sc-sub-bubbles__item" {{ block.shopify_attributes }}>
+        <{{ tag }}
+          class="sc-sub-bubbles__link{% if is_active %} is-active{% endif %}"
+          {% if url != blank %}
+            href="{{ url }}"
+            {% if b.new_tab %}target="_blank" rel="noopener"{% endif %}
+          {% endif %}
+          {% if is_active %}aria-current="page"{% endif %}
+          data-sc-bubble
+          data-sc-bubble-label="{{ label | escape }}"
+          data-sc-bubble-position="{{ sc_count }}"
+          data-sc-bubble-handle="{{ c.handle | default: '' }}"
+          data-sc-bubble-badge="{{ badge | escape }}"
+        >
+          <span class="sc-sub-bubbles__figure">
+            <span
+              class="sc-sub-bubbles__media"
+              {% if b.bubble_bg != blank %}style="--sc-sb-item-bg: {{ b.bubble_bg }};"{% endif %}
+            >
+              {%- if img != blank -%}
+                {%- liquid
+                  if s.show_labels
+                    assign alt = ''
+                  else
+                    assign alt = label
+                  endif
+                  echo img | image_url: width: 400 | image_tag: widths: '80, 120, 160, 200, 240, 320, 400', sizes: sizes, loading: loading, alt: alt, class: 'sc-sub-bubbles__img'
+                -%}
+              {%- elsif is_placeholder -%}
+                {%- assign ph = 'collection-' | append: ph_index -%}
+                {{ ph | placeholder_svg_tag: 'sc-sub-bubbles__img sc-sub-bubbles__img--ph' }}
+              {%- else -%}
+                <span class="sc-sub-bubbles__initial" aria-hidden="true">{{ label | slice: 0 | upcase }}</span>
+              {%- endif -%}
+            </span>
+            {%- if badge != blank -%}
+              <span class="sc-sub-bubbles__badge">{{ badge | escape }}</span>
+            {%- endif -%}
+          </span>
+          {%- if s.show_labels -%}
+            <span class="sc-sub-bubbles__label">{{ label | escape }}</span>
+          {%- elsif img == blank -%}
+            <span class="sc-sub-bubbles__sr">{{ label | escape }}</span>
+          {%- endif -%}
+        </{{ tag }}>
+      </li>
+    {%- endif -%}
+  {%- endfor -%}
+{%- endcapture -%}
+
+{%- assign show_section = true -%}
+{%- if s.enabled == false or sc_count == 0 -%}
+  {%- assign show_section = false -%}
+{%- endif -%}
+
+{%- if show_section -%}
+<style>
+  {{ root }} {
+    --sc-sb-img: {{ s.image_size_d }}px;
+    --sc-sb-fs: {{ s.font_size_d }}px;
+    --sc-sb-hs: {{ s.heading_size_d }}px;
+    --sc-sb-gap: {{ s.gap_d }}px;
+    --sc-sb-row-gap: {{ s.row_gap_d }}px;
+    --sc-sb-label-max: {{ s.label_max_width_d }}px;
+    --sc-sb-pt: {{ s.pad_top_d }}px;
+    --sc-sb-pb: {{ s.pad_bottom_d }}px;
+    --sc-sb-side: {{ s.side_pad_d }}px;
+    --sc-sb-justify: {{ justify_d }};
+    --sc-sb-abs-off: {{ s.absolute_offset_d }}px;
+    --sc-sb-max: {% if s.full_width %}none{% else %}{{ s.max_width }}px{% endif %};
+    --sc-sb-radius: {{ radius }};
+    --sc-sb-bw: {{ s.border_width }}px;
+    --sc-sb-img-pad: {{ s.image_padding }}px;
+    --sc-sb-fit: {{ s.image_fit }};
+    --sc-sb-fw: {{ s.font_weight }};
+    --sc-sb-label-gap: {{ s.label_gap }}px;
+    --sc-sb-lines: {{ s.label_lines }};
+    --sc-sb-item-align: {{ item_align }};
+    --sc-sb-text-align: {{ s.text_align }};
+    --sc-sb-bg: {% if s.transparent_bg %}transparent{% else %}{{ s.bg_color }}{% endif %};
+    --sc-sb-heading: {{ s.heading_color }};
+    --sc-sb-text: {{ s.text_color }};
+    --sc-sb-text-hover: {{ s.text_hover_color }};
+    --sc-sb-img-bg: {{ s.image_bg_color }};
+    --sc-sb-bc: {{ s.border_color }};
+    --sc-sb-bc-hover: {{ s.border_hover_color }};
+    --sc-sb-active: {{ s.active_color }};
+    --sc-sb-focus: {{ s.focus_color }};
+    --sc-sb-badge-bg: {{ s.badge_bg }};
+    --sc-sb-badge-text: {{ s.badge_text }};
+    display: block;
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 100%;
+    background: var(--sc-sb-bg);
+    color: var(--sc-sb-text);
+  }
+  @media screen and (max-width: 749px) {
+    {{ root }} {
+      --sc-sb-img: {{ s.image_size_m }}px;
+      --sc-sb-fs: {{ s.font_size_m }}px;
+      --sc-sb-hs: {{ s.heading_size_m }}px;
+      --sc-sb-gap: {{ s.gap_m }}px;
+      --sc-sb-row-gap: {{ s.row_gap_m }}px;
+      --sc-sb-label-max: {{ s.label_max_width_m }}px;
+      --sc-sb-pt: {{ s.pad_top_m }}px;
+      --sc-sb-pb: {{ s.pad_bottom_m }}px;
+      --sc-sb-side: {{ s.side_pad_m }}px;
+      --sc-sb-justify: {{ justify_m }};
+      --sc-sb-abs-off: {{ s.absolute_offset_m }}px;
+    }
+  }
+
+  {{ root }} *,
+  {{ root }} *::before,
+  {{ root }} *::after { box-sizing: border-box; }
+
+  {{ root }} .sc-sub-bubbles__inner {
+    max-width: var(--sc-sb-max);
+    margin: 0 auto;
+    padding: var(--sc-sb-pt) var(--sc-sb-side) var(--sc-sb-pb);
+  }
+  {{ root }} .sc-sub-bubbles__heading {
+    margin: 0 0 16px;
+    font-size: var(--sc-sb-hs);
+    line-height: 1.2;
+    color: var(--sc-sb-heading);
+    text-align: {% if align_d == 'center' %}center{% else %}left{% endif %};
+  }
+  @media screen and (max-width: 749px) {
+    {{ root }} .sc-sub-bubbles__heading { text-align: {% if align_m == 'center' %}center{% else %}left{% endif %}; }
+  }
+
+  {{ root }} .sc-sub-bubbles__list {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: var(--sc-sb-justify);
+    align-items: flex-start;
+    gap: var(--sc-sb-row-gap) var(--sc-sb-gap);
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  /* Horizontal scroll – applied per breakpoint */
+  {%- capture sc_scroll_css -%}
+    {{ root }} .sc-sub-bubbles__list {
+      flex-wrap: nowrap;
+      justify-content: flex-start;
+      overflow-x: auto;
+      overscroll-behavior-x: contain;
+      scroll-snap-type: x proximity;
+      -webkit-overflow-scrolling: touch;
+      margin: -8px calc(var(--sc-sb-side) * -1);
+      padding: 8px var(--sc-sb-side);
+      scroll-padding-inline: var(--sc-sb-side);
+      {% if s.hide_scrollbar %}scrollbar-width: none;{% endif %}
+    }
+    {% if s.hide_scrollbar %}{{ root }} .sc-sub-bubbles__list::-webkit-scrollbar { display: none; }{% endif %}
+    {{ root }} .sc-sub-bubbles__item { scroll-snap-align: start; }
+  {%- endcapture -%}
+  {%- capture sc_scroll_center_css -%}
+    {{ root }} .sc-sub-bubbles__item:first-child { margin-left: auto; }
+    {{ root }} .sc-sub-bubbles__item:last-child { margin-right: auto; }
+  {%- endcapture -%}
+  {%- if s.layout_desktop == 'scroll' %}
+  @media screen and (min-width: 750px) {
+    {{ sc_scroll_css }}
+    {% if align_d == 'center' %}{{ sc_scroll_center_css }}{% endif %}
+  }
+  {%- endif %}
+  {%- if s.layout_mobile == 'scroll' %}
+  @media screen and (max-width: 749px) {
+    {{ sc_scroll_css }}
+    {% if align_m == 'center' %}{{ sc_scroll_center_css }}{% endif %}
+  }
+  {%- endif %}
+
+  {{ root }} .sc-sub-bubbles__item {
+    flex: 0 0 auto;
+    width: max-content;
+    min-width: var(--sc-sb-img);
+    max-width: max(var(--sc-sb-img), var(--sc-sb-label-max));
+    margin: 0;
+    padding: 0;
+  }
+  {{ root }} .sc-sub-bubbles__link {
+    display: flex;
+    flex-direction: column;
+    align-items: var(--sc-sb-item-align);
+    gap: var(--sc-sb-label-gap);
+    width: 100%;
+    color: var(--sc-sb-text);
+    text-decoration: none;
+    border-radius: 6px;
+    -webkit-tap-highlight-color: transparent;
+  }
+  {{ root }} a.sc-sub-bubbles__link { cursor: pointer; }
+  {{ root }} .sc-sub-bubbles__link:focus { outline: none; }
+  {{ root }} .sc-sub-bubbles__link:focus-visible {
+    outline: 2px solid var(--sc-sb-focus);
+    outline-offset: 4px;
+  }
+
+  {{ root }} .sc-sub-bubbles__figure {
+    position: relative;
+    display: block;
+    flex: none;
+    width: var(--sc-sb-img);
+    height: var(--sc-sb-img);
+    transition: transform 0.25s ease;
+  }
+  {{ root }} .sc-sub-bubbles__media {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    border-radius: var(--sc-sb-radius);
+    border: var(--sc-sb-bw) solid var(--sc-sb-bc);
+    background: var(--sc-sb-item-bg, var(--sc-sb-img-bg));
+    padding: var(--sc-sb-img-pad);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    /* keeps rounded clipping during the zoom transition in Safari */
+    isolation: isolate;
+    transform: translateZ(0);
+  }
+  {{ root }} .sc-sub-bubbles__img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    object-fit: var(--sc-sb-fit);
+    object-position: center;
+    border-radius: {% if s.image_padding > 0 %}var(--sc-sb-radius){% else %}0{% endif %};
+    transition: transform 0.35s ease;
+  }
+  {{ root }} .sc-sub-bubbles__img--ph {
+    background: transparent;
+    fill: currentColor;
+    opacity: 0.45;
+  }
+  {{ root }} .sc-sub-bubbles__initial {
+    font-size: calc(var(--sc-sb-img) * 0.4);
+    font-weight: 600;
+    line-height: 1;
+    color: var(--sc-sb-text);
+    opacity: 0.7;
+  }
+  {{ root }} .sc-sub-bubbles__badge {
+    position: absolute;
+    top: 0;
+    {% if s.image_shape == 'circle' %}right: -6px;{% else %}right: -4px; top: -6px;{% endif %}
+    z-index: 1;
+    max-width: calc(var(--sc-sb-img) + 12px);
+    padding: 3px 7px;
+    border-radius: 999px;
+    background: var(--sc-sb-badge-bg);
+    color: var(--sc-sb-badge-text);
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1.2;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  {{ root }} .sc-sub-bubbles__label {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: var(--sc-sb-lines);
+    overflow: hidden;
+    width: 100%;
+    font-size: var(--sc-sb-fs);
+    font-weight: var(--sc-sb-fw);
+    line-height: 1.3;
+    text-align: var(--sc-sb-text-align);
+    text-transform: {{ s.text_transform }};
+    color: inherit;
+    overflow-wrap: break-word;
+    transition: color 0.2s ease;
+  }
+  {{ root }} .sc-sub-bubbles__sr {
+    position: absolute !important;
+    width: 1px; height: 1px;
+    margin: -1px; padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  /* Active (current collection) */
+  {{ root }} .sc-sub-bubbles__link.is-active .sc-sub-bubbles__media {
+    border-color: var(--sc-sb-active);
+    box-shadow: 0 0 0 2px var(--sc-sb-active);
+  }
+  {{ root }} .sc-sub-bubbles__link.is-active .sc-sub-bubbles__label { font-weight: 700; }
+
+  /* Hover */
+  @media (hover: hover) {
+    {{ root }} a.sc-sub-bubbles__link:hover { color: var(--sc-sb-text-hover); }
+    {%- case s.hover_effect -%}
+      {%- when 'zoom' %}
+    {{ root }} a.sc-sub-bubbles__link:hover .sc-sub-bubbles__img { transform: scale(1.07); }
+      {%- when 'lift' %}
+    {{ root }} a.sc-sub-bubbles__link:hover .sc-sub-bubbles__figure { transform: translateY(-4px); }
+      {%- when 'ring' %}
+    {{ root }} a.sc-sub-bubbles__link:hover .sc-sub-bubbles__media {
+      border-color: var(--sc-sb-bc-hover);
+      box-shadow: 0 0 0 2px var(--sc-sb-bc-hover);
+    }
+    {%- endcase %}
+  }
+  @media (prefers-reduced-motion: reduce) {
+    {{ root }} .sc-sub-bubbles__figure,
+    {{ root }} .sc-sub-bubbles__img { transition: none; transform: none !important; }
+  }
+
+  {%- if is_absolute %}
+  /* Absolute positioning: anchored to the boundary with the section above. Section itself takes no height. */
+  {%- capture sc_abs_css -%}
+    {{ wrap_sel }} {
+      position: relative !important;
+      z-index: {{ s.z_index }};
+      height: 0 !important;
+      min-height: 0 !important;
+      margin-top: 0 !important;
+      margin-bottom: 0 !important;
+      padding: 0 !important;
+      overflow: visible !important;
+    }
+    {{ root }} {
+      position: absolute;
+      left: 0;
+      right: 0;
+      pointer-events: none;
+      {% if s.absolute_placement == 'straddle' %}
+        top: 0;
+        transform: translateY(-50%);
+      {% else %}
+        bottom: var(--sc-sb-abs-off);
+      {% endif %}
+    }
+    {{ root }} .sc-sub-bubbles__heading,
+    {{ root }} .sc-sub-bubbles__item { pointer-events: auto; }
+    {{ root }} .sc-sub-bubbles__list { pointer-events: auto; }
+  {%- endcapture -%}
+  {%- if s.absolute_mobile == 'static' %}
+  @media screen and (min-width: 750px) {
+    {{ sc_abs_css }}
+  }
+  {%- else %}
+  {{ sc_abs_css }}
+  {%- endif %}
+  {%- endif %}
+
+  {%- if s.custom_css != blank %}
+  /* Custom CSS (scoped to this section) */
+  {{ root }} {
+    {{ s.custom_css | remove: '<' }}
+  }
+  {%- endif %}
+</style>
+
+<div
+  id="ScSb-{{ sid }}"
+  class="sc-sub-bubbles sc-sub-bubbles--{{ s.image_shape }}{% if is_absolute %} sc-sub-bubbles--absolute{% endif %}"
+  data-sc-section="{{ sid }}"
+  {% if s.enable_tracking %}data-sc-track{% endif %}
+>
+  <div class="sc-sub-bubbles__inner">
+    {%- if heading != blank -%}
+      <h2 class="sc-sub-bubbles__heading">{{ heading | escape }}</h2>
+    {%- endif -%}
+    <nav aria-label="{{ nav_label | escape }}">
+      <ul class="sc-sub-bubbles__list" role="list">
+        {{ sc_items }}
+      </ul>
+    </nav>
+  </div>
+</div>
+
+{%- if s.enable_tracking -%}
+<script>
+  (function () {
+    if (window.__scSubBubblesTracking) return;
+    window.__scSubBubblesTracking = true;
+    document.addEventListener('click', function (e) {
+      var link = e.target && e.target.closest ? e.target.closest('[data-sc-bubble]') : null;
+      if (!link) return;
+      var wrap = link.closest('[data-sc-track]');
+      if (!wrap) return;
+      var data = {
+        section_id: wrap.getAttribute('data-sc-section') || '',
+        label: link.getAttribute('data-sc-bubble-label') || '',
+        position: Number(link.getAttribute('data-sc-bubble-position')) || 0,
+        collection_handle: link.getAttribute('data-sc-bubble-handle') || '',
+        badge: link.getAttribute('data-sc-bubble-badge') || '',
+        url: link.getAttribute('href') || '',
+        page_type: {{ template.name | json }}
+      };
+      try {
+        window.dataLayer = window.dataLayer || [];
+        window.dataLayer.push(Object.assign({ event: 'sc_bubble_click' }, data));
+      } catch (err) {}
+      try {
+        if (window.Shopify && window.Shopify.analytics && typeof window.Shopify.analytics.publish === 'function') {
+          window.Shopify.analytics.publish('sc_bubble_click', data);
+        }
+      } catch (err) {}
+    }, true);
+  })();
+</script>
+{%- endif -%}
+
+{%- elsif request.design_mode -%}
+  <div style="padding:16px;margin:8px auto;max-width:1200px;border:1px dashed #b5b5b5;border-radius:8px;font:14px/1.4 sans-serif;color:#555;text-align:center;">
+    {%- if s.enabled == false -%}
+      SC – Sub-collection bubbles is hidden. Turn on “Show section” to display it.
+    {%- else -%}
+      SC – Sub-collection bubbles: add a “Collection bubble” block and pick a collection.
+    {%- endif -%}
+  </div>
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "SC–Sub-collection bubbles",
+  "class": "sc-sub-bubbles-section",
+  "settings": [
+    { "type": "header", "content": "General" },
+    { "type": "checkbox", "id": "enabled", "label": "Show section", "default": true },
+    { "type": "text", "id": "heading", "label": "Heading", "info": "Optional. Leave empty to show only the bubbles." },
+    { "type": "range", "id": "heading_size_d", "label": "Heading size – desktop", "min": 14, "max": 48, "step": 1, "unit": "px", "default": 24 },
+    { "type": "range", "id": "heading_size_m", "label": "Heading size – mobile", "min": 12, "max": 36, "step": 1, "unit": "px", "default": 20 },
+    { "type": "text", "id": "nav_label", "label": "Accessible navigation name", "default": "Shop by collection", "info": "Read by screen readers. Not shown on the page." },
+
+    { "type": "header", "content": "Layout & alignment" },
+    {
+      "type": "select", "id": "alignment", "label": "Alignment – desktop", "default": "center",
+      "options": [ { "value": "left", "label": "Left" }, { "value": "center", "label": "Center" } ]
+    },
+    {
+      "type": "select", "id": "alignment_mobile", "label": "Alignment – mobile", "default": "same",
+      "options": [ { "value": "same", "label": "Same as desktop" }, { "value": "left", "label": "Left" }, { "value": "center", "label": "Center" } ]
+    },
+    {
+      "type": "select", "id": "layout_desktop", "label": "Layout – desktop", "default": "wrap",
+      "options": [ { "value": "wrap", "label": "Wrap to new rows" }, { "value": "scroll", "label": "Single row, scroll" } ]
+    },
+    {
+      "type": "select", "id": "layout_mobile", "label": "Layout – mobile", "default": "scroll",
+      "options": [ { "value": "wrap", "label": "Wrap to new rows" }, { "value": "scroll", "label": "Single row, swipe" } ]
+    },
+    { "type": "checkbox", "id": "hide_scrollbar", "label": "Hide scrollbar in scroll layout", "default": true },
+    { "type": "checkbox", "id": "full_width", "label": "Full width content", "default": false },
+    { "type": "range", "id": "max_width", "label": "Content max width", "min": 600, "max": 1800, "step": 20, "unit": "px", "default": 1200 },
+    { "type": "range", "id": "side_pad_d", "label": "Side padding – desktop", "min": 0, "max": 80, "step": 2, "unit": "px", "default": 20 },
+    { "type": "range", "id": "side_pad_m", "label": "Side padding – mobile", "min": 0, "max": 40, "step": 2, "unit": "px", "default": 16 },
+
+    { "type": "header", "content": "Bubble image" },
+    {
+      "type": "select", "id": "image_shape", "label": "Image shape", "default": "circle",
+      "options": [ { "value": "circle", "label": "Circle" }, { "value": "square", "label": "Square" } ]
+    },
+    { "type": "range", "id": "square_radius", "label": "Square corner radius", "min": 0, "max": 40, "step": 1, "unit": "px", "default": 8, "info": "Square shape only." },
+    { "type": "range", "id": "image_size_d", "label": "Image size – desktop", "min": 40, "max": 200, "step": 4, "unit": "px", "default": 80 },
+    { "type": "range", "id": "image_size_m", "label": "Image size – mobile", "min": 40, "max": 160, "step": 4, "unit": "px", "default": 68 },
+    {
+      "type": "select", "id": "image_fit", "label": "Image fit", "default": "cover",
+      "options": [ { "value": "cover", "label": "Fill (crop)" }, { "value": "contain", "label": "Fit (no crop)" } ],
+      "info": "Use 'Fit' for product packshots on a coloured bubble."
+    },
+    { "type": "range", "id": "image_padding", "label": "Image inner padding", "min": 0, "max": 24, "step": 1, "unit": "px", "default": 0 },
+    { "type": "range", "id": "border_width", "label": "Border width", "min": 0, "max": 8, "step": 1, "unit": "px", "default": 0 },
+    {
+      "type": "select", "id": "hover_effect", "label": "Hover effect", "default": "zoom",
+      "options": [
+        { "value": "none", "label": "None" },
+        { "value": "zoom", "label": "Zoom image" },
+        { "value": "lift", "label": "Lift bubble" },
+        { "value": "ring", "label": "Highlight border" }
+      ]
+    },
+    { "type": "checkbox", "id": "highlight_active", "label": "Highlight current collection", "default": true, "info": "On a collection page the matching bubble gets a ring." },
+
+    { "type": "header", "content": "Labels" },
+    { "type": "checkbox", "id": "show_labels", "label": "Show labels", "default": true },
+    { "type": "range", "id": "font_size_d", "label": "Font size – desktop", "min": 10, "max": 28, "step": 1, "unit": "px", "default": 15 },
+    { "type": "range", "id": "font_size_m", "label": "Font size – mobile", "min": 10, "max": 22, "step": 1, "unit": "px", "default": 13 },
+    {
+      "type": "select", "id": "font_weight", "label": "Font weight", "default": "400",
+      "options": [
+        { "value": "400", "label": "Regular" },
+        { "value": "500", "label": "Medium" },
+        { "value": "600", "label": "Semibold" },
+        { "value": "700", "label": "Bold" }
+      ]
+    },
+    {
+      "type": "select", "id": "text_transform", "label": "Text case", "default": "none",
+      "options": [
+        { "value": "none", "label": "As typed" },
+        { "value": "uppercase", "label": "UPPERCASE" },
+        { "value": "capitalize", "label": "Capitalize" }
+      ]
+    },
+    {
+      "type": "select", "id": "text_align", "label": "Label alignment", "default": "center",
+      "options": [ { "value": "left", "label": "Left" }, { "value": "center", "label": "Center" }, { "value": "right", "label": "Right" } ]
+    },
+    { "type": "range", "id": "label_lines", "label": "Max label lines", "min": 1, "max": 3, "step": 1, "default": 2 },
+    { "type": "range", "id": "label_max_width_d", "label": "Max label width – desktop", "min": 60, "max": 240, "step": 4, "unit": "px", "default": 140 },
+    { "type": "range", "id": "label_max_width_m", "label": "Max label width – mobile", "min": 60, "max": 200, "step": 4, "unit": "px", "default": 100 },
+    { "type": "range", "id": "label_gap", "label": "Space between image and label", "min": 0, "max": 24, "step": 1, "unit": "px", "default": 8 },
+
+    { "type": "header", "content": "Spacing" },
+    { "type": "range", "id": "gap_d", "label": "Gap between bubbles – desktop", "min": 0, "max": 80, "step": 2, "unit": "px", "default": 40 },
+    { "type": "range", "id": "gap_m", "label": "Gap between bubbles – mobile", "min": 0, "max": 60, "step": 2, "unit": "px", "default": 16 },
+    { "type": "range", "id": "row_gap_d", "label": "Row gap – desktop", "min": 0, "max": 60, "step": 2, "unit": "px", "default": 24, "info": "Used when bubbles wrap to a new row." },
+    { "type": "range", "id": "row_gap_m", "label": "Row gap – mobile", "min": 0, "max": 40, "step": 2, "unit": "px", "default": 16 },
+    { "type": "range", "id": "pad_top_d", "label": "Top padding – desktop", "min": 0, "max": 100, "step": 4, "unit": "px", "default": 16 },
+    { "type": "range", "id": "pad_bottom_d", "label": "Bottom padding – desktop", "min": 0, "max": 100, "step": 4, "unit": "px", "default": 16 },
+    { "type": "range", "id": "pad_top_m", "label": "Top padding – mobile", "min": 0, "max": 100, "step": 4, "unit": "px", "default": 12 },
+    { "type": "range", "id": "pad_bottom_m", "label": "Bottom padding – mobile", "min": 0, "max": 100, "step": 4, "unit": "px", "default": 12 },
+
+    { "type": "header", "content": "Positioning" },
+    {
+      "type": "select", "id": "positioning", "label": "Positioning", "default": "static",
+      "options": [ { "value": "static", "label": "Static" }, { "value": "absolute", "label": "Absolute (over the section above)" } ]
+    },
+    {
+      "type": "paragraph",
+      "content": "Absolute: place this section directly below the hero in the editor. The bubbles then sit over the bottom of that section and this section takes no space. Ignored if this is the first section on the page."
+    },
+    {
+      "type": "select", "id": "absolute_placement", "label": "Absolute placement", "default": "inside",
+      "options": [ { "value": "inside", "label": "Inside the bottom of the section above" }, { "value": "straddle", "label": "Half over the section edge" } ]
+    },
+    { "type": "range", "id": "absolute_offset_d", "label": "Distance from section edge – desktop", "min": 0, "max": 200, "step": 4, "unit": "px", "default": 24, "info": "For 'Inside' placement." },
+    { "type": "range", "id": "absolute_offset_m", "label": "Distance from section edge – mobile", "min": 0, "max": 120, "step": 4, "unit": "px", "default": 16 },
+    {
+      "type": "select", "id": "absolute_mobile", "label": "On mobile", "default": "static",
+      "options": [ { "value": "static", "label": "Switch to static (recommended)" }, { "value": "absolute", "label": "Stay absolute" } ]
+    },
+    { "type": "range", "id": "z_index", "label": "Stack order (z-index)", "min": 1, "max": 20, "step": 1, "default": 3 },
+
+    { "type": "header", "content": "Colors" },
+    { "type": "checkbox", "id": "transparent_bg", "label": "Transparent background", "default": false, "info": "Recommended with Absolute positioning." },
+    { "type": "color", "id": "bg_color", "label": "Background", "default": "#ffffff" },
+    { "type": "color", "id": "heading_color", "label": "Heading", "default": "#121212" },
+    { "type": "color", "id": "text_color", "label": "Label text", "default": "#121212" },
+    { "type": "color", "id": "text_hover_color", "label": "Label text on hover", "default": "#555555" },
+    { "type": "color", "id": "image_bg_color", "label": "Bubble background", "default": "#f3f3f3", "info": "Visible behind transparent images, with 'Fit' or inner padding. Can be overridden per bubble." },
+    { "type": "color", "id": "border_color", "label": "Bubble border", "default": "#e5e5e5" },
+    { "type": "color", "id": "border_hover_color", "label": "Bubble border on hover", "default": "#121212" },
+    { "type": "color", "id": "active_color", "label": "Current collection ring", "default": "#121212" },
+    { "type": "color", "id": "focus_color", "label": "Keyboard focus outline", "default": "#121212" },
+    { "type": "color", "id": "badge_bg", "label": "Badge background", "default": "#d14b2f" },
+    { "type": "color", "id": "badge_text", "label": "Badge text", "default": "#ffffff" },
+
+    { "type": "header", "content": "Performance & tracking" },
+    {
+      "type": "select", "id": "lazy_load", "label": "Image loading", "default": "auto",
+      "options": [
+        { "value": "auto", "label": "Auto (eager near the top of the page)" },
+        { "value": "lazy", "label": "Lazy" },
+        { "value": "eager", "label": "Eager" }
+      ]
+    },
+    {
+      "type": "checkbox", "id": "enable_tracking", "label": "Send click events", "default": false,
+      "info": "Pushes 'sc_bubble_click' to dataLayer (GTM) and Shopify customer events with label, position, collection and badge."
+    },
+    {
+      "type": "textarea", "id": "custom_css", "label": "Custom CSS",
+      "info": "Scoped to this section only. Example: .sc-sub-bubbles__label { letter-spacing: 0.05em; }"
+    }
+  ],
+  "blocks": [
+    {
+      "type": "sc_collection_bubble",
+      "name": "Collection bubble",
+      "settings": [
+        { "type": "checkbox", "id": "enabled", "label": "Show bubble", "default": true },
+        { "type": "collection", "id": "collection", "label": "Collection", "info": "Image, title and link are taken from the collection unless overridden below." },
+        { "type": "image_picker", "id": "image", "label": "Custom image" },
+        { "type": "text", "id": "label", "label": "Custom label" },
+        { "type": "url", "id": "link", "label": "Custom link" },
+        { "type": "checkbox", "id": "new_tab", "label": "Open link in new tab", "default": false },
+        { "type": "text", "id": "badge", "label": "Badge", "info": "Optional, e.g. New, Sale, -20%." },
+        { "type": "color", "id": "bubble_bg", "label": "Bubble background", "info": "Optional. Overrides the section bubble background." }
+      ]
+    }
+  ],
+  "presets": [
+    {
+      "name": "SC – Sub-collection bubbles",
+      "blocks": [
+        { "type": "sc_collection_bubble" },
+        { "type": "sc_collection_bubble" },
+        { "type": "sc_collection_bubble" },
+        { "type": "sc_collection_bubble" }
+      ]
+    }
+  ]
+}
+{% endschema %}
