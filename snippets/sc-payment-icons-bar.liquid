@@ -1,561 +1,184 @@
 {%- comment -%}
   SC – Payment icons bar (PDP, Cart, Cart drawer, Global)
   ----------------------------------------------------------------------------
-  One shared implementation. Every option lives in Theme settings →
-  "SC – Payment icons bar" (config/settings_schema.json, ids prefixed sc_pay_),
-  so the PDP block, the cart page and the cart drawer always look the same.
+  One shared implementation: Liquid + scoped CSS, no JavaScript, no theme deps.
+  Settings live in Theme settings → "SC – Payment icons bar" (ids prefixed sc_pay_):
+  - sc_pay_source: 'static'  → the methods ticked in sc_pay_m_* checkboxes
+                   'dynamic' → shop.enabled_payment_types (active in Settings → Payments)
+  - sc_pay_order:  comma-separated keys that set the icon order in both modes.
 
   Usage:
     PDP (Dawn product block):
-      {% render 'sc-payment-icons-bar', placement: 'pdp', product: product, block: block %}
-    Cart page / cart drawer:
+      {% render 'sc-payment-icons-bar', placement: 'pdp', block: block %}
+    Cart page / cart drawer (rendered only when the cart has items):
       {% render 'sc-payment-icons-bar', placement: 'cart', uid: 'cart-page' %}
       {% render 'sc-payment-icons-bar', placement: 'drawer', uid: 'cart-drawer' %}
-    Anywhere else (always shown when the master toggle is on):
+    Anywhere else:
       {% render 'sc-payment-icons-bar', placement: 'global', uid: 'footer' %}
 
   Accepts:
   - placement: {String} 'pdp' | 'cart' | 'drawer' | 'global' (default 'global')
-  - product:   {Object} product for the instalment [amount] on PDP (optional)
   - block:     {Object} block, for theme-editor attributes + unique id (optional)
   - uid:       {String} unique suffix when there is no block (optional)
 
   Notes:
   - Icons come from Shopify's native `payment_type_svg_tag` filter.
-  - "Only show methods enabled in store" intersects the selection with
-    shop.enabled_payment_types, so unavailable methods are never shown.
   - The SVG ids Shopify outputs (pi-visa …) are re-namespaced per instance,
     so several bars on one page never produce duplicate ids.
-  - Icon order is driven by the `methods` list below (v1.1: custom ordering
-    can replace this list with a merchant setting without other changes).
 {%- endcomment -%}
 
 {%- liquid
   assign placement = placement | default: 'global'
 
-  # ---------------------------------------------------------------- placement
-  assign sc_place_on = false
-  case placement
-    when 'pdp'
-      if settings.sc_pay_show_pdp
-        assign sc_place_on = true
-      endif
-    when 'cart'
-      if settings.sc_pay_show_cart and cart.item_count > 0
-        assign sc_place_on = true
-      endif
-    when 'drawer'
-      if settings.sc_pay_show_drawer and cart.item_count > 0
-        assign sc_place_on = true
-      endif
-    else
-      assign sc_place_on = true
-  endcase
+  assign sc_render = true
+  if placement == 'cart' or placement == 'drawer'
+    if cart.item_count == 0
+      assign sc_render = false
+    endif
+  endif
 
   assign sc_uid = uid | default: placement
   if block.id != blank
     assign sc_uid = block.id
   endif
   assign sc_uid = sc_uid | handleize | prepend: 'sc-pay-bar-'
-
-  assign sc_master_on = settings.sc_pay_enable
-  assign sc_ab_markup = false
-  if sc_master_on == false and settings.sc_pay_ab_keep_markup
-    assign sc_ab_markup = true
-  endif
-
-  assign sc_render = false
-  if sc_place_on
-    if sc_master_on or sc_ab_markup
-      assign sc_render = true
-    endif
-  endif
 -%}
 
 {%- if sc_render -%}
   {%- liquid
-    # ------------------------------------------------------------ icon list
-    # key:setting_id pairs, in display order.
-    assign methods = 'paypal:sc_pay_m_paypal,master:sc_pay_m_master,visa:sc_pay_m_visa,american_express:sc_pay_m_american_express,klarna:sc_pay_m_klarna,apple_pay:sc_pay_m_apple_pay,google_pay:sc_pay_m_google_pay,amazon:sc_pay_m_amazon,klarna-pay-later:sc_pay_m_klarna_pay_later,sofort:sc_pay_m_sofort,bitcoin:sc_pay_m_bitcoin,shopify_pay:sc_pay_m_shopify_pay,twint:sc_pay_m_twint' | split: ','
-    assign max_icons = settings.sc_pay_max_icons | default: 6
-    assign only_enabled = settings.sc_pay_only_enabled
-    assign shown_keys = ''
-    assign skipped = ''
-    assign shown_count = 0
+    # Known methods as payment_type key:checkbox setting id, in fallback order.
+    assign methods = 'paypal:sc_pay_m_paypal,klarna:sc_pay_m_klarna,visa:sc_pay_m_visa,master:sc_pay_m_master,amazon:sc_pay_m_amazon,apple_pay:sc_pay_m_apple_pay,google_pay:sc_pay_m_google_pay,american_express:sc_pay_m_american_express,klarna-pay-later:sc_pay_m_klarna_pay_later,sofort:sc_pay_m_sofort,bitcoin:sc_pay_m_bitcoin,shopify_pay:sc_pay_m_shopify_pay,twint:sc_pay_m_twint' | split: ','
 
-    for pair in methods
-      assign parts = pair | split: ':'
-      assign key = parts[0]
-      assign sid = parts[1]
-      if settings[sid]
-        if only_enabled and shop.enabled_payment_types contains key
-          assign ok = true
-        elsif only_enabled
-          assign ok = false
-          assign skipped = skipped | append: key | append: ', '
+    # ---- 1. Candidate keys for the chosen source
+    assign candidates = ','
+    if settings.sc_pay_source == 'dynamic'
+      for key in shop.enabled_payment_types
+        assign candidates = candidates | append: key | append: ','
+      endfor
+    else
+      for pair in methods
+        assign parts = pair | split: ':'
+        assign sid = parts[1]
+        if settings[sid]
+          assign candidates = candidates | append: parts[0] | append: ','
+        endif
+      endfor
+    endif
+
+    # ---- 2. Merchant order first (with friendly aliases), then the rest
+    assign order_raw = settings.sc_pay_order | downcase | replace: ' ', '' | split: ','
+    assign ordered = ','
+    for name in order_raw
+      case name
+        when 'mastercard'
+          assign key = 'master'
+        when 'amex'
+          assign key = 'american_express'
+        when 'amazon_pay', 'amazonpay'
+          assign key = 'amazon'
+        when 'shop_pay', 'shoppay'
+          assign key = 'shopify_pay'
+        when 'applepay'
+          assign key = 'apple_pay'
+        when 'googlepay', 'gpay'
+          assign key = 'google_pay'
+        when 'klarna_pay_later'
+          assign key = 'klarna-pay-later'
         else
-          assign ok = true
-        endif
-        if ok and shown_count < max_icons
-          assign shown_keys = shown_keys | append: key | append: ','
-          assign shown_count = shown_count | plus: 1
-        endif
+          assign key = name
+      endcase
+      assign needle = ',' | append: key | append: ','
+      if key != blank and candidates contains needle
+        unless ordered contains needle
+          assign ordered = ordered | append: key | append: ','
+        endunless
       endif
     endfor
-    assign shown_keys = shown_keys | split: ','
 
-    # ------------------------------------------------------------ instalment
-    assign inst_on = false
-    if settings.sc_pay_inst_enable
-      if placement == 'cart' or placement == 'drawer'
-        if settings.sc_pay_inst_show_cart
-          assign inst_on = true
-        endif
-      elsif settings.sc_pay_inst_show_pdp
-        assign inst_on = true
+    assign rest = candidates | split: ','
+    for key in rest
+      assign needle = ',' | append: key | append: ','
+      if key != blank
+        unless ordered contains needle
+          assign ordered = ordered | append: key | append: ','
+        endunless
       endif
-    endif
-    assign inst_text = settings.sc_pay_inst_text | strip
-    if inst_text == blank and settings.sc_pay_inst_logo == blank
-      assign inst_on = false
-    endif
+    endfor
 
-    assign inst_count = settings.sc_pay_inst_count | default: 3
-    assign inst_count_str = inst_count | append: ''
-    assign has_amount = false
-    assign amount_mode = ''
-    if inst_on and inst_text contains '[amount]'
-      if placement == 'cart' or placement == 'drawer'
-        assign amount_cents = cart.total_price | divided_by: inst_count
-        assign amount_mode = 'cart'
-        assign has_amount = true
-      elsif product != blank
-        assign amount_cents = product.selected_or_first_available_variant.price | divided_by: inst_count
-        assign amount_mode = 'pdp'
-        assign has_amount = true
-      endif
-    endif
-
-    assign inst_html = inst_text | escape
-    if has_amount
-      assign amount_html = amount_cents | money | prepend: '<span class="sc-pay-bar__amount" data-sc-pay-amount>' | append: '</span>'
-      assign inst_html = inst_html | replace: '[amount]', amount_html
-    else
-      assign inst_html = inst_html | replace: '[amount]', ''
-    endif
-    assign inst_html = inst_html | replace: '[count]', inst_count_str
-
-    # ------------------------------------------------------------ heading
-    assign heading = settings.sc_pay_heading | strip | escape
-    assign show_heading = false
-    if settings.sc_pay_show_heading and heading != blank
-      assign show_heading = true
-    endif
-
-    # ------------------------------------------------------------ styles
-    assign bg = settings.sc_pay_bg
-    if bg == blank or bg.alpha == 0
-      assign bg = 'transparent'
-    endif
-    assign border_w = settings.sc_pay_border_width | default: 0
-    assign border_c = settings.sc_pay_border_color
-    if border_c == blank or border_c.alpha == 0
-      assign border_w = 0
-      assign border_c = 'transparent'
-    endif
-    assign radius = 0
-    if settings.sc_pay_border_style == 'rounded'
-      assign radius = settings.sc_pay_radius
-    endif
-
-    case settings.sc_pay_align
-      when 'left'
-        assign justify = 'flex-start'
-      when 'right'
-        assign justify = 'flex-end'
-      when 'between'
-        assign justify = 'space-between'
-      when 'evenly'
-        assign justify = 'space-evenly'
-      else
-        assign justify = 'center'
-    endcase
-
-    assign inst_logo_style = settings.sc_pay_inst_logo_style
-    if inst_logo_style == 'inherit'
-      assign inst_logo_style = settings.sc_pay_icon_style
-    endif
+    assign shown_keys = ordered | split: ','
   -%}
 
-  {%- if shown_keys.size > 0 or inst_on -%}
-    <sc-pay-bar
+  {%- if shown_keys.size > 0 -%}
+    <div
       id="{{ sc_uid }}"
-      class="sc-pay-bar sc-pay-bar--{{ placement }} sc-pay-bar--{{ settings.sc_pay_icon_style }}{% if settings.sc_pay_hover_color %} sc-pay-bar--hover-color{% endif %}{% if settings.sc_pay_heading_position == 'inline' %} sc-pay-bar--inline{% endif %}{% if settings.sc_pay_mobile_scroll %} sc-pay-bar--nowrap-mobile{% endif %}"
-      {% if sc_master_on == false %}data-sc-ab-hidden{% endif %}
-      {% if has_amount %}data-mode="{{ amount_mode }}" data-count="{{ inst_count }}"{% endif %}
+      class="sc-pay-bar sc-pay-bar--{{ placement }}"
       {{ block.shopify_attributes }}
-      style="
-        --sc-pay-bg: {{ bg }};
-        --sc-pay-radius: {{ radius }}px;
-        --sc-pay-border: {{ border_w }}px solid {{ border_c }};
-        --sc-pay-mt: {{ settings.sc_pay_margin_top }}px;
-        --sc-pay-mb: {{ settings.sc_pay_margin_bottom }}px;
-        --sc-pay-py: {{ settings.sc_pay_padding_y }}px;
-        --sc-pay-px: {{ settings.sc_pay_padding_x }}px;
-        --sc-pay-py-m: {{ settings.sc_pay_padding_y_mobile }}px;
-        --sc-pay-px-m: {{ settings.sc_pay_padding_x_mobile }}px;
-        --sc-pay-icon-w: {{ settings.sc_pay_icon_width }}px;
-        --sc-pay-icon-w-m: {{ settings.sc_pay_icon_width_mobile }}px;
-        --sc-pay-gap: {{ settings.sc_pay_gap }}px;
-        --sc-pay-gap-m: {{ settings.sc_pay_gap_mobile }}px;
-        --sc-pay-justify: {{ justify }};
-        --sc-pay-gray-opacity: {{ settings.sc_pay_gray_opacity | divided_by: 100.0 }};
-        --sc-pay-h-size: {{ settings.sc_pay_heading_size }}px;
-        --sc-pay-h-size-m: {{ settings.sc_pay_heading_size_mobile }}px;
-        --sc-pay-h-color: {{ settings.sc_pay_heading_color | default: 'inherit' }};
-        --sc-pay-h-weight: {{ settings.sc_pay_heading_weight }};
-        --sc-pay-h-align: {{ settings.sc_pay_heading_align }};
-        --sc-pay-inst-size: {{ settings.sc_pay_inst_font_size }}px;
-        --sc-pay-inst-size-m: {{ settings.sc_pay_inst_font_size_mobile }}px;
-        --sc-pay-inst-color: {{ settings.sc_pay_inst_color | default: 'inherit' }};
-        --sc-pay-inst-logo-h: {{ settings.sc_pay_inst_logo_height }}px;
-        --sc-pay-inst-align: {{ settings.sc_pay_inst_align }};
-      "
     >
-      {%- if shown_keys.size > 0 -%}
-        <div class="sc-pay-bar__main">
-          {%- if show_heading -%}
-            <p class="sc-pay-bar__heading" id="{{ sc_uid }}-heading">{{ heading }}</p>
-          {%- endif -%}
-          <ul
-            class="sc-pay-bar__list"
-            role="list"
-            {% if show_heading %}
-              aria-labelledby="{{ sc_uid }}-heading"
-            {% else %}
-              aria-label="Accepted payment methods"
-            {% endif %}
-          >
-            {%- for key in shown_keys -%}
-              {%- assign svg_prefix = '"' | append: sc_uid | append: '-pi-' -%}
-              <li class="sc-pay-bar__item">
-                {{- key | payment_type_svg_tag: class: 'sc-pay-bar__svg' | replace: '"pi-', svg_prefix -}}
-              </li>
-            {%- endfor -%}
-          </ul>
-        </div>
-      {%- endif -%}
-
-      {%- if inst_on -%}
-        <p class="sc-pay-bar__inst sc-pay-bar__inst--{{ inst_logo_style }}">
-          <span class="sc-pay-bar__inst-logo">
-            {%- if settings.sc_pay_inst_logo != blank -%}
-              {{-
-                settings.sc_pay_inst_logo
-                | image_url: height: 120
-                | image_tag: loading: 'lazy', alt: settings.sc_pay_inst_provider, class: 'sc-pay-bar__inst-img'
-              -}}
-            {%- else -%}
-              {%- assign svg_prefix = '"' | append: sc_uid | append: '-inst-pi-' -%}
-              {{- settings.sc_pay_inst_provider | payment_type_svg_tag: class: 'sc-pay-bar__inst-svg' | replace: '"pi-', svg_prefix -}}
-            {%- endif -%}
-          </span>
-          {%- if inst_html != blank -%}
-            <span class="sc-pay-bar__inst-text">{{ inst_html }}</span>
-          {%- endif -%}
-        </p>
-
-        {%- if amount_mode == 'pdp' -%}
-          <script type="application/json" data-sc-pay-variants>
-            {
-              {%- for v in product.variants -%}
-                "{{ v.id }}": {{ v.price | divided_by: inst_count | money | json }}{% unless forloop.last %},{% endunless %}
-              {%- endfor -%}
-            }
-          </script>
-        {%- elsif amount_mode == 'cart' -%}
-          <script type="application/json" data-sc-pay-money>{{ shop.money_format | json }}</script>
-        {%- endif -%}
-      {%- endif -%}
-
-      {%- if request.design_mode and skipped != blank -%}
-        <p class="sc-pay-bar__hint">
-          Editor only – hidden because not enabled in this store's payment settings:
-          {{ skipped | split: ', ' | join: ', ' }}. Untick "Only show methods enabled in store" to show them anyway.
-        </p>
-      {%- endif -%}
-    </sc-pay-bar>
+      <ul class="sc-pay-bar__list" role="list" aria-label="Accepted payment methods">
+        {%- assign svg_prefix = '"' | append: sc_uid | append: '-pi-' -%}
+        {%- for key in shown_keys -%}
+          <li class="sc-pay-bar__item">
+            {{- key | payment_type_svg_tag: class: 'sc-pay-bar__svg' | replace: '"pi-', svg_prefix -}}
+          </li>
+        {%- endfor -%}
+      </ul>
+    </div>
   {%- elsif request.design_mode -%}
     <p class="sc-pay-bar__hint" {{ block.shopify_attributes }}>
-      SC – Payment icons bar: no payment method to show. Tick methods in Theme settings → SC – Payment icons bar.
+      SC – Payment icons bar: no payment method to show. Tick methods (Static) or activate payment methods in Settings →
+      Payments (Dynamic).
     </p>
   {%- endif -%}
 
   <style>
-    sc-pay-bar.sc-pay-bar {
-      display: block;
+    .sc-pay-bar {
       box-sizing: border-box;
       width: 100%;
-      margin: var(--sc-pay-mt) 0 var(--sc-pay-mb);
-      padding: var(--sc-pay-py) var(--sc-pay-px);
-      background: var(--sc-pay-bg);
-      border: var(--sc-pay-border);
-      border-radius: var(--sc-pay-radius);
-      line-height: 1.4;
-    }
-    sc-pay-bar.sc-pay-bar[data-sc-ab-hidden] {
-      display: none;
-    }
-    .sc-pay-bar *,
-    .sc-pay-bar *::before,
-    .sc-pay-bar *::after {
-      box-sizing: border-box;
-    }
-    .sc-pay-bar__main {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-    .sc-pay-bar--inline .sc-pay-bar__main {
-      flex-direction: row;
-      align-items: center;
-      gap: 12px;
-    }
-    .sc-pay-bar--inline .sc-pay-bar__list {
-      flex: 1 1 auto;
-    }
-    .sc-pay-bar__heading {
-      margin: 0;
-      font-size: var(--sc-pay-h-size);
-      font-weight: var(--sc-pay-h-weight);
-      color: var(--sc-pay-h-color);
-      text-align: var(--sc-pay-h-align);
-    }
-    .sc-pay-bar--inline .sc-pay-bar__heading {
-      flex: 0 0 auto;
-      text-align: left;
+      margin: 12px 0;
+      line-height: 0;
     }
     .sc-pay-bar__list {
       display: flex;
       flex-wrap: wrap;
       align-items: center;
-      justify-content: var(--sc-pay-justify);
-      gap: var(--sc-pay-gap);
+      justify-content: center;
+      gap: 8px;
       margin: 0;
       padding: 0;
       list-style: none;
     }
+    .sc-pay-bar--drawer .sc-pay-bar__list,
+    .sc-pay-bar--cart .sc-pay-bar__list {
+      justify-content: space-between;
+    }
     .sc-pay-bar__item {
-      flex: 0 0 auto;
       display: flex;
+      flex: 0 0 auto;
       margin: 0;
       padding: 0;
-      line-height: 0;
     }
     .sc-pay-bar__svg {
       display: block;
-      width: var(--sc-pay-icon-w);
+      width: 44px;
       height: auto;
       aspect-ratio: 38 / 24;
-      transition: filter 0.2s ease, opacity 0.2s ease;
-    }
-    .sc-pay-bar--grayscale .sc-pay-bar__svg,
-    .sc-pay-bar__inst--grayscale .sc-pay-bar__inst-logo > * {
-      filter: grayscale(1);
-      opacity: var(--sc-pay-gray-opacity);
-    }
-    .sc-pay-bar--hover-color .sc-pay-bar__item:hover .sc-pay-bar__svg {
-      filter: none;
-      opacity: 1;
-    }
-    .sc-pay-bar__inst {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      justify-content: var(--sc-pay-inst-align);
-      gap: 6px 8px;
-      margin: 12px 0 0;
-      font-size: var(--sc-pay-inst-size);
-      color: var(--sc-pay-inst-color);
-      text-align: center;
-    }
-    .sc-pay-bar__inst:first-child {
-      margin-top: 0;
-    }
-    .sc-pay-bar__inst-logo {
-      display: inline-flex;
-      flex: 0 0 auto;
-      line-height: 0;
-    }
-    .sc-pay-bar__inst-svg,
-    .sc-pay-bar__inst-img {
-      display: block;
-      height: var(--sc-pay-inst-logo-h);
-      width: auto;
-      max-width: 160px;
-    }
-    .sc-pay-bar__amount {
-      font-weight: 700;
-      white-space: nowrap;
     }
     .sc-pay-bar__hint {
-      margin: 8px 0 0;
+      margin: 8px 0;
       padding: 8px 10px;
       font-size: 12px;
       font-style: italic;
+      line-height: 1.4;
       opacity: 0.7;
       border: 1px dashed currentColor;
     }
     @media screen and (max-width: 749px) {
-      sc-pay-bar.sc-pay-bar {
-        padding: var(--sc-pay-py-m) var(--sc-pay-px-m);
-      }
-      .sc-pay-bar__heading {
-        font-size: var(--sc-pay-h-size-m);
-      }
       .sc-pay-bar__list {
-        gap: var(--sc-pay-gap-m);
+        gap: 6px;
       }
       .sc-pay-bar__svg {
-        width: var(--sc-pay-icon-w-m);
-      }
-      .sc-pay-bar__inst {
-        font-size: var(--sc-pay-inst-size-m);
-      }
-      .sc-pay-bar--inline .sc-pay-bar__main {
-        flex-direction: column;
-        align-items: stretch;
-        gap: 8px;
-      }
-      .sc-pay-bar--inline .sc-pay-bar__heading {
-        text-align: var(--sc-pay-h-align);
-      }
-      .sc-pay-bar--nowrap-mobile .sc-pay-bar__list {
-        flex-wrap: nowrap;
-        justify-content: flex-start;
-        overflow-x: auto;
-        scrollbar-width: none;
-        -webkit-overflow-scrolling: touch;
-      }
-      .sc-pay-bar--nowrap-mobile .sc-pay-bar__list::-webkit-scrollbar {
-        display: none;
-      }
-    }
-    @media (prefers-reduced-motion: reduce) {
-      .sc-pay-bar__svg {
-        transition: none;
+        width: 38px;
       }
     }
   </style>
-
-  {%- if has_amount -%}
-    <script>
-      (function () {
-        if (!window.customElements || customElements.get('sc-pay-bar')) return;
-
-        var CART_EVENTS = ['cart:updated', 'cart:change', 'cart:refresh', 'cart-updated', 'theme:cart:change', 'on:cart:change'];
-
-        function formatMoney(cents, format) {
-          cents = Math.round(cents);
-          format = format || '';
-          function fmt(n, dec, ts, ds) {
-            var parts = (n / 100).toFixed(dec).split('.');
-            return parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ts) + (parts[1] ? ds + parts[1] : '');
-          }
-          var match = format.match(/\{\{\s*(\w+)\s*\}\}/);
-          if (!match) return fmt(cents, 2, ',', '.');
-          var out;
-          switch (match[1]) {
-            case 'amount_no_decimals': out = fmt(cents, 0, ',', '.'); break;
-            case 'amount_with_comma_separator': out = fmt(cents, 2, '.', ','); break;
-            case 'amount_no_decimals_with_comma_separator': out = fmt(cents, 0, '.', ','); break;
-            case 'amount_with_apostrophe_separator': out = fmt(cents, 2, "'", '.'); break;
-            case 'amount_with_space_separator': out = fmt(cents, 2, ' ', ','); break;
-            default: out = fmt(cents, 2, ',', '.');
-          }
-          return format.replace(match[0], out);
-        }
-
-        class ScPayBar extends HTMLElement {
-          connectedCallback() {
-            this.count = parseInt(this.dataset.count, 10) || 3;
-            this.onPdpChange = this.onPdpChange.bind(this);
-            this.onCartChange = this.onCartChange.bind(this);
-            if (this.dataset.mode === 'pdp') {
-              var json = this.querySelector('[data-sc-pay-variants]');
-              try { this.prices = json ? JSON.parse(json.textContent) : {}; } catch (e) { this.prices = {}; }
-              document.addEventListener('change', this.onPdpChange);
-              ['variant:change', 'variant:changed', 'product:variant-change', 'variant:update'].forEach(function (ev) {
-                document.addEventListener(ev, this.onPdpChange);
-              }, this);
-            } else if (this.dataset.mode === 'cart') {
-              var mf = this.querySelector('[data-sc-pay-money]');
-              try { this.moneyFormat = mf ? JSON.parse(mf.textContent) : ''; } catch (e) { this.moneyFormat = ''; }
-              CART_EVENTS.forEach(function (ev) { document.addEventListener(ev, this.onCartChange); }, this);
-              // Optional hook for Dawn-style pub/sub themes (feature-detected, not required).
-              if (typeof window.subscribe === 'function' && window.PUB_SUB_EVENTS && window.PUB_SUB_EVENTS.cartUpdate) {
-                this.unsub = window.subscribe(window.PUB_SUB_EVENTS.cartUpdate, this.onCartChange);
-              }
-            }
-          }
-
-          disconnectedCallback() {
-            document.removeEventListener('change', this.onPdpChange);
-            ['variant:change', 'variant:changed', 'product:variant-change', 'variant:update'].forEach(function (ev) {
-              document.removeEventListener(ev, this.onPdpChange);
-            }, this);
-            CART_EVENTS.forEach(function (ev) { document.removeEventListener(ev, this.onCartChange); }, this);
-            if (typeof this.unsub === 'function') this.unsub();
-          }
-
-          setAmount(text) {
-            if (!text) return;
-            this.querySelectorAll('[data-sc-pay-amount]').forEach(function (el) { el.textContent = text; });
-          }
-
-          currentVariantId(evt) {
-            var d = evt && evt.detail;
-            var v = d && (d.variant || (d.resource && d.resource.id ? d.resource : null));
-            if (v && v.id) return String(v.id);
-            var scope = this.closest('.shopify-section, section') || document;
-            var input = scope.querySelector('form[action*="/cart/add"] [name="id"]') ||
-              document.querySelector('form[action*="/cart/add"] [name="id"]');
-            if (input && input.value) return String(input.value);
-            var param = new URLSearchParams(window.location.search).get('variant');
-            return param || null;
-          }
-
-          onPdpChange(evt) {
-            var self = this;
-            var apply = function () {
-              var id = self.currentVariantId(evt);
-              if (id && self.prices[id]) self.setAmount(self.prices[id]);
-            };
-            apply();
-            setTimeout(apply, 300);
-          }
-
-          onCartChange() {
-            var self = this;
-            var root = (window.Shopify && window.Shopify.routes && window.Shopify.routes.root) || '/';
-            fetch(root + 'cart.js', { headers: { Accept: 'application/json' } })
-              .then(function (r) { return r.json(); })
-              .then(function (cart) {
-                self.setAmount(formatMoney(Math.floor(cart.total_price / self.count), self.moneyFormat));
-              })
-              .catch(function () {});
-          }
-        }
-
-        customElements.define('sc-pay-bar', ScPayBar);
-      })();
-    </script>
-  {%- endif -%}
-{%- elsif request.design_mode and block != blank -%}
-  <p
-    {{ block.shopify_attributes }}
-    style="margin:8px 0;padding:8px 10px;font-size:12px;font-style:italic;opacity:.7;border:1px dashed currentColor;"
-  >
-    SC – Payment icons bar is turned off for this placement. Turn it on in Theme settings → SC – Payment icons bar.
-  </p>
 {%- endif -%}

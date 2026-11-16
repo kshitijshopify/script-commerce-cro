@@ -1,0 +1,218 @@
+{%- comment -%}
+  SC – Cart shipping cost breakdown (Subtotal / Shipping / Total)
+  ----------------------------------------------------------------------------
+  Self-contained cart totals block: Liquid + scoped CSS (sc-cart-shipping-breakdown.css)
+  + optional JS (sc-cart-shipping-breakdown.js, live rates only). No theme dependencies.
+  Configured in Theme settings > "SC – Cart shipping breakdown" (settings.sc_csb_*).
+
+  Usage (anywhere the cart total is shown, eg. cart drawer footer or cart page footer):
+    {% render 'sc-cart-shipping-breakdown', sc_context: 'drawer' %}
+
+  Accepts:
+  - sc_context: {String} unique id suffix per placement ('drawer', 'page', ...). Default 'cart'.
+
+  Modes:
+  - fixed: delivery fee from settings, free once the free shipping minimum is reached.
+  - live: country / province / postal code picker that fetches Shopify's real shipping
+    rates (/cart/prepare_shipping_rates.json + /cart/async_shipping_rates.json), shows
+    the cheapest one and updates the total. Fires a bubbling `sc:shipping-estimate` event.
+{%- endcomment -%}
+
+{%- liquid
+  assign sc_ctx = sc_context | default: 'cart'
+  assign sc_uid = 'sc-csb-' | append: sc_ctx
+
+  assign sc_live = false
+  if settings.sc_csb_mode == 'live'
+    assign sc_live = true
+  endif
+
+  capture sc_fee_raw
+    render 'sc-currency-amount', value: settings.sc_csb_fee
+  endcapture
+  assign sc_fee_raw = sc_fee_raw | strip
+
+  capture sc_threshold_raw
+    render 'sc-currency-amount', value: settings.sc_csb_free_threshold
+  endcapture
+  assign sc_threshold_raw = sc_threshold_raw | strip
+
+  assign sc_free_reached = false
+  if sc_threshold_raw != blank
+    assign sc_threshold = sc_threshold_raw | plus: 0
+    if cart.total_price >= sc_threshold
+      assign sc_free_reached = true
+    endif
+  endif
+
+  assign sc_has_fee = false
+  assign sc_shipping = 0
+  if sc_fee_raw != blank
+    assign sc_has_fee = true
+    assign sc_shipping = sc_fee_raw | plus: 0
+  endif
+  if sc_free_reached
+    assign sc_shipping = 0
+  endif
+
+  assign sc_show_rows = sc_has_fee
+  if sc_live
+    assign sc_show_rows = true
+    assign sc_shipping = 0
+  endif
+
+  assign sc_final_total = cart.total_price | plus: sc_shipping
+-%}
+
+{{ 'sc-cart-shipping-breakdown.css' | asset_url | stylesheet_tag }}
+{%- if sc_live -%}
+  <script src="{{ 'sc-cart-shipping-breakdown.js' | asset_url }}" defer="defer"></script>
+{%- endif -%}
+
+<div
+  class="sc-csb"
+  id="{{ sc_uid }}"
+  data-sc-csb
+  style="--sc-csb-free-color: {{ settings.sc_csb_free_color | default: '#007600' }};"
+>
+  {%- if sc_show_rows -%}
+    <div class="sc-csb__row sc-csb__row--subtotal">
+      <span class="sc-csb__label">{{ settings.sc_csb_label_subtotal | escape }}</span>
+      <span class="sc-csb__value">{{ cart.total_price | money }}</span>
+    </div>
+
+    {%- if sc_live -%}
+      {%- liquid
+        assign sc_country_options = country_option_tags
+        if sc_country_options == blank
+          assign sc_country_options = all_country_option_tags
+        endif
+        assign sc_country_options = sc_country_options | remove: '<option value="---" data-provinces="[]">---</option>'
+
+        assign sc_default_country = settings.sc_csb_default_country | strip
+        if sc_default_country == blank
+          assign sc_default_country = localization.country.name
+        endif
+
+        comment
+          Representative postal codes so a rate can be estimated from the country alone,
+          before the shopper types their own code. Format: Country[+Province]=ZIP.
+        endcomment
+        assign sc_fallback_list = 'Albania=1001,Argentina+Buenos Aires=B1406,Armenia=0002,Australia+Australian Capital Territory=2609,Austria=1010,Belgium=1000,Brazil+Rio de Janeiro=20000-000,Bulgaria=1000,Canada+Ontario=L7K 0C2,China+Beijing=065001,Croatia=10000,Cyprus=2480,Czech Republic=110 00,Czechia=110 00,Denmark=2300,Estonia=10001,Finland=00100,France=70123,Georgia=0200,Germany=10115,Greece=104 31,Hungary=1051,India+Delhi=110003,Indonesia+Jakarta=10110,Ireland+Dublin=D01,Italy+Roma=00153,Jordan=11191,Kuwait+Al Ahmadi=60000,Latvia=1000,Lebanon=46052,Liechtenstein=9490,Lithuania=00116,Luxembourg=1508,Malta=ATD,Mexico+México=31846,Monaco=98000,Netherlands=1105 AW,Norway=1621,Poland=33-300,Portugal+Lisboa=1750-194,Romania+București=010011,Saudi Arabia=46477,Serbia=11000,Singapore=269437,Slovakia=010 01,Slovenia=1504,Spain+Madrid=28054,Sweden=100 44,Switzerland=3001,Turkey=37600,Türkiye=37600,United Arab Emirates+Abu Dhabi=00000,United Kingdom+England=PO16 7GZ,United States+District of Columbia=20005' | split: ','
+      -%}
+      <sc-shipping-estimator class="sc-csb__estimator">
+        <div class="sc-csb__row sc-csb__row--shipping">
+          <div class="sc-csb__label sc-csb__label--picker">
+            <span>{{ settings.sc_csb_label_shipping | escape }}</span>
+            <div class="sc-csb__select-wrap">
+              <label class="sc-csb__visually-hidden" for="{{ sc_uid }}-country">
+                {{- settings.sc_csb_label_shipping | escape }} – {{ 'customer.addresses.country' | t -}}
+              </label>
+              <select id="{{ sc_uid }}-country" class="sc-csb__select" autocomplete="country-name" data-sc-csb-country>
+                {{- sc_country_options -}}
+              </select>
+              <svg class="sc-csb__chevron" aria-hidden="true" focusable="false" viewBox="0 0 10 6">
+                <path fill="currentColor" fill-rule="evenodd" clip-rule="evenodd" d="M9.354.646a.5.5 0 00-.708 0L5 4.293 1.354.646a.5.5 0 00-.708.708l4 4a.5.5 0 00.708 0l4-4a.5.5 0 000-.708z"/>
+              </svg>
+            </div>
+          </div>
+          <span class="sc-csb__value" data-sc-csb-shipping aria-live="polite">
+            {%- if sc_free_reached -%}
+              <span class="sc-csb__free">{{ settings.sc_csb_label_free | escape }}</span>
+            {%- else -%}
+              <span class="sc-csb__muted">&mdash;</span>
+            {%- endif -%}
+          </span>
+        </div>
+
+        <div class="sc-csb__address" data-sc-csb-address{% if sc_free_reached %} hidden{% endif %}>
+          <div class="sc-csb__select-wrap sc-csb__select-wrap--full" data-sc-csb-province-wrap hidden>
+            <label class="sc-csb__visually-hidden" for="{{ sc_uid }}-province">
+              {{- 'customer.addresses.province' | t -}}
+            </label>
+            <select
+              id="{{ sc_uid }}-province"
+              class="sc-csb__select sc-csb__select--full"
+              autocomplete="address-level1"
+              data-sc-csb-province
+            ></select>
+            <svg class="sc-csb__chevron" aria-hidden="true" focusable="false" viewBox="0 0 10 6">
+              <path fill="currentColor" fill-rule="evenodd" clip-rule="evenodd" d="M9.354.646a.5.5 0 00-.708 0L5 4.293 1.354.646a.5.5 0 00-.708.708l4 4a.5.5 0 00.708 0l4-4a.5.5 0 000-.708z"/>
+            </svg>
+          </div>
+          <div class="sc-csb__zip">
+            <label class="sc-csb__visually-hidden" for="{{ sc_uid }}-zip">{{ settings.sc_csb_label_zip | escape }}</label>
+            <input
+              id="{{ sc_uid }}-zip"
+              class="sc-csb__input"
+              type="text"
+              inputmode="text"
+              autocomplete="postal-code"
+              placeholder="{{ settings.sc_csb_label_zip | escape }}"
+              data-sc-csb-zip
+            >
+            <button type="button" class="sc-csb__button" data-sc-csb-submit>
+              {{- settings.sc_csb_label_calculate | escape -}}
+            </button>
+          </div>
+        </div>
+
+        <p class="sc-csb__message" data-sc-csb-message hidden></p>
+
+        <script type="application/json" data-sc-csb-config>
+          {
+            "cartUrl": {{ routes.cart_url | json }},
+            "cartTotal": {{ cart.total_price | json }},
+            "itemCount": {{ cart.item_count | json }},
+            "free": {{ sc_free_reached | json }},
+            "moneyFormat": {{ shop.money_format | json }},
+            "moneyWithCurrencyFormat": {{ shop.money_with_currency_format | json }},
+            "defaultCountry": {{ sc_default_country | json }},
+            "customer": {% if customer and customer.default_address %}{
+              "country": {{ customer.default_address.country | json }},
+              "province": {{ customer.default_address.province | json }},
+              "zip": {{ customer.default_address.zip | json }}
+            }{% else %}null{% endif %},
+            "fallback": {
+              {%- for sc_entry in sc_fallback_list -%}
+                {%- liquid
+                  assign sc_entry_zip = sc_entry | split: '=' | last
+                  assign sc_entry_place = sc_entry | split: '=' | first
+                  assign sc_entry_country = sc_entry_place | split: '+' | first
+                  assign sc_entry_province = ''
+                  if sc_entry_place contains '+'
+                    assign sc_entry_province = sc_entry_place | split: '+' | last
+                  endif
+                -%}
+                {{ sc_entry_country | json }}: { "province": {{ sc_entry_province | json }}, "zip": {{ sc_entry_zip | json }} }
+                {%- unless forloop.last %},{% endunless -%}
+              {%- endfor -%}
+            },
+            "labels": {
+              "free": {{ settings.sc_csb_label_free | json }},
+              "zipRequired": {{ settings.sc_csb_label_zip_required | json }},
+              "noRates": {{ settings.sc_csb_label_no_rates | json }},
+              "error": {{ settings.sc_csb_label_error | json }}
+            }
+          }
+        </script>
+      </sc-shipping-estimator>
+    {%- else -%}
+      <div class="sc-csb__row sc-csb__row--shipping">
+        <span class="sc-csb__label">{{ settings.sc_csb_label_shipping | escape }}</span>
+        <span class="sc-csb__value">
+          {%- if sc_shipping == 0 -%}
+            <span class="sc-csb__free">{{ settings.sc_csb_label_free | escape }}</span>
+          {%- else -%}
+            {{ sc_shipping | money }}
+          {%- endif -%}
+        </span>
+      </div>
+    {%- endif -%}
+  {%- endif -%}
+
+  <div class="sc-csb__row sc-csb__row--total{% unless sc_show_rows %} sc-csb__row--solo{% endunless %}" role="status">
+    <span class="sc-csb__total-label">{{ settings.sc_csb_label_total | escape }}</span>
+    <span class="sc-csb__total-value" data-sc-csb-total>{{ sc_final_total | money_with_currency }}</span>
+  </div>
+</div>

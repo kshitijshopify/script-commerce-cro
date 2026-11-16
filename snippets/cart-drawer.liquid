@@ -19,7 +19,28 @@
   }
 </style>
 
-<cart-drawer class="drawer{% if cart == empty %} is-empty{% endif %}">
+{%- liquid
+  assign sc_ocd = settings.sc_ocd_enable
+  assign sc_ocd_title = settings.sc_ocd_title | strip
+  assign sc_ocd_cta_label = settings.sc_ocd_cta_label | strip
+  # SC – Free gift milestones live inside the free shipping bar when it is shown.
+  assign sc_fg_in_bar = false
+  # Always rendered (also with an empty cart) so its script runs on page load.
+  if sc_ocd and settings.sc_ocd_fsb_enable
+    assign sc_fg_in_bar = true
+  endif
+-%}
+{%- if sc_ocd -%}
+  {{ 'sc-cart-drawer.css' | asset_url | stylesheet_tag }}
+{%- endif -%}
+{%- render 'sc-cart-upsell', assets_only: true -%}
+
+<cart-drawer
+  class="drawer{% if cart == empty %} is-empty{% endif %}{% if sc_ocd %} sc-ocd{% unless settings.sc_ocd_show_remove %} sc-ocd--no-remove{% endunless %}{% unless settings.sc_ocd_show_quantity %} sc-ocd--no-qty{% endunless %}{% endif %}"
+  {% if sc_ocd %}
+    style="--sc-ocd-header-bg: {{ settings.sc_ocd_header_bg }}; --sc-ocd-header-text: {{ settings.sc_ocd_header_text }}; --sc-ocd-cta-bg: {{ settings.sc_ocd_cta_bg }}; --sc-ocd-cta-text: {{ settings.sc_ocd_cta_text }};"
+  {% endif %}
+>
   <div id="CartDrawer" class="cart-drawer">
     <div id="CartDrawer-Overlay" class="cart-drawer__overlay"></div>
     <div
@@ -64,7 +85,13 @@
         </div>
       {%- endif -%}
       <div class="drawer__header">
-        <h2 class="drawer__heading">{{ 'sections.cart.title' | t }}</h2>
+        <h2 class="drawer__heading">
+          {%- if sc_ocd and sc_ocd_title != blank -%}
+            {{ sc_ocd_title | escape }}
+          {%- else -%}
+            {{ 'sections.cart.title' | t }}
+          {%- endif -%}
+        </h2>
         <button
           class="drawer__close"
           type="button"
@@ -76,7 +103,9 @@
           </span>
         </button>
       </div>
-      {%- render 'sc-cart-free-gift', placement: 'drawer' -%}
+      {%- unless sc_fg_in_bar -%}
+        {%- render 'sc-cart-free-gift', placement: 'drawer' -%}
+      {%- endunless -%}
       <cart-drawer-items
         view-event-payload="{{ cart | standard_event_data: 'view', context: 'dialog' | escape }}"
         view-event-trigger="manual"
@@ -84,6 +113,19 @@
           class=" is-empty"
         {% endif %}
       >
+        {%- if sc_ocd and cart != empty -%}
+          {%- capture sc_ocd_top -%}
+            {%- render 'sc-cart-delivery-promise' -%}
+            {%- render 'sc-free-shipping-bar' -%}
+            {%- render 'sc-cart-social-proof' -%}
+          {%- endcapture -%}
+          {%- if sc_ocd_top != blank -%}
+            <div class="sc-ocd-top">{{ sc_ocd_top }}</div>
+          {%- endif -%}
+        {%- endif -%}
+        {%- if sc_fg_in_bar -%}
+          {%- render 'sc-cart-free-gift', placement: 'drawer', in_bar: true -%}
+        {%- endif -%}
         <form
           action="{{ routes.cart_url }}"
           id="CartDrawer-Form"
@@ -125,7 +167,7 @@
                     {%- for item in cart.items -%}
                       <tr
                         id="CartDrawer-Item-{{ item.index | plus: 1 }}"
-                        class="cart-item{% if item.parent_relationship.parent != null %} cart-item__nested-line{% endif %}"
+                        class="cart-item{% if item.parent_relationship.parent != null %} cart-item__nested-line{% endif %}{% if item.properties['_sc_free_gift'] != blank %} sc-cart-item--gift{% endif %}"
                         role="row"
                         {% if item.parent_relationship.parent != null %}
                           aria-label="{{- 'products.product.nested_label' | t: title: item.product.title, parent_title: item.parent_relationship.parent.title | escape -}}"
@@ -166,7 +208,9 @@
                             -%}
                           </div>
 
-                          {%- if item.original_price != item.final_price -%}
+                          {%- if sc_ocd -%}
+                            {%- comment -%} SC drawer shows the price next to the quantity selector {%- endcomment -%}
+                          {%- elsif item.original_price != item.final_price -%}
                             <div class="cart-item__discounted-prices">
                               <span class="visually-hidden">
                                 {{ 'products.product.price.regular_price' | t }}
@@ -248,7 +292,9 @@
                         <td class="cart-item__totals right" role="cell" headers="CartDrawer-ColumnTotal">
                           {%- render 'loading-spinner' -%}
                           <div class="cart-item__price-wrapper">
-                            {%- if item.original_line_price != item.final_line_price -%}
+                            {%- if sc_ocd -%}
+                              {%- render 'sc-cart-line-price', item: item -%}
+                            {%- elsif item.original_line_price != item.final_line_price -%}
                               <div class="cart-item__discounted-prices">
                                 <span class="visually-hidden">
                                   {{ 'products.product.price.regular_price' | t }}
@@ -296,6 +342,9 @@
                           <quantity-popover>
                             <div class="cart-item__quantity-wrapper quantity-popover-wrapper">
                               <div class="quantity-popover-container{% if has_qty_rules or has_vol_pricing %} quantity-popover-container--hover{% endif %}">
+                                {%- if item.properties['_sc_free_gift'] != blank -%}
+                                  <span class="sc-cart-gift-qty">{{ 'products.product.quantity.label' | t }}: 1</span>
+                                {%- endif -%}
                                 <quantity-input class="quantity cart-quantity">
                                   <button
                                     class="quantity__button"
@@ -487,6 +536,7 @@
           </div>
           <div id="CartDrawer-CartErrors" role="alert"></div>
         </form>
+        {%- render 'sc-cart-upsell', placement: 'drawer' -%}
       </cart-drawer-items>
       <div class="drawer__footer">
         {%- if settings.show_cart_note -%}
@@ -527,12 +577,16 @@
             {%- endif -%}
           </div>
 
-          <div class="totals" role="status">
-            <h2 class="totals__total">{{ 'sections.cart.estimated_total' | t }}</h2>
-            <p class="totals__total-value">{{ cart.total_price | money_with_currency }}</p>
-          </div>
+          {%- if settings.sc_csb_enable and settings.sc_csb_show_drawer -%}
+            {% render 'sc-cart-shipping-breakdown', sc_context: 'drawer' %}
+          {%- else -%}
+            <div class="totals" role="status">
+              <h2 class="totals__total">{{ 'sections.cart.estimated_total' | t }}</h2>
+              <p class="totals__total-value">{{ cart.total_price | money_with_currency }}</p>
+            </div>
+          {%- endif -%}
 
-          <small class="tax-note caption-large rte">
+          <small class="tax-note caption-large rte"{% if sc_ocd and settings.sc_ocd_show_tax_note == false %} hidden{% endif %}>
             {%- if cart.duties_included and cart.taxes_included -%}
               {%- if shop.shipping_policy.body == blank -%}
                 {{ 'sections.cart.duties_and_taxes_included_shipping_at_checkout_without_policy' | t }}
@@ -586,7 +640,16 @@
               disabled
             {% endif %}
           >
-            {{ 'sections.cart.checkout' | t }}
+            {%- if sc_ocd and sc_ocd_cta_label != blank -%}
+              <span>{{ sc_ocd_cta_label | escape }}</span>
+            {%- else -%}
+              <span>{{ 'sections.cart.checkout' | t }}</span>
+            {%- endif -%}
+            {%- if sc_ocd and settings.sc_ocd_cta_arrow -%}
+              <svg class="sc-ocd-cta__arrow" aria-hidden="true" focusable="false" viewBox="0 0 9 14">
+                <path d="M1.5 1.5L7 7l-5.5 5.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            {%- endif -%}
           </button>
         </div>
 

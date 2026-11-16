@@ -1,0 +1,52 @@
+{%- comment -%}
+  SC – Cart social proof ("[avatars] Max, Laura ✔ and 22,000+ others wear our products")
+  ----------------------------------------------------------------------------
+  Self-contained: Liquid + classes from sc-cart-drawer.css, no JS, no theme deps.
+  Settings: Theme settings > "SC – Optimized cart drawer" (sc_ocd_sp_*).
+  Avatar slots without an uploaded image show the initial of the matching name.
+
+  Usage:
+    {% render 'sc-cart-social-proof' %}
+{%- endcomment -%}
+{%- liquid
+  assign sc_names = settings.sc_ocd_sp_names | strip
+  assign sc_text = settings.sc_ocd_sp_text | strip
+  assign sc_name_list = sc_names | split: ','
+-%}
+{%- if settings.sc_ocd_sp_enable and sc_names != blank or settings.sc_ocd_sp_enable and sc_text != blank -%}
+  <div class="sc-social-proof">
+    <span class="sc-social-proof__avatars" aria-hidden="true">
+      {%- for i in (1..3) -%}
+        {%- liquid
+          assign sc_key = 'sc_ocd_sp_avatar_' | append: i
+          assign sc_img = settings[sc_key]
+          assign sc_idx = forloop.index0
+          assign sc_initial = sc_name_list[sc_idx] | strip | slice: 0 | upcase
+        -%}
+        {%- if sc_img != blank -%}
+          <span class="sc-social-proof__avatar">
+            {{- sc_img | image_url: width: 80, height: 80, crop: 'center' | image_tag: alt: '', width: 40, height: 40, loading: 'lazy' -}}
+          </span>
+        {%- elsif sc_initial != blank -%}
+          <span class="sc-social-proof__avatar sc-social-proof__avatar--initial sc-social-proof__avatar--{{ i }}">
+            {{- sc_initial -}}
+          </span>
+        {%- endif -%}
+      {%- endfor -%}
+    </span>
+    <p class="sc-social-proof__text">
+      {%- if sc_names != blank -%}
+        <span class="sc-social-proof__names">{{ sc_names | escape }}</span>
+        {%- if settings.sc_ocd_sp_verified -%}
+          <svg class="sc-social-proof__verified" viewBox="0 0 24 24" width="16" height="16" role="img" aria-label="Verified">
+            <path fill="#3B82F6" d="M12 1.5l2.6 1.9 3.2-.1 1 3 2.6 1.9-1 3 1 3-2.6 1.9-1 3-3.2-.1L12 22.5l-2.6-1.9-3.2.1-1-3-2.6-1.9 1-3-1-3 2.6-1.9 1-3 3.2.1z"/>
+            <path d="M8 12.2l2.7 2.7L16.2 9.4" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        {%- endif %}
+      {% endif -%}
+      {%- if sc_text != blank -%}
+        <span>{{ sc_text | escape }}</span>
+      {%- endif -%}
+    </p>
+  </div>
+{%- endif -%}

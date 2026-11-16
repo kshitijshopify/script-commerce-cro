@@ -1,0 +1,119 @@
+{%- comment -%}
+  SC – Free gift: one gift product row (used by snippets/sc-cart-free-gift.liquid)
+
+  Accepts:
+  - product:        {Object} gift product
+  - tier:           {String} '1' | '2'
+  - mode:           {String} pricing mode ('zero_price' | 'automatic_discount')
+  - tier_unlocked:  {Boolean} the tier's minimum is reached
+  - tier_in_cart:   {Boolean} a gift of this tier is already in the cart
+  - custom_image:   {Object} optional image that replaces the product image
+{%- endcomment -%}
+{%- liquid
+  assign sc_v = product.selected_or_first_available_variant
+
+  assign sc_row_in_cart = false
+  for item in cart.items
+    if item.product_id == product.id
+      assign sc_prop = item.properties['_sc_free_gift'] | append: ''
+      if sc_prop != blank or mode == 'zero_price'
+        assign sc_row_in_cart = true
+      endif
+    endif
+  endfor
+
+  # Only offered while it can be added: hidden once this tier's gift is in the cart
+  # (the cart list shows it) and when sold out; locked rows follow the setting.
+  assign sc_row_hidden = false
+  if tier_in_cart
+    assign sc_row_hidden = true
+  elsif tier_unlocked == false and settings.sc_fg_show_gift_when_locked == false
+    assign sc_row_hidden = true
+  elsif tier_unlocked and sc_v.available == false
+    assign sc_row_hidden = true
+  endif
+
+  assign sc_img = custom_image
+  if sc_img == blank
+    assign sc_img = sc_v.featured_image | default: product.featured_image
+  endif
+
+  assign sc_strike = 0
+  if settings.sc_fg_show_original_price
+    if mode == 'automatic_discount'
+      assign sc_strike = sc_v.price
+    elsif sc_v.compare_at_price > sc_v.price
+      assign sc_strike = sc_v.compare_at_price
+    endif
+  endif
+-%}
+<div
+  class="sc-fg__gift{% unless tier_unlocked %} is-locked{% endunless %}"
+  data-sc-fg-gift
+  data-tier="{{ tier }}"
+  data-product-id="{{ product.id }}"
+  data-variant-id="{{ sc_v.id }}"
+  data-available="{{ sc_v.available }}"
+  {% if sc_row_hidden %}
+    hidden
+  {% endif %}
+>
+  <div class="sc-fg__gift-media">
+    {%- if sc_img != blank -%}
+      {{-
+        sc_img
+        | image_url: width: 240
+        | image_tag: widths: '80, 120, 160, 240', sizes: '120px', loading: 'lazy', alt: product.title
+      -}}
+    {%- else -%}
+      {{- 'product-1' | placeholder_svg_tag -}}
+    {%- endif -%}
+  </div>
+  <div class="sc-fg__gift-info">
+    <p class="sc-fg__gift-title">{{ product.title | escape }}</p>
+    <p class="sc-fg__gift-price">
+      {%- if settings.sc_fg_free_label != blank -%}
+        <span class="sc-fg__free" data-sc-fg-free>{{ settings.sc_fg_free_label | escape }}</span>
+      {%- endif -%}
+      {%- if sc_strike > 0 -%}
+        <s class="sc-fg__strike" data-sc-fg-strike>
+          <span class="sc-fg__sr">Regular price</span>
+          {{- sc_strike | money -}}
+        </s>
+      {%- endif -%}
+      <span data-sc-fg-line-price hidden></span>
+    </p>
+  </div>
+  <div class="sc-fg__gift-action">
+    <button
+      type="button"
+      class="sc-fg__btn"
+      data-sc-fg-add
+      {% if tier_unlocked == false or tier_in_cart or sc_v.available == false %}
+        hidden
+      {% endif %}
+    >
+      {{- settings.sc_fg_add_button_label | default: 'Add free gift' | escape -}}
+    </button>
+    <span
+      class="sc-fg__status sc-fg__status--added"
+      data-sc-fg-added
+      {% unless sc_row_in_cart and tier_unlocked %}
+        hidden
+      {% endunless %}
+    >
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>
+      {{- settings.sc_fg_added_label | escape -}}
+    </span>
+    <span
+      class="sc-fg__status"
+      data-sc-fg-locked
+      {% if tier_unlocked %}
+        hidden
+      {% endif %}
+    >
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+      {{- settings.sc_fg_locked_label | escape -}}
+    </span>
+  </div>
+</div>

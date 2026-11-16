@@ -1,0 +1,30 @@
+{%- comment -%}
+  SC – Cart delivery promise ("Great choice! Your items arrive in 1-3 working days")
+  ----------------------------------------------------------------------------
+  Self-contained: Liquid + classes from sc-cart-drawer.css, no JS, no theme deps.
+  Settings: Theme settings > "SC – Optimized cart drawer" (sc_ocd_delivery_*, sc_ocd_accent).
+
+  Usage:
+    {% render 'sc-cart-delivery-promise' %}
+{%- endcomment -%}
+{%- liquid
+  assign sc_heading = settings.sc_ocd_delivery_heading | strip
+  assign sc_text = settings.sc_ocd_delivery_text | strip
+-%}
+{%- if settings.sc_ocd_delivery_enable and sc_heading != blank or settings.sc_ocd_delivery_enable and sc_text != blank -%}
+  <div class="sc-delivery-promise" style="--sc-accent: {{ settings.sc_ocd_accent | default: '#B5562A' }};">
+    <span class="sc-delivery-promise__icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" width="24" height="24" focusable="false">
+        <path d="M6 12.5l4 4 8-9" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </span>
+    <p class="sc-delivery-promise__body">
+      {%- if sc_heading != blank -%}
+        <strong class="sc-delivery-promise__heading">{{ sc_heading | escape }}</strong>
+      {%- endif -%}
+      {%- if sc_text != blank -%}
+        <span class="sc-delivery-promise__text">{{ sc_text | escape }}</span>
+      {%- endif -%}
+    </p>
+  </div>
+{%- endif -%}

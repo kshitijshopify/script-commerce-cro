@@ -1,0 +1,43 @@
+{%- comment -%}
+  SC – Cart line price with compare-at price + savings badge ("84€ 74€ [You save 10€]")
+  ----------------------------------------------------------------------------
+  Self-contained: Liquid + classes from sc-cart-drawer.css, no JS, no theme deps.
+  Savings = (compare-at price or original price, whichever is higher) x quantity
+  minus the final line price, so it covers both sale prices and line discounts.
+  Settings: Theme settings > "SC – Optimized cart drawer" (sc_ocd_show_savings, sc_ocd_savings_text, sc_ocd_accent).
+
+  Usage:
+    {% render 'sc-cart-line-price', item: item %}
+
+  Accepts:
+  - item: {Object} cart line item
+{%- endcomment -%}
+{%- liquid
+  assign sc_regular_unit = item.original_price
+  if settings.sc_ocd_show_savings and item.variant.compare_at_price > item.original_price
+    assign sc_regular_unit = item.variant.compare_at_price
+  endif
+  assign sc_regular = sc_regular_unit | times: item.quantity
+  if item.original_line_price > sc_regular
+    assign sc_regular = item.original_line_price
+  endif
+  assign sc_savings = sc_regular | minus: item.final_line_price
+-%}
+<div class="sc-line-price" style="--sc-accent: {{ settings.sc_ocd_accent | default: '#B5562A' }};">
+  {%- if sc_savings > 0 -%}
+    <s class="sc-line-price__compare">
+      <span class="sc-line-price__sr">{{ 'products.product.price.regular_price' | t }}</span>
+      {{- sc_regular | money -}}
+    </s>
+    <span class="sc-line-price__final">
+      <span class="sc-line-price__sr">{{ 'products.product.price.sale_price' | t }}</span>
+      {{- item.final_line_price | money -}}
+    </span>
+    {%- if settings.sc_ocd_show_savings and settings.sc_ocd_savings_text != blank -%}
+      {%- assign sc_saved = sc_savings | money -%}
+      <span class="sc-line-price__badge">{{ settings.sc_ocd_savings_text | escape | replace: '[amount]', sc_saved }}</span>
+    {%- endif -%}
+  {%- else -%}
+    <span class="sc-line-price__final">{{ item.final_line_price | money }}</span>
+  {%- endif -%}
+</div>
