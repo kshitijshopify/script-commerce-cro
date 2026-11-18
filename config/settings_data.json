@@ -134,6 +134,7 @@
       "the-multi-location-snowboard"
     ],
     "customer_account_menu": "customer-account-main-menu",
+    "sc_pay_source": "dynamic",
     "sc_fg_enable": true,
     "sc_fg_gift_product": "the-collection-snowboard-hydrogen",
     "sc_fg_ship_enable": true,
