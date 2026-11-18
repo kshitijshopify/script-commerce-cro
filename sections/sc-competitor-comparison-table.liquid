@@ -1,0 +1,841 @@
+{%- comment -%}
+  SC – Competitor Comparison Table
+  ScriptCommerce CRO section. Self-contained, theme-independent (Dawn, Horizon, any OS 2.0 theme).
+
+  "Us vs them" table: a highlighted brand column next to up to three competitor columns.
+  - Each "Comparison row" block is one feature; every cell has its own Yes / No / Not applicable value.
+  - The brand column is one continuous highlighted strip (colour + optional glow) behind the header and rows.
+  - Competitor 3 is optional: leave its name and logo empty and the column disappears.
+  - Logo tiles show the uploaded image, or the first letter of the name when no image is set.
+  - Accessible: ARIA table roles + screen-reader text ("Yes" / "No") for every icon.
+{%- endcomment -%}
+
+{%- liquid
+  assign s = section.settings
+  assign sid = section.id
+  assign root = '#ScCmp-' | append: sid
+
+  assign heading = s.heading | strip
+  assign sub_html = s.subheading
+  assign sub_text = sub_html | strip_html | strip
+  assign has_header = false
+  if heading != blank or sub_text != blank
+    assign has_header = true
+  endif
+
+  comment
+    Colours: the pickers always apply. "Light" only swaps a colour whose picker is still at its
+    dark default, so choosing Light works out of the box and any colour the merchant edits wins.
+  endcomment
+  assign is_light = false
+  if s.color_scheme == 'light'
+    assign is_light = true
+  endif
+
+  assign bg = s.background_color | append: '' | downcase
+  if bg == blank
+    assign bg = '#141414'
+  endif
+  if is_light and bg == '#141414'
+    assign bg = '#ffffff'
+  endif
+
+  assign text_color = s.text_color | append: '' | downcase
+  if text_color == blank
+    assign text_color = '#ffffff'
+  endif
+  if is_light and text_color == '#ffffff'
+    assign text_color = '#141414'
+  endif
+
+  assign muted_color = s.subheading_color | append: '' | downcase
+  if muted_color == blank
+    assign muted_color = '#b3b3b3'
+  endif
+  if is_light and muted_color == '#b3b3b3'
+    assign muted_color = '#5c5c5c'
+  endif
+
+  assign row_bg = s.row_background | append: '' | downcase
+  if row_bg == blank
+    assign row_bg = '#232323'
+  endif
+  if is_light and row_bg == '#232323'
+    assign row_bg = '#f5f4f6'
+  endif
+
+  assign tile_bg = s.tile_background | append: '' | downcase
+  if tile_bg == blank
+    assign tile_bg = '#2c2c2c'
+  endif
+  if is_light and tile_bg == '#2c2c2c'
+    assign tile_bg = '#ecebee'
+  endif
+  if s.transparent_background
+    assign bg = 'transparent'
+  endif
+
+  assign hl = s.highlight_color | default: '#5BE584'
+  assign hl_text = s.highlight_text_color | default: '#0E0E0E'
+  assign hl_icon = s.brand_icon_color | default: '#0E0E0E'
+  assign check_c = s.check_color | default: '#4ADE80'
+  assign cross_c = s.cross_color | default: '#F05252'
+  assign dash_c = muted_color
+
+  assign glow = s.glow_size | default: 0
+  assign glow_shadow = 'none'
+  if glow > 0
+    assign glow_alpha = s.glow_strength | divided_by: 100.0
+    assign glow_rgba = hl | color_modify: 'alpha', glow_alpha
+    assign glow_spread = glow | divided_by: 6 | round: 0
+    assign glow_shadow = '0 0 ' | append: glow | append: 'px ' | append: glow_spread | append: 'px ' | append: glow_rgba
+  endif
+
+  comment
+    Active columns: brand is always shown. Competitors are shown when they have a name or a logo.
+  endcomment
+  assign comp_list = ''
+  for i in (1..3)
+    assign name_key = 'competitor_' | append: i | append: '_name'
+    assign logo_key = 'competitor_' | append: i | append: '_logo'
+    assign c_name = s[name_key] | strip
+    if c_name != blank or s[logo_key] != blank
+      assign comp_list = comp_list | append: i | append: ','
+    endif
+  endfor
+  assign comps = comp_list | split: ','
+  assign n_comp = comps.size
+
+  assign brand_name = s.brand_name | strip
+  assign logo_mode = s.logo_display | default: 'tiles'
+
+  assign heading_size_m = s.heading_size | times: 0.7 | round: 0
+  if heading_size_m < 24
+    assign heading_size_m = 24
+  endif
+  if heading_size_m > s.heading_size
+    assign heading_size_m = s.heading_size
+  endif
+  assign label_size_m = s.label_size
+  if label_size_m > 15
+    assign label_size_m = 15
+  endif
+  assign col_t = s.column_width | times: 0.85 | round: 0
+  assign col_m = s.column_width | times: 0.55 | round: 0
+  if col_m < 58
+    assign col_m = 58
+  endif
+  if col_m > 84
+    assign col_m = 84
+  endif
+  if n_comp > 2 and col_m > 56
+    assign col_m = 56
+  endif
+  assign row_py_m = s.row_padding | times: 0.75 | round: 0
+  assign pad_top_m = s.padding_top | times: 0.75 | round: 0
+  assign pad_bottom_m = s.padding_bottom | times: 0.75 | round: 0
+
+  assign row_style = s.row_style | default: 'alternate'
+  assign icon_style = s.icon_style | default: 'plain'
+-%}
+
+{%- capture sc_icon_check -%}
+  <svg viewBox="0 0 24 24" width="24" height="24" focusable="false" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+{%- endcapture -%}
+{%- capture sc_icon_cross -%}
+  <svg viewBox="0 0 24 24" width="24" height="24" focusable="false" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg>
+{%- endcapture -%}
+{%- capture sc_icon_dash -%}
+  <svg viewBox="0 0 24 24" width="24" height="24" focusable="false" aria-hidden="true"><path d="M7 12h10" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg>
+{%- endcapture -%}
+
+{%- if s.enabled == false -%}
+  {%- if request.design_mode -%}
+    <div style="padding:16px;margin:8px auto;max-width:720px;border:1px dashed #b5b5b5;border-radius:8px;font:14px/1.4 sans-serif;color:#555;text-align:center;">
+      SC – Competitor Comparison Table is hidden. Turn on “Show section” to display it.
+    </div>
+  {%- endif -%}
+{%- else -%}
+  {%- capture sc_rows -%}
+    {%- assign sc_row_count = 0 -%}
+    {%- for block in section.blocks -%}
+      {%- liquid
+        assign b = block.settings
+        if b.enabled == false
+          continue
+        endif
+        assign label = b.label | strip
+        if label == blank
+          if request.design_mode
+            assign label = 'Feature'
+          else
+            continue
+          endif
+        endif
+        assign sc_row_count = sc_row_count | plus: 1
+        assign row_mod = sc_row_count | modulo: 2
+      -%}
+      <div
+        class="sc-cmp__row{% if row_mod == 1 %} sc-cmp__row--odd{% else %} sc-cmp__row--even{% endif %}"
+        role="row"
+        {{ block.shopify_attributes }}
+      >
+        <div class="sc-cmp__label" role="rowheader">
+          <span class="sc-cmp__label-text">{{ label | escape }}</span>
+          {%- assign note = b.note | strip -%}
+          {%- if note != blank -%}
+            <span class="sc-cmp__note">{{ note | escape }}</span>
+          {%- endif -%}
+        </div>
+        {%- for col in (0..3) -%}
+          {%- liquid
+            if col == 0
+              assign val = b.brand_value | default: 'check'
+              assign is_brand = true
+            else
+              assign idx = col | minus: 1
+              assign comp_i = comps[idx]
+              if comp_i == blank
+                continue
+              endif
+              assign val_key = 'competitor_' | append: comp_i | append: '_value'
+              assign val = b[val_key] | default: 'cross'
+              assign is_brand = false
+            endif
+          -%}
+          <div class="sc-cmp__cell{% if is_brand %} sc-cmp__cell--brand{% endif %}" role="cell">
+            <span class="sc-cmp__icon sc-cmp__icon--{{ val }}">
+              {%- case val -%}
+                {%- when 'check' -%}
+                  {{ sc_icon_check }}
+                {%- when 'cross' -%}
+                  {{ sc_icon_cross }}
+                {%- else -%}
+                  {{ sc_icon_dash }}
+              {%- endcase -%}
+            </span>
+            <span class="sc-cmp__sr">
+              {%- case val -%}
+                {%- when 'check' -%}
+                  {{ s.sr_yes | default: 'Yes' }}
+                {%- when 'cross' -%}
+                  {{ s.sr_no | default: 'No' }}
+                {%- else -%}
+                  {{ s.sr_na | default: 'Not applicable' }}
+              {%- endcase -%}
+            </span>
+          </div>
+        {%- endfor -%}
+      </div>
+    {%- endfor -%}
+  {%- endcapture -%}
+
+  {%- if sc_row_count == 0 and has_header == false -%}
+    {%- if request.design_mode -%}
+      <div style="padding:16px;margin:8px auto;max-width:720px;border:1px dashed #b5b5b5;border-radius:8px;font:14px/1.4 sans-serif;color:#555;text-align:center;">
+        SC – Competitor Comparison Table: add a “Comparison row” block and enter a feature label.
+      </div>
+    {%- endif -%}
+  {%- else -%}
+    <style>
+      {{ root }} {
+        --sc-cmp-bg: {{ bg }};
+        --sc-cmp-text: {{ text_color }};
+        --sc-cmp-muted: {{ muted_color }};
+        --sc-cmp-row: {{ row_bg }};
+        --sc-cmp-tile: {{ tile_bg }};
+        --sc-cmp-hl: {{ hl }};
+        --sc-cmp-hl-text: {{ hl_text }};
+        --sc-cmp-hl-icon: {{ hl_icon }};
+        --sc-cmp-check: {{ check_c }};
+        --sc-cmp-cross: {{ cross_c }};
+        --sc-cmp-dash: {{ dash_c }};
+        --sc-cmp-glow: {{ glow_shadow }};
+        --sc-cmp-width: {{ s.content_width }}px;
+        --sc-cmp-col: {{ s.column_width }}px;
+        --sc-cmp-ncomp: {{ n_comp }};
+        --sc-cmp-h: {{ s.heading_size }}px;
+        --sc-cmp-label: {{ s.label_size }}px;
+        --sc-cmp-row-py: {{ s.row_padding }}px;
+        --sc-cmp-row-gap: {{ s.row_gap }}px;
+        --sc-cmp-row-radius: {{ s.row_radius }}px;
+        --sc-cmp-hl-radius: {{ s.highlight_radius }}px;
+        --sc-cmp-icon: {{ s.icon_size }}px;
+        --sc-cmp-tile-size: 72px;
+        --sc-cmp-pt: {{ s.padding_top }}px;
+        --sc-cmp-pb: {{ s.padding_bottom }}px;
+        --sc-cmp-px: 24px;
+        --sc-cmp-label-px: 18px;
+        display: block;
+        box-sizing: border-box;
+        width: 100%;
+        max-width: 100%;
+        background: var(--sc-cmp-bg);
+        color: var(--sc-cmp-text);
+        overflow-x: clip;
+      }
+      @media screen and (min-width: 750px) and (max-width: 989px) {
+        {{ root }} {
+          --sc-cmp-col: {{ col_t }}px;
+          --sc-cmp-tile-size: 60px;
+        }
+      }
+      @media screen and (max-width: 749px) {
+        {{ root }} {
+          --sc-cmp-col: {{ col_m }}px;
+          --sc-cmp-h: {{ heading_size_m }}px;
+          --sc-cmp-label: {{ label_size_m }}px;
+          --sc-cmp-row-py: {{ row_py_m }}px;
+          --sc-cmp-icon: {{ s.icon_size | times: 0.85 | round: 0 }}px;
+          --sc-cmp-tile-size: 44px;
+          --sc-cmp-pt: {{ pad_top_m }}px;
+          --sc-cmp-pb: {{ pad_bottom_m }}px;
+          --sc-cmp-px: 16px;
+          --sc-cmp-label-px: 12px;
+        }
+      }
+
+      {{ root }} *,
+      {{ root }} *::before,
+      {{ root }} *::after { box-sizing: border-box; }
+
+      {{ root }} .sc-cmp__inner {
+        width: 100%;
+        max-width: var(--sc-cmp-width);
+        margin: 0 auto;
+        padding: var(--sc-cmp-pt) var(--sc-cmp-px) var(--sc-cmp-pb);
+      }
+
+      {{ root }} .sc-cmp__header { margin: 0 0 36px; text-align: {{ s.heading_alignment | default: 'center' }}; }
+      @media screen and (max-width: 749px) {
+        {{ root }} .sc-cmp__header { margin-bottom: 24px; }
+      }
+      {{ root }} .sc-cmp__title {
+        margin: 0;
+        padding: 0;
+        font-family: var(--font-heading-family, var(--font-heading--family, inherit));
+        font-style: var(--font-heading-style, normal);
+        font-weight: var(--font-heading-weight, 700);
+        font-size: var(--sc-cmp-h);
+        line-height: 1.15;
+        letter-spacing: normal;
+        text-transform: none;
+        color: var(--sc-cmp-text);
+        overflow-wrap: break-word;
+      }
+      {{ root }} .sc-cmp__sub {
+        max-width: 40em;
+        margin: 12px 0 0;
+        font-size: 16px;
+        line-height: 1.55;
+        color: var(--sc-cmp-muted);
+        overflow-wrap: break-word;
+      }
+      {{ root }}.sc-cmp--center .sc-cmp__sub { margin-left: auto; margin-right: auto; }
+      {{ root }} .sc-cmp__sub > *:first-child { margin-top: 0; }
+      {{ root }} .sc-cmp__sub > *:last-child { margin-bottom: 0; }
+      {{ root }} .sc-cmp__sub a { color: inherit; }
+
+      /* Table */
+      {{ root }} .sc-cmp__table {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        gap: var(--sc-cmp-row-gap);
+        padding: 16px 0 18px;
+      }
+      {{ root }} .sc-cmp__highlight {
+        position: absolute;
+        z-index: 1;
+        top: 0;
+        bottom: 0;
+        right: calc(var(--sc-cmp-col) * var(--sc-cmp-ncomp));
+        width: var(--sc-cmp-col);
+        background: var(--sc-cmp-hl);
+        border-radius: var(--sc-cmp-hl-radius);
+        box-shadow: var(--sc-cmp-glow);
+        pointer-events: none;
+      }
+      {{ root }} .sc-cmp__row,
+      {{ root }} .sc-cmp__head {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) repeat({{ n_comp | plus: 1 }}, var(--sc-cmp-col));
+        align-items: center;
+        margin: 0;
+      }
+      {{ root }} .sc-cmp__row {
+        min-height: 48px;
+        border-radius: var(--sc-cmp-row-radius);
+      }
+      {{ root }}.sc-cmp--rows-alternate .sc-cmp__row--odd,
+      {{ root }}.sc-cmp--rows-all .sc-cmp__row { background: var(--sc-cmp-row); }
+      {{ root }}.sc-cmp--rows-lines .sc-cmp__row { border-radius: 0; }
+      {{ root }}.sc-cmp--rows-lines .sc-cmp__row + .sc-cmp__row {
+        box-shadow: inset 0 1px 0 var(--sc-cmp-row);
+      }
+
+      {{ root }} .sc-cmp__label,
+      {{ root }} .sc-cmp__cell,
+      {{ root }} .sc-cmp__colhead {
+        position: relative;
+        z-index: 2;
+        min-width: 0;
+      }
+      {{ root }} .sc-cmp__label {
+        padding: var(--sc-cmp-row-py) 12px var(--sc-cmp-row-py) var(--sc-cmp-label-px);
+        font-size: var(--sc-cmp-label);
+        font-weight: {{ s.label_weight | default: 600 }};
+        line-height: 1.35;
+        color: var(--sc-cmp-text);
+        overflow-wrap: break-word;
+        hyphens: auto;
+      }
+      {{ root }} .sc-cmp__label-text { display: block; }
+      {{ root }} .sc-cmp__note {
+        display: block;
+        margin-top: 3px;
+        font-size: 0.8em;
+        font-weight: 400;
+        color: var(--sc-cmp-muted);
+      }
+      {{ root }} .sc-cmp__cell {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: var(--sc-cmp-row-py) 4px;
+      }
+
+      /* Icons */
+      {{ root }} .sc-cmp__icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex: 0 0 auto;
+        width: var(--sc-cmp-icon);
+        height: var(--sc-cmp-icon);
+        line-height: 0;
+      }
+      {{ root }} .sc-cmp__icon svg { width: 100%; height: 100%; display: block; }
+      {{ root }} .sc-cmp__icon--check { color: var(--sc-cmp-check); }
+      {{ root }} .sc-cmp__icon--cross { color: var(--sc-cmp-cross); }
+      {{ root }} .sc-cmp__icon--na { color: var(--sc-cmp-dash); }
+      {{ root }} .sc-cmp__cell--brand .sc-cmp__icon { color: var(--sc-cmp-hl-icon); }
+
+      {{ root }}.sc-cmp--icons-filled .sc-cmp__icon {
+        width: calc(var(--sc-cmp-icon) * 1.3);
+        height: calc(var(--sc-cmp-icon) * 1.3);
+        padding: calc(var(--sc-cmp-icon) * 0.2);
+        border-radius: calc(var(--sc-cmp-icon) * 0.3);
+        color: #FFFFFF;
+      }
+      {{ root }}.sc-cmp--icons-filled .sc-cmp__icon--check { background: var(--sc-cmp-check); }
+      {{ root }}.sc-cmp--icons-filled .sc-cmp__icon--cross { background: var(--sc-cmp-cross); }
+      {{ root }}.sc-cmp--icons-filled .sc-cmp__icon--na { background: var(--sc-cmp-dash); }
+      {{ root }}.sc-cmp--icons-filled .sc-cmp__cell--brand .sc-cmp__icon {
+        background: var(--sc-cmp-hl-icon);
+        color: var(--sc-cmp-hl);
+      }
+
+      {{ root }}.sc-cmp--icons-circle .sc-cmp__icon {
+        width: calc(var(--sc-cmp-icon) * 1.35);
+        height: calc(var(--sc-cmp-icon) * 1.35);
+        padding: calc(var(--sc-cmp-icon) * 0.25);
+        border-radius: 50%;
+      }
+      {{ root }}.sc-cmp--icons-circle .sc-cmp__icon--check { background: color-mix(in srgb, var(--sc-cmp-check) 18%, transparent); }
+      {{ root }}.sc-cmp--icons-circle .sc-cmp__icon--cross { background: color-mix(in srgb, var(--sc-cmp-cross) 18%, transparent); }
+      {{ root }}.sc-cmp--icons-circle .sc-cmp__icon--na { background: color-mix(in srgb, var(--sc-cmp-dash) 18%, transparent); }
+      {{ root }}.sc-cmp--icons-circle .sc-cmp__cell--brand .sc-cmp__icon {
+        background: color-mix(in srgb, var(--sc-cmp-hl-icon) 14%, transparent);
+      }
+
+      /* Column headers */
+      {{ root }} .sc-cmp__head { align-items: end; padding-bottom: 6px; }
+      {{ root }} .sc-cmp__colhead {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 10px;
+        padding: 0 4px;
+        text-align: center;
+      }
+      {{ root }} .sc-cmp__tile {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: var(--sc-cmp-tile-size);
+        height: var(--sc-cmp-tile-size);
+        max-width: 100%;
+        border-radius: calc(var(--sc-cmp-tile-size) * 0.24);
+        background: var(--sc-cmp-tile);
+        overflow: hidden;
+        font-size: calc(var(--sc-cmp-tile-size) * 0.42);
+        font-weight: 700;
+        line-height: 1;
+        color: var(--sc-cmp-muted);
+        text-transform: uppercase;
+      }
+      {{ root }} .sc-cmp__colhead--brand .sc-cmp__tile {
+        background: rgba(0, 0, 0, 0.08);
+        color: var(--sc-cmp-hl-text);
+      }
+      {{ root }}.sc-cmp--no-tile-bg .sc-cmp__tile { background: transparent; }
+      {{ root }} .sc-cmp__tile img {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        padding: {% if s.tile_background_on %}12%{% else %}0{% endif %};
+      }
+      {{ root }} .sc-cmp__name {
+        display: block;
+        max-width: 100%;
+        font-size: 16px;
+        font-weight: 700;
+        line-height: 1.2;
+        color: var(--sc-cmp-text);
+        overflow-wrap: break-word;
+        hyphens: auto;
+      }
+      {{ root }} .sc-cmp__colhead--brand .sc-cmp__name { color: var(--sc-cmp-hl-text); }
+      @media screen and (max-width: 749px) {
+        {{ root }} .sc-cmp__colhead { gap: 6px; padding: 0 2px; }
+        {{ root }} .sc-cmp__name { font-size: 12px; }
+        {{ root }} .sc-cmp__table { padding: 12px 0 14px; }
+      }
+
+      /* CTA */
+      {{ root }} .sc-cmp__cta-wrap { margin-top: 32px; text-align: center; }
+      {{ root }} .sc-cmp__cta {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 50px;
+        padding: 14px 32px;
+        border-radius: {{ s.button_radius }}px;
+        background: var(--sc-cmp-hl);
+        color: var(--sc-cmp-hl-text);
+        font-size: 16px;
+        font-weight: 700;
+        line-height: 1.2;
+        text-decoration: none;
+        box-shadow: var(--sc-cmp-glow);
+        transition: transform 0.2s ease, filter 0.2s ease;
+      }
+      {{ root }} .sc-cmp__cta:hover { transform: translateY(-1px); filter: brightness(1.05); }
+      {{ root }} .sc-cmp__cta:focus-visible { outline: 2px solid var(--sc-cmp-text); outline-offset: 3px; }
+      @media screen and (max-width: 749px) {
+        {{ root }} .sc-cmp__cta-wrap { margin-top: 24px; }
+        {{ root }} .sc-cmp__cta { width: 100%; }
+      }
+
+      {{ root }} .sc-cmp__sr {
+        position: absolute !important;
+        width: 1px;
+        height: 1px;
+        margin: -1px;
+        padding: 0;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
+        border: 0;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        {{ root }} .sc-cmp__cta { transition: none; }
+        {{ root }} .sc-cmp__cta:hover { transform: none; }
+      }
+    </style>
+
+    <section
+      id="ScCmp-{{ sid }}"
+      class="sc-cmp sc-cmp--rows-{{ row_style }} sc-cmp--icons-{{ icon_style }}{% if s.tile_background_on == false %} sc-cmp--no-tile-bg{% endif %}{% if s.heading_alignment == 'center' %} sc-cmp--center{% endif %}"
+      {% if heading != blank %}aria-labelledby="ScCmpTitle-{{ sid }}"{% endif %}
+    >
+      <div class="sc-cmp__inner">
+        {%- if has_header -%}
+          <div class="sc-cmp__header">
+            {%- if heading != blank -%}
+              <h2 class="sc-cmp__title" id="ScCmpTitle-{{ sid }}">{{ heading | escape }}</h2>
+            {%- endif -%}
+            {%- if sub_text != blank -%}
+              <div class="sc-cmp__sub">{{ sub_html }}</div>
+            {%- endif -%}
+          </div>
+        {%- endif -%}
+
+        {%- if sc_row_count > 0 -%}
+          <div
+            class="sc-cmp__table"
+            role="table"
+            {% if heading != blank %}aria-labelledby="ScCmpTitle-{{ sid }}"{% else %}aria-label="{{ brand_name | default: 'Comparison' | escape }}"{% endif %}
+          >
+            <div class="sc-cmp__highlight" aria-hidden="true"></div>
+
+            <div class="sc-cmp__head" role="row">
+              <div class="sc-cmp__colhead sc-cmp__colhead--empty" role="columnheader">
+                <span class="sc-cmp__sr">{{ s.sr_feature | default: 'Feature' }}</span>
+              </div>
+              {%- for col in (0..3) -%}
+                {%- liquid
+                  if col == 0
+                    assign c_name = brand_name
+                    assign c_logo = s.brand_logo
+                    assign is_brand = true
+                  else
+                    assign idx = col | minus: 1
+                    assign comp_i = comps[idx]
+                    if comp_i == blank
+                      continue
+                    endif
+                    assign name_key = 'competitor_' | append: comp_i | append: '_name'
+                    assign logo_key = 'competitor_' | append: comp_i | append: '_logo'
+                    assign c_name = s[name_key] | strip
+                    assign c_logo = s[logo_key]
+                    assign is_brand = false
+                  endif
+                  assign show_tile = false
+                  if logo_mode == 'tiles'
+                    assign show_tile = true
+                  elsif logo_mode == 'uploaded' and c_logo != blank
+                    assign show_tile = true
+                  endif
+                -%}
+                <div class="sc-cmp__colhead{% if is_brand %} sc-cmp__colhead--brand{% endif %}" role="columnheader">
+                  {%- if show_tile -%}
+                    <span class="sc-cmp__tile" aria-hidden="true">
+                      {%- if c_logo != blank -%}
+                        {{ c_logo | image_url: width: 240 | image_tag: loading: 'lazy', alt: '', widths: '120, 240', sizes: '120px' }}
+                      {%- elsif c_name != blank -%}
+                        {{ c_name | slice: 0 }}
+                      {%- endif -%}
+                    </span>
+                  {%- endif -%}
+                  {%- if c_name != blank -%}
+                    <span class="sc-cmp__name">{{ c_name | escape }}</span>
+                  {%- elsif c_logo != blank and c_logo.alt != blank -%}
+                    <span class="sc-cmp__sr">{{ c_logo.alt | escape }}</span>
+                  {%- endif -%}
+                </div>
+              {%- endfor -%}
+            </div>
+
+            {{ sc_rows }}
+          </div>
+        {%- endif -%}
+
+        {%- assign cta_label = s.button_label | strip -%}
+        {%- if cta_label != blank -%}
+          <div class="sc-cmp__cta-wrap">
+            <a class="sc-cmp__cta" {% if s.button_link != blank %}href="{{ s.button_link }}"{% else %}role="link" aria-disabled="true"{% endif %}>
+              {{- cta_label | escape -}}
+            </a>
+          </div>
+        {%- endif -%}
+      </div>
+    </section>
+  {%- endif -%}
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "SC – Comparison table",
+  "tag": "div",
+  "class": "sc-cmp-section",
+  "max_blocks": 20,
+  "settings": [
+    { "type": "header", "content": "Content" },
+    { "type": "checkbox", "id": "enabled", "label": "Show section", "default": true },
+    { "type": "text", "id": "heading", "label": "Heading", "default": "Why customers choose us" },
+    { "type": "richtext", "id": "subheading", "label": "Subheading" },
+    {
+      "type": "select",
+      "id": "heading_alignment",
+      "label": "Heading alignment",
+      "options": [
+        { "value": "left", "label": "Left" },
+        { "value": "center", "label": "Center" }
+      ],
+      "default": "center"
+    },
+    { "type": "header", "content": "Your brand column" },
+    { "type": "text", "id": "brand_name", "label": "Brand name", "default": "Us" },
+    { "type": "image_picker", "id": "brand_logo", "label": "Brand logo / icon" },
+    { "type": "header", "content": "Competitor columns" },
+    { "type": "text", "id": "competitor_1_name", "label": "Competitor 1 name", "default": "Others" },
+    { "type": "image_picker", "id": "competitor_1_logo", "label": "Competitor 1 logo / icon" },
+    { "type": "text", "id": "competitor_2_name", "label": "Competitor 2 name", "default": "Competitor" },
+    { "type": "image_picker", "id": "competitor_2_logo", "label": "Competitor 2 logo / icon" },
+    { "type": "text", "id": "competitor_3_name", "label": "Competitor 3 name (optional)", "info": "Leave name and logo empty to hide this column." },
+    { "type": "image_picker", "id": "competitor_3_logo", "label": "Competitor 3 logo / icon" },
+    {
+      "type": "select",
+      "id": "logo_display",
+      "label": "Logo tiles",
+      "options": [
+        { "value": "tiles", "label": "Always (first letter when no logo)" },
+        { "value": "uploaded", "label": "Only when a logo is uploaded" },
+        { "value": "none", "label": "Hide logos" }
+      ],
+      "default": "tiles"
+    },
+    { "type": "checkbox", "id": "tile_background_on", "label": "Show tile background behind logos", "default": true },
+    { "type": "header", "content": "Table style" },
+    {
+      "type": "select",
+      "id": "color_scheme",
+      "label": "Colour scheme",
+      "options": [
+        { "value": "dark", "label": "Dark" },
+        { "value": "light", "label": "Light" },
+        { "value": "custom", "label": "Custom" }
+      ],
+      "default": "dark",
+      "info": "Starting palette. Colours you change under Colours always apply on top of it."
+    },
+    {
+      "type": "select",
+      "id": "row_style",
+      "label": "Row backgrounds",
+      "options": [
+        { "value": "alternate", "label": "Alternating" },
+        { "value": "all", "label": "Every row" },
+        { "value": "lines", "label": "Divider lines" },
+        { "value": "none", "label": "None" }
+      ],
+      "default": "alternate"
+    },
+    {
+      "type": "select",
+      "id": "icon_style",
+      "label": "Icon style",
+      "options": [
+        { "value": "plain", "label": "Plain" },
+        { "value": "circle", "label": "Soft circle" },
+        { "value": "filled", "label": "Filled square" }
+      ],
+      "default": "plain"
+    },
+    { "type": "range", "id": "icon_size", "label": "Icon size", "min": 14, "max": 32, "step": 1, "unit": "px", "default": 18 },
+    { "type": "range", "id": "column_width", "label": "Column width", "min": 80, "max": 200, "step": 4, "unit": "px", "default": 128, "info": "Brand and competitor columns. Scaled down automatically on tablet and mobile." },
+    { "type": "range", "id": "row_padding", "label": "Row height", "min": 8, "max": 32, "step": 1, "unit": "px", "default": 18 },
+    { "type": "range", "id": "row_gap", "label": "Space between rows", "min": 0, "max": 16, "step": 1, "unit": "px", "default": 0 },
+    { "type": "range", "id": "row_radius", "label": "Row corner radius", "min": 0, "max": 24, "step": 1, "unit": "px", "default": 8 },
+    { "type": "header", "content": "Brand highlight" },
+    { "type": "color", "id": "highlight_color", "label": "Highlight colour", "default": "#5BE584" },
+    { "type": "color", "id": "highlight_text_color", "label": "Brand name colour", "default": "#0E0E0E" },
+    { "type": "color", "id": "brand_icon_color", "label": "Brand column icon colour", "default": "#0E0E0E" },
+    { "type": "range", "id": "highlight_radius", "label": "Highlight corner radius", "min": 0, "max": 40, "step": 1, "unit": "px", "default": 18 },
+    { "type": "range", "id": "glow_size", "label": "Glow size", "min": 0, "max": 80, "step": 2, "unit": "px", "default": 36, "info": "0 turns the glow off." },
+    { "type": "range", "id": "glow_strength", "label": "Glow strength", "min": 5, "max": 100, "step": 5, "unit": "%", "default": 35 },
+    { "type": "header", "content": "Colours" },
+    { "type": "color", "id": "check_color", "label": "Check icon colour", "default": "#4ADE80" },
+    { "type": "color", "id": "cross_color", "label": "Cross icon colour", "default": "#F05252" },
+    { "type": "checkbox", "id": "transparent_background", "label": "Transparent section background", "default": false },
+    { "type": "paragraph", "content": "With Light scheme, colours still at their dark default switch to light automatically. Any colour you change is used as-is." },
+    { "type": "color", "id": "background_color", "label": "Section background", "default": "#141414" },
+    { "type": "color", "id": "row_background", "label": "Row background", "default": "#232323" },
+    { "type": "color", "id": "text_color", "label": "Heading and label text", "default": "#FFFFFF" },
+    { "type": "color", "id": "subheading_color", "label": "Subheading and note text", "default": "#B3B3B3" },
+    { "type": "color", "id": "tile_background", "label": "Logo tile background", "default": "#2C2C2C" },
+    { "type": "header", "content": "Typography" },
+    { "type": "range", "id": "heading_size", "label": "Heading size", "min": 20, "max": 64, "step": 1, "unit": "px", "default": 40 },
+    { "type": "range", "id": "label_size", "label": "Feature label size", "min": 12, "max": 22, "step": 1, "unit": "px", "default": 17 },
+    {
+      "type": "select",
+      "id": "label_weight",
+      "label": "Feature label weight",
+      "options": [
+        { "value": "400", "label": "Regular" },
+        { "value": "500", "label": "Medium" },
+        { "value": "600", "label": "Semibold" },
+        { "value": "700", "label": "Bold" }
+      ],
+      "default": "600"
+    },
+    { "type": "header", "content": "Button (optional)" },
+    { "type": "text", "id": "button_label", "label": "Button label", "info": "Leave empty to hide the button." },
+    { "type": "url", "id": "button_link", "label": "Button link" },
+    { "type": "range", "id": "button_radius", "label": "Button corner radius", "min": 0, "max": 40, "step": 1, "unit": "px", "default": 12 },
+    { "type": "header", "content": "Layout" },
+    { "type": "range", "id": "content_width", "label": "Content width", "min": 480, "max": 1400, "step": 20, "unit": "px", "default": 780 },
+    { "type": "range", "id": "padding_top", "label": "Top padding", "min": 0, "max": 160, "step": 4, "unit": "px", "default": 64 },
+    { "type": "range", "id": "padding_bottom", "label": "Bottom padding", "min": 0, "max": 160, "step": 4, "unit": "px", "default": 64 },
+    { "type": "header", "content": "Accessibility" },
+    { "type": "text", "id": "sr_feature", "label": "Screen-reader text: feature column", "default": "Feature" },
+    { "type": "text", "id": "sr_yes", "label": "Screen-reader text: check", "default": "Yes" },
+    { "type": "text", "id": "sr_no", "label": "Screen-reader text: cross", "default": "No" },
+    { "type": "text", "id": "sr_na", "label": "Screen-reader text: not applicable", "default": "Not applicable" }
+  ],
+  "blocks": [
+    {
+      "type": "row",
+      "name": "Comparison row",
+      "settings": [
+        { "type": "checkbox", "id": "enabled", "label": "Show this row", "default": true },
+        { "type": "text", "id": "label", "label": "Feature label", "default": "Feature" },
+        { "type": "text", "id": "note", "label": "Small note under label (optional)" },
+        {
+          "type": "select",
+          "id": "brand_value",
+          "label": "Your brand",
+          "options": [
+            { "value": "check", "label": "✓ Check" },
+            { "value": "cross", "label": "✕ Cross" },
+            { "value": "na", "label": "– Not applicable" }
+          ],
+          "default": "check"
+        },
+        {
+          "type": "select",
+          "id": "competitor_1_value",
+          "label": "Competitor 1",
+          "options": [
+            { "value": "check", "label": "✓ Check" },
+            { "value": "cross", "label": "✕ Cross" },
+            { "value": "na", "label": "– Not applicable" }
+          ],
+          "default": "cross"
+        },
+        {
+          "type": "select",
+          "id": "competitor_2_value",
+          "label": "Competitor 2",
+          "options": [
+            { "value": "check", "label": "✓ Check" },
+            { "value": "cross", "label": "✕ Cross" },
+            { "value": "na", "label": "– Not applicable" }
+          ],
+          "default": "cross"
+        },
+        {
+          "type": "select",
+          "id": "competitor_3_value",
+          "label": "Competitor 3 (if shown)",
+          "options": [
+            { "value": "check", "label": "✓ Check" },
+            { "value": "cross", "label": "✕ Cross" },
+            { "value": "na", "label": "– Not applicable" }
+          ],
+          "default": "cross"
+        }
+      ]
+    }
+  ],
+  "presets": [
+    {
+      "name": "SC – Comparison table",
+      "blocks": [
+        { "type": "row", "settings": { "label": "A/B-tested sections", "competitor_1_value": "cross", "competitor_2_value": "cross" } },
+        { "type": "row", "settings": { "label": "Built by Shopify Plus developers", "competitor_1_value": "cross", "competitor_2_value": "cross" } },
+        { "type": "row", "settings": { "label": "Detailed video tutorials", "competitor_1_value": "cross", "competitor_2_value": "cross" } },
+        { "type": "row", "settings": { "label": "Easy integration", "competitor_1_value": "check", "competitor_2_value": "cross" } },
+        { "type": "row", "settings": { "label": "Free section updates", "competitor_1_value": "check", "competitor_2_value": "cross" } },
+        { "type": "row", "settings": { "label": "Free review after setup", "competitor_1_value": "cross", "competitor_2_value": "cross" } },
+        { "type": "row", "settings": { "label": "Premium support", "competitor_1_value": "check", "competitor_2_value": "cross" } }
+      ]
+    }
+  ]
+}
+{% endschema %}
