@@ -38,33 +38,107 @@
       "settings": {
         "image_overlay_opacity": 40,
         "image_height": "large",
-        "desktop_content_position": "bottom-center",
-        "show_text_box": false,
         "image_behavior": "none",
+        "desktop_content_position": "bottom-center",
         "desktop_content_alignment": "center",
+        "show_text_box": false,
         "color_scheme": "scheme-3",
-        "mobile_content_alignment": "center",
         "stack_images_on_mobile": false,
+        "mobile_content_alignment": "center",
         "show_text_below": false
+      }
+    },
+    "sc_faq_accordion_CzDPcp": {
+      "type": "sc-faq-accordion",
+      "blocks": {
+        "faq_EByCNm": {
+          "type": "faq",
+          "settings": {
+            "enabled": true,
+            "question": "How long does shipping take?",
+            "answer": "<p>Orders ship within 1-2 business days. Most deliveries arrive in 3-5 business days. You will receive a tracking link by email once the order is on its way.</p>"
+          }
+        },
+        "faq_9ekMyJ": {
+          "type": "faq",
+          "settings": {
+            "enabled": true,
+            "question": "What is your return policy?",
+            "answer": "<p>You can return unused items within 30 days of delivery for a refund or exchange. Start a return from your order confirmation email and we will send you a label.</p>"
+          }
+        },
+        "faq_rCntFE": {
+          "type": "faq",
+          "settings": {
+            "enabled": true,
+            "question": "How do I choose the right size?",
+            "answer": "<p>Use the size guide on the product page for measurements and fit notes. If you are between sizes, the guide says which way to go. Support can also help you choose.</p>"
+          }
+        },
+        "faq_HbRgje": {
+          "type": "faq",
+          "settings": {
+            "enabled": true,
+            "question": "How can I track my order?",
+            "answer": "<p>Open the tracking link in your shipping email, or sign in and view the order status. Tracking usually appears within a few hours of the order shipping.</p>"
+          }
+        }
+      },
+      "block_order": [
+        "faq_EByCNm",
+        "faq_9ekMyJ",
+        "faq_rCntFE",
+        "faq_HbRgje"
+      ],
+      "name": "SC – FAQ accordion",
+      "settings": {
+        "enabled": true,
+        "heading": "Frequently asked questions",
+        "intro": "",
+        "heading_alignment": "center",
+        "content_width": 760,
+        "open_first": true,
+        "allow_multiple": false,
+        "icon_style": "plus",
+        "icon_position": "right",
+        "border_mode": "box",
+        "border_width": 1,
+        "item_gap": 0,
+        "border_radius": 8,
+        "question_padding": 18,
+        "heading_size": 36,
+        "question_size": 18,
+        "answer_size": 16,
+        "background_color": "#FFFFFF",
+        "transparent_background": false,
+        "item_background": "#FFFFFF",
+        "transparent_item_background": false,
+        "text_color": "#141414",
+        "answer_color": "#4A4A4A",
+        "icon_color": "#141414",
+        "border_color": "#E4E4E4",
+        "hover_background": "#F5F5F5",
+        "disable_hover_background": false,
+        "padding_top": 48,
+        "padding_bottom": 48
       }
     },
     "featured_collection": {
       "type": "featured-collection",
       "settings": {
+        "collection": "all",
+        "products_to_show": 8,
         "title": "Featured products",
         "heading_size": "h2",
         "description": "",
         "show_description": false,
         "description_style": "body",
-        "collection": "all",
-        "products_to_show": 8,
         "columns_desktop": 4,
-        "color_scheme": "scheme-1",
+        "enable_desktop_slider": false,
         "full_width": false,
         "show_view_all": true,
         "view_all_style": "solid",
-        "enable_desktop_slider": false,
-        "swipe_on_mobile": false,
+        "color_scheme": "scheme-1",
         "image_ratio": "adapt",
         "image_shape": "default",
         "show_secondary_image": true,
@@ -72,6 +146,7 @@
         "show_rating": false,
         "quick_add": "none",
         "columns_mobile": "2",
+        "swipe_on_mobile": false,
         "padding_top": 44,
         "padding_bottom": 36
       }
@@ -79,6 +154,7 @@
   },
   "order": [
     "image_banner",
+    "sc_faq_accordion_CzDPcp",
     "featured_collection"
   ]
 }
