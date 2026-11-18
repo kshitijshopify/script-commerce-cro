@@ -240,20 +240,20 @@
         "row_padding": 18,
         "row_gap": 0,
         "row_radius": 8,
-        "highlight_color": "#5BE584",
-        "highlight_text_color": "#0E0E0E",
-        "brand_icon_color": "#0E0E0E",
+        "highlight_color": "#5be584",
+        "highlight_text_color": "#0e0e0e",
+        "brand_icon_color": "#0e0e0e",
         "highlight_radius": 18,
         "glow_size": 36,
         "glow_strength": 35,
-        "check_color": "#4ADE80",
-        "cross_color": "#F05252",
+        "check_color": "#4ade80",
+        "cross_color": "#f05252",
         "transparent_background": false,
-        "background_color": "#D8D8D8",
-        "row_background": "#AEAEAE",
+        "background_color": "#d8d8d8",
+        "row_background": "#aeaeae",
         "text_color": "#000000",
-        "subheading_color": "#B3B3B3",
-        "tile_background": "#2C2C2C",
+        "subheading_color": "#b3b3b3",
+        "tile_background": "#2c2c2c",
         "heading_size": 40,
         "label_size": 17,
         "label_weight": "600",
@@ -267,6 +267,101 @@
         "sr_yes": "Yes",
         "sr_no": "No",
         "sr_na": "Not applicable"
+      }
+    },
+    "sc_testimonials_carousel_NLUVmm": {
+      "type": "sc-testimonials-carousel",
+      "blocks": {
+        "testimonial_WBkMGD": {
+          "type": "testimonial",
+          "settings": {
+            "enabled": true,
+            "name": "Emma",
+            "company": "Northwind Studio",
+            "headline": "A real game changer for us",
+            "rating": 5,
+            "text": "<p>“Within a few weeks our store felt faster, cleaner and easier to shop. The changes were simple, but the impact on conversion was clear. Setup was quick and painless, and support answered every question the same day.”</p>"
+          }
+        },
+        "testimonial_73PE4P": {
+          "type": "testimonial",
+          "settings": {
+            "enabled": true,
+            "name": "Liam",
+            "company": "Harbor Goods",
+            "headline": "Top-tier quality",
+            "rating": 5,
+            "text": "<p>“The code is clean, well structured and fast. Everything is easy to extend, exactly what you expect from a professional partner.”</p>"
+          }
+        },
+        "testimonial_MfAt4F": {
+          "type": "testimonial",
+          "settings": {
+            "enabled": true,
+            "name": "Sofia",
+            "company": "Bloom & Co.",
+            "headline": "Best value for money",
+            "rating": 5,
+            "text": "<p>“For a fair price we got high-quality, conversion-focused sections that added value from day one. I have not found this level of quality anywhere else.”</p>"
+          }
+        },
+        "testimonial_bAGA8q": {
+          "type": "testimonial",
+          "settings": {
+            "enabled": true,
+            "name": "Noah",
+            "company": "Peak Outfitters",
+            "headline": "Perfect for growing brands",
+            "rating": 5,
+            "text": "<p>“We rely on them for every new landing page. Even complex requests are handled quickly and the results always look on brand.”</p>"
+          }
+        }
+      },
+      "block_order": [
+        "testimonial_WBkMGD",
+        "testimonial_73PE4P",
+        "testimonial_MfAt4F",
+        "testimonial_bAGA8q"
+      ],
+      "name": "SC – Testimonial carousel",
+      "settings": {
+        "enabled": true,
+        "heading": "What our customers say",
+        "subtitle": "Real reviews from brands that grow with us every day.",
+        "heading_alignment": "center",
+        "cards_desktop": 3,
+        "cards_mobile": 1,
+        "show_peek": true,
+        "equal_height": true,
+        "show_arrows": true,
+        "show_progress": true,
+        "loop": false,
+        "autoplay": false,
+        "autoplay_speed": 5,
+        "italic_text": true,
+        "show_initials": true,
+        "avatar_size": 60,
+        "card_radius": 24,
+        "card_padding": 36,
+        "card_gap": 24,
+        "heading_size": 40,
+        "text_size": 18,
+        "background_color": "#1F1F1F",
+        "heading_color": "#FFFFFF",
+        "subtitle_color": "#C4C4C4",
+        "card_background": "#333333",
+        "card_border_color": "",
+        "name_color": "#E6E6E6",
+        "headline_color": "#FFFFFF",
+        "text_color": "#D9D9D9",
+        "star_color": "#3DD68C",
+        "star_empty_color": "#5A5A5A",
+        "progress_color": "#E5422B",
+        "progress_track_color": "#3A3A3A",
+        "full_width": false,
+        "content_width": 1400,
+        "padding_top": 64,
+        "padding_bottom": 64
       }
     },
     "featured_collection": {
@@ -302,6 +397,7 @@
     "image_banner",
     "sc_faq_accordion_CzDPcp",
     "sc_competitor_comparison_table_PjBJcR",
+    "sc_testimonials_carousel_NLUVmm",
     "featured_collection"
   ]
 }
