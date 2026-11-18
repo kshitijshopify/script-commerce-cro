@@ -109,18 +109,164 @@
         "heading_size": 36,
         "question_size": 18,
         "answer_size": 16,
-        "background_color": "#FFFFFF",
+        "background_color": "#ffffff",
         "transparent_background": false,
-        "item_background": "#FFFFFF",
+        "item_background": "#ffffff",
         "transparent_item_background": false,
         "text_color": "#141414",
-        "answer_color": "#4A4A4A",
+        "answer_color": "#4a4a4a",
         "icon_color": "#141414",
-        "border_color": "#E4E4E4",
-        "hover_background": "#F5F5F5",
+        "border_color": "#e4e4e4",
+        "hover_background": "#f5f5f5",
         "disable_hover_background": false,
         "padding_top": 48,
         "padding_bottom": 48
+      }
+    },
+    "sc_competitor_comparison_table_PjBJcR": {
+      "type": "sc-competitor-comparison-table",
+      "blocks": {
+        "row_JHbjTQ": {
+          "type": "row",
+          "settings": {
+            "enabled": true,
+            "label": "A/B-tested sections",
+            "note": "",
+            "brand_value": "check",
+            "competitor_1_value": "cross",
+            "competitor_2_value": "cross",
+            "competitor_3_value": "cross"
+          }
+        },
+        "row_WRJQgi": {
+          "type": "row",
+          "settings": {
+            "enabled": true,
+            "label": "Built by Shopify Plus developers",
+            "note": "",
+            "brand_value": "check",
+            "competitor_1_value": "cross",
+            "competitor_2_value": "cross",
+            "competitor_3_value": "cross"
+          }
+        },
+        "row_AJrqHB": {
+          "type": "row",
+          "settings": {
+            "enabled": true,
+            "label": "Detailed video tutorials",
+            "note": "",
+            "brand_value": "check",
+            "competitor_1_value": "cross",
+            "competitor_2_value": "cross",
+            "competitor_3_value": "cross"
+          }
+        },
+        "row_9bJNUc": {
+          "type": "row",
+          "settings": {
+            "enabled": true,
+            "label": "Easy integration",
+            "note": "",
+            "brand_value": "check",
+            "competitor_1_value": "check",
+            "competitor_2_value": "cross",
+            "competitor_3_value": "cross"
+          }
+        },
+        "row_jxe8bd": {
+          "type": "row",
+          "settings": {
+            "enabled": true,
+            "label": "Free section updates",
+            "note": "",
+            "brand_value": "check",
+            "competitor_1_value": "check",
+            "competitor_2_value": "cross",
+            "competitor_3_value": "cross"
+          }
+        },
+        "row_YqKw6w": {
+          "type": "row",
+          "settings": {
+            "enabled": true,
+            "label": "Free review after setup",
+            "note": "",
+            "brand_value": "check",
+            "competitor_1_value": "cross",
+            "competitor_2_value": "cross",
+            "competitor_3_value": "cross"
+          }
+        },
+        "row_NMhp78": {
+          "type": "row",
+          "settings": {
+            "enabled": true,
+            "label": "Premium support",
+            "note": "",
+            "brand_value": "check",
+            "competitor_1_value": "check",
+            "competitor_2_value": "cross",
+            "competitor_3_value": "cross"
+          }
+        }
+      },
+      "block_order": [
+        "row_JHbjTQ",
+        "row_WRJQgi",
+        "row_AJrqHB",
+        "row_9bJNUc",
+        "row_jxe8bd",
+        "row_YqKw6w",
+        "row_NMhp78"
+      ],
+      "name": "SC – Comparison table",
+      "settings": {
+        "enabled": true,
+        "heading": "Why customers choose us",
+        "subheading": "",
+        "heading_alignment": "center",
+        "brand_name": "Us",
+        "competitor_1_name": "Others",
+        "competitor_2_name": "Competitor",
+        "competitor_3_name": "",
+        "logo_display": "tiles",
+        "tile_background_on": true,
+        "color_scheme": "dark",
+        "row_style": "alternate",
+        "icon_style": "plain",
+        "icon_size": 18,
+        "column_width": 128,
+        "row_padding": 18,
+        "row_gap": 0,
+        "row_radius": 8,
+        "highlight_color": "#5BE584",
+        "highlight_text_color": "#0E0E0E",
+        "brand_icon_color": "#0E0E0E",
+        "highlight_radius": 18,
+        "glow_size": 36,
+        "glow_strength": 35,
+        "check_color": "#4ADE80",
+        "cross_color": "#F05252",
+        "transparent_background": false,
+        "background_color": "#D8D8D8",
+        "row_background": "#232323",
+        "text_color": "#FFFFFF",
+        "subheading_color": "#B3B3B3",
+        "tile_background": "#2C2C2C",
+        "heading_size": 40,
+        "label_size": 17,
+        "label_weight": "600",
+        "button_label": "",
+        "button_link": "",
+        "button_radius": 12,
+        "content_width": 780,
+        "padding_top": 64,
+        "padding_bottom": 64,
+        "sr_feature": "Feature",
+        "sr_yes": "Yes",
+        "sr_no": "No",
+        "sr_na": "Not applicable"
       }
     },
     "featured_collection": {
@@ -155,6 +301,7 @@
   "order": [
     "image_banner",
     "sc_faq_accordion_CzDPcp",
+    "sc_competitor_comparison_table_PjBJcR",
     "featured_collection"
   ]
 }
