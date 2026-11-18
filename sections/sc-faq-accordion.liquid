@@ -1,0 +1,847 @@
+{%- comment -%}
+  SC – FAQ accordion
+  ScriptCommerce CRO section. Self-contained, theme-independent (Dawn, Horizon, any OS 2.0 theme).
+
+  Vertical accordion of question / answer blocks.
+  - The first question that has an answer is expanded on load (setting, default on).
+  - Every other question starts collapsed.
+  - Opening a question closes the one that is already open, unless "Allow multiple open" is on.
+  - Empty questions are skipped on the storefront. The theme editor still shows them so they can be filled in.
+  - Each instance is scoped to its own root, so several sections on one page do not share open state.
+{%- endcomment -%}
+
+{%- liquid
+  assign s = section.settings
+  assign sid = section.id
+  assign root = '#ScFaq-' | append: sid
+
+  assign heading = s.heading | strip
+  assign intro_html = s.intro
+  assign intro_text = intro_html | strip_html | strip
+  assign has_header = false
+  if heading != blank or intro_text != blank
+    assign has_header = true
+  endif
+
+  assign bg = s.background_color
+  if s.transparent_background or bg == blank
+    assign bg = 'transparent'
+  endif
+
+  assign text_color = s.text_color | default: '#141414'
+  assign answer_color = s.answer_color | default: '#4A4A4A'
+  assign border_color = s.border_color | default: '#E4E4E4'
+  assign item_bg = s.item_background | default: '#FFFFFF'
+  assign icon_color = s.icon_color | default: text_color
+  assign hover_bg = s.hover_background | default: '#F5F5F5'
+  if s.transparent_item_background
+    assign item_bg = 'transparent'
+  endif
+  if s.disable_hover_background
+    assign hover_bg = 'transparent'
+  endif
+
+  assign heading_size_m = s.heading_size | times: 0.75 | round: 0
+  if heading_size_m < 22
+    assign heading_size_m = 22
+  endif
+  if heading_size_m > s.heading_size
+    assign heading_size_m = s.heading_size
+  endif
+  assign question_size_m = s.question_size
+  if question_size_m > 17
+    assign question_size_m = 17
+  endif
+  assign answer_size_m = s.answer_size
+  if answer_size_m > 16
+    assign answer_size_m = 16
+  endif
+  assign pad_top_m = s.padding_top | times: 0.75 | round: 0
+  assign pad_bottom_m = s.padding_bottom | times: 0.75 | round: 0
+  assign question_pad_m = s.question_padding
+  if question_pad_m > 16
+    assign question_pad_m = s.question_padding | times: 0.85 | round: 0
+  endif
+
+  assign border_mode = s.border_mode | default: 'box'
+  assign layout_class = 'sc-faq--plain'
+  if border_mode == 'box'
+    if s.item_gap == 0
+      assign layout_class = 'sc-faq--grouped'
+    else
+      assign layout_class = 'sc-faq--cards'
+    endif
+  elsif border_mode == 'lines'
+    assign layout_class = 'sc-faq--lines'
+  endif
+-%}
+
+{%- if s.enabled == false -%}
+  {%- if request.design_mode -%}
+    <div style="padding:16px;margin:8px auto;max-width:720px;border:1px dashed #b5b5b5;border-radius:8px;font:14px/1.4 sans-serif;color:#555;text-align:center;">
+      SC – FAQ accordion is hidden. Turn on “Show section” to display it.
+    </div>
+  {%- endif -%}
+{%- else -%}
+  {%- capture sc_items -%}
+    {%- assign sc_count = 0 -%}
+    {%- assign sc_has_items = false -%}
+    {%- assign sc_opened = false -%}
+    {%- for block in section.blocks -%}
+      {%- liquid
+        assign b = block.settings
+        assign question = b.question | strip
+        assign answer_html = b.answer
+        assign answer_text = answer_html | strip_html | strip
+        assign has_answer = false
+        if answer_text != blank
+          assign has_answer = true
+        endif
+      -%}
+      {%- if b.enabled == false -%}
+        {%- continue -%}
+      {%- endif -%}
+      {%- if question == blank and has_answer == false -%}
+        {%- if request.design_mode -%}
+          {%- assign sc_has_items = true -%}
+          <li class="sc-faq__item" {{ block.shopify_attributes }}>
+            <div class="sc-faq__trigger sc-faq__trigger--static">
+              <span class="sc-faq__question">FAQ item</span>
+            </div>
+          </li>
+        {%- endif -%}
+        {%- continue -%}
+      {%- endif -%}
+      {%- if question == blank -%}
+        {%- if request.design_mode -%}
+          {%- assign question = 'Question' -%}
+        {%- else -%}
+          {%- continue -%}
+        {%- endif -%}
+      {%- endif -%}
+      {%- if has_answer == false and request.design_mode == false -%}
+        {%- continue -%}
+      {%- endif -%}
+      {%- liquid
+        assign sc_has_items = true
+        assign sc_count = sc_count | plus: 1
+        assign is_open = false
+        if sc_opened == false and s.open_first
+          assign is_open = true
+          assign sc_opened = true
+        endif
+        assign btn_id = 'ScFaqBtn-' | append: sid | append: '-' | append: block.id
+        assign panel_id = 'ScFaqPanel-' | append: sid | append: '-' | append: block.id
+      -%}
+      <li class="sc-faq__item{% if is_open %} is-open{% endif %}" {{ block.shopify_attributes }}>
+        <h3 class="sc-faq__heading">
+          <button
+            type="button"
+            class="sc-faq__trigger"
+            id="{{ btn_id }}"
+            aria-expanded="{% if is_open %}true{% else %}false{% endif %}"
+            aria-controls="{{ panel_id }}"
+            data-sc-faq-trigger
+            data-sc-faq-index="{{ sc_count }}"
+            data-sc-faq-question="{{ question | escape }}"
+          >
+            <span class="sc-faq__question">{{ question | escape }}</span>
+            <span class="sc-faq__icon" aria-hidden="true">
+              {%- if s.icon_style == 'chevron' -%}
+                <svg viewBox="0 0 24 24" width="20" height="20" focusable="false" aria-hidden="true">
+                  <path class="sc-faq__chevron" d="M6 9.5 12 15.5 18 9.5"></path>
+                </svg>
+              {%- else -%}
+                <svg viewBox="0 0 24 24" width="20" height="20" focusable="false" aria-hidden="true">
+                  <path class="sc-faq__bar sc-faq__bar--h" d="M5 12h14"></path>
+                  <path class="sc-faq__bar sc-faq__bar--v" d="M12 5v14"></path>
+                </svg>
+              {%- endif -%}
+            </span>
+          </button>
+        </h3>
+        <div
+          class="sc-faq__panel"
+          id="{{ panel_id }}"
+          role="region"
+          aria-labelledby="{{ btn_id }}"
+          {% if is_open %}
+            aria-hidden="false"
+          {% else %}
+            inert
+            aria-hidden="true"
+          {% endif %}
+        >
+          <div class="sc-faq__panel-inner">
+            <div class="sc-faq__answer">
+              {%- if has_answer -%}
+                {{ answer_html }}
+              {%- elsif request.design_mode -%}
+                <p class="sc-faq__placeholder">Add an answer in this block.</p>
+              {%- endif -%}
+            </div>
+          </div>
+        </div>
+      </li>
+    {%- endfor -%}
+  {%- endcapture -%}
+
+  {%- if sc_has_items == false and has_header == false -%}
+    {%- if request.design_mode -%}
+      <div style="padding:16px;margin:8px auto;max-width:720px;border:1px dashed #b5b5b5;border-radius:8px;font:14px/1.4 sans-serif;color:#555;text-align:center;">
+        SC – FAQ accordion: add an FAQ block, then enter a question and an answer.
+      </div>
+    {%- endif -%}
+  {%- else -%}
+    <style>
+      {{ root }} {
+        --sc-faq-bg: {{ bg }};
+        --sc-faq-text: {{ text_color }};
+        --sc-faq-answer: {{ answer_color }};
+        --sc-faq-border: {{ border_color }};
+        --sc-faq-item-bg: {{ item_bg }};
+        --sc-faq-icon-c: {{ icon_color }};
+        --sc-faq-hover: {{ hover_bg }};
+        --sc-faq-bw: {{ s.border_width }}px;
+        --sc-faq-width: {{ s.content_width }}px;
+        --sc-faq-h: {{ s.heading_size }}px;
+        --sc-faq-q: {{ s.question_size }}px;
+        --sc-faq-a: {{ s.answer_size }}px;
+        --sc-faq-pt: {{ s.padding_top }}px;
+        --sc-faq-pb: {{ s.padding_bottom }}px;
+        --sc-faq-px: 24px;
+        --sc-faq-q-py: {{ s.question_padding }}px;
+        --sc-faq-gap: {{ s.item_gap }}px;
+        --sc-faq-radius: {{ s.border_radius }}px;
+        --sc-faq-icon: 22px;
+        --sc-faq-icon-gap: 16px;
+        display: block;
+        box-sizing: border-box;
+        width: 100%;
+        max-width: 100%;
+        background: var(--sc-faq-bg);
+        color: var(--sc-faq-text);
+        overflow-x: clip;
+      }
+      @media screen and (max-width: 749px) {
+        {{ root }} {
+          --sc-faq-h: {{ heading_size_m }}px;
+          --sc-faq-q: {{ question_size_m }}px;
+          --sc-faq-a: {{ answer_size_m }}px;
+          --sc-faq-pt: {{ pad_top_m }}px;
+          --sc-faq-pb: {{ pad_bottom_m }}px;
+          --sc-faq-px: 16px;
+          --sc-faq-q-py: {{ question_pad_m }}px;
+          --sc-faq-icon-gap: 12px;
+        }
+      }
+
+      {{ root }} *,
+      {{ root }} *::before,
+      {{ root }} *::after { box-sizing: border-box; }
+
+      {{ root }} .sc-faq__inner {
+        width: 100%;
+        max-width: var(--sc-faq-width);
+        margin: 0 auto;
+        padding: var(--sc-faq-pt) var(--sc-faq-px) var(--sc-faq-pb);
+      }
+
+      {{ root }} .sc-faq__header { margin: 0 0 28px; }
+      @media screen and (max-width: 749px) {
+        {{ root }} .sc-faq__header { margin-bottom: 20px; }
+      }
+      {{ root }}.sc-faq--align-center .sc-faq__header { text-align: center; }
+
+      {{ root }} .sc-faq__title {
+        margin: 0;
+        padding: 0;
+        font-family: var(--font-heading-family, var(--font-heading--family, inherit));
+        font-style: var(--font-heading-style, normal);
+        font-weight: var(--font-heading-weight, 600);
+        font-size: var(--sc-faq-h);
+        line-height: 1.2;
+        letter-spacing: normal;
+        text-transform: none;
+        color: var(--sc-faq-text);
+      }
+      {{ root }} .sc-faq__intro {
+        max-width: 42em;
+        margin: 12px 0 0;
+        font-size: var(--sc-faq-a);
+        font-weight: 400;
+        line-height: 1.55;
+        color: var(--sc-faq-answer);
+        overflow-wrap: break-word;
+      }
+      {{ root }}.sc-faq--align-center .sc-faq__intro {
+        margin-left: auto;
+        margin-right: auto;
+      }
+      {{ root }} .sc-faq__intro > *:first-child { margin-top: 0; }
+      {{ root }} .sc-faq__intro > *:last-child { margin-bottom: 0; }
+
+      {{ root }} .sc-faq__list {
+        display: flex;
+        flex-direction: column;
+        gap: var(--sc-faq-gap);
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+      {{ root }} .sc-faq__item {
+        margin: 0;
+        padding: 0;
+        overflow-anchor: none;
+        min-width: 0;
+        background: var(--sc-faq-item-bg);
+      }
+      {{ root }}.sc-faq--grouped .sc-faq__list {
+        gap: 0;
+        border: var(--sc-faq-bw) solid var(--sc-faq-border);
+        border-radius: var(--sc-faq-radius);
+        overflow: hidden;
+        background: var(--sc-faq-item-bg);
+      }
+      {{ root }}.sc-faq--grouped .sc-faq__item {
+        background: transparent;
+      }
+      {{ root }}.sc-faq--grouped .sc-faq__item + .sc-faq__item {
+        border-top: var(--sc-faq-bw) solid var(--sc-faq-border);
+      }
+      {{ root }}.sc-faq--cards .sc-faq__item {
+        border: var(--sc-faq-bw) solid var(--sc-faq-border);
+        border-radius: var(--sc-faq-radius);
+        overflow: hidden;
+      }
+      {{ root }}.sc-faq--lines .sc-faq__list { gap: 0; }
+      {{ root }}.sc-faq--lines .sc-faq__item + .sc-faq__item {
+        border-top: var(--sc-faq-bw) solid var(--sc-faq-border);
+      }
+      {{ root }}.sc-faq--plain .sc-faq__item {
+        border-radius: var(--sc-faq-radius);
+        overflow: hidden;
+      }
+
+      {{ root }} .sc-faq__heading {
+        margin: 0;
+        font-size: inherit;
+        font-weight: inherit;
+        line-height: inherit;
+      }
+      {{ root }} .sc-faq__trigger {
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        gap: var(--sc-faq-icon-gap);
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        margin: 0;
+        padding: var(--sc-faq-q-py) var(--sc-faq-px);
+        border: 0;
+        border-radius: 0;
+        background: transparent;
+        color: inherit;
+        font-family: inherit;
+        font-size: var(--sc-faq-q);
+        font-weight: 600;
+        font-style: normal;
+        line-height: 1.35;
+        letter-spacing: normal;
+        text-align: left;
+        text-transform: none;
+        text-decoration: none;
+        cursor: pointer;
+        appearance: none;
+        -webkit-appearance: none;
+        -webkit-tap-highlight-color: transparent;
+        transition: background-color 0.15s ease;
+      }
+      {{ root }}.sc-faq--icon-left .sc-faq__trigger { flex-direction: row-reverse; }
+      {{ root }} .sc-faq__trigger--static { cursor: default; }
+      {{ root }} .sc-faq__question {
+        flex: 1 1 auto;
+        min-width: 0;
+        overflow-wrap: break-word;
+      }
+      {{ root }} .sc-faq__icon {
+        flex: 0 0 var(--sc-faq-icon);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: var(--sc-faq-icon);
+        height: var(--sc-faq-icon);
+        color: var(--sc-faq-icon-c);
+      }
+      {{ root }} .sc-faq__icon svg { display: block; width: 20px; height: 20px; }
+      {{ root }} .sc-faq__bar,
+      {{ root }} .sc-faq__chevron {
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.75;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      {{ root }} .sc-faq__bar--v,
+      {{ root }} .sc-faq__chevron {
+        transform-origin: 12px 12px;
+        transition: transform 0.2s ease;
+      }
+      {{ root }} .sc-faq__item.is-open .sc-faq__bar--v { transform: scaleY(0); }
+      {{ root }} .sc-faq__item.is-open .sc-faq__chevron { transform: rotate(180deg); }
+
+      @media (hover: hover) and (pointer: fine) {
+        {{ root }} .sc-faq__trigger:hover {
+          background: var(--sc-faq-hover);
+        }
+        {{ root }} .sc-faq__trigger--static:hover { background: transparent; }
+      }
+      {{ root }} .sc-faq__trigger:focus { outline: none; }
+      {{ root }} .sc-faq__trigger:focus-visible {
+        outline: 2px solid var(--sc-faq-text);
+        outline-offset: -3px;
+      }
+
+      {{ root }} .sc-faq__panel {
+        display: grid;
+        grid-template-rows: 0fr;
+        transition: grid-template-rows 0.25s ease;
+      }
+      {{ root }} .sc-faq__item.is-open .sc-faq__panel { grid-template-rows: 1fr; }
+      {{ root }} .sc-faq__panel-inner {
+        overflow: hidden;
+        min-height: 0;
+      }
+      {{ root }} .sc-faq__answer {
+        padding: 0 var(--sc-faq-px) var(--sc-faq-q-py);
+        font-size: var(--sc-faq-a);
+        font-weight: 400;
+        line-height: 1.6;
+        color: var(--sc-faq-answer);
+        overflow-wrap: anywhere;
+      }
+      {{ root }}.sc-faq--icon-left .sc-faq__answer {
+        padding-left: calc(var(--sc-faq-px) + var(--sc-faq-icon) + var(--sc-faq-icon-gap));
+      }
+      {{ root }} .sc-faq__answer > *:first-child { margin-top: 0; }
+      {{ root }} .sc-faq__answer > *:last-child { margin-bottom: 0; }
+      {{ root }} .sc-faq__answer p { margin: 0 0 0.75em; }
+      {{ root }} .sc-faq__answer ul,
+      {{ root }} .sc-faq__answer ol { margin: 0 0 0.75em; padding-left: 1.25em; }
+      {{ root }} .sc-faq__answer a {
+        color: inherit;
+        text-decoration: underline;
+        text-underline-offset: 2px;
+      }
+      {{ root }} .sc-faq__answer img,
+      {{ root }} .sc-faq__intro img {
+        max-width: 100%;
+        height: auto;
+      }
+      {{ root }} .sc-faq__placeholder {
+        margin: 0;
+        font-style: italic;
+      }
+      {{ root }} .sc-faq__empty {
+        margin: 0;
+        padding: 16px;
+        border: var(--sc-faq-bw) dashed var(--sc-faq-border);
+        border-radius: var(--sc-faq-radius);
+        color: var(--sc-faq-answer);
+        font-size: 14px;
+        line-height: 1.45;
+        text-align: center;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        {{ root }} .sc-faq__panel,
+        {{ root }} .sc-faq__trigger,
+        {{ root }} .sc-faq__bar--v,
+        {{ root }} .sc-faq__chevron { transition: none; }
+      }
+    </style>
+
+    <div
+      id="ScFaq-{{ sid }}"
+      class="sc-faq {{ layout_class }} sc-faq--align-{{ s.heading_alignment }} sc-faq--icon-{{ s.icon_position }} sc-faq--icon-{{ s.icon_style }}"
+      data-sc-faq
+      data-sc-section="{{ sid }}"
+      data-sc-page="{{ template.name }}"
+      data-sc-faq-multiple="{% if s.allow_multiple %}true{% else %}false{% endif %}"
+    >
+      <div class="sc-faq__inner">
+        {%- if has_header -%}
+          <div class="sc-faq__header">
+            {%- if heading != blank -%}
+              <h2 class="sc-faq__title">{{ heading | escape }}</h2>
+            {%- endif -%}
+            {%- if intro_text != blank -%}
+              <div class="sc-faq__intro">{{ intro_html }}</div>
+            {%- endif -%}
+          </div>
+        {%- endif -%}
+
+        {%- if sc_has_items -%}
+          <ul class="sc-faq__list">
+            {{ sc_items }}
+          </ul>
+        {%- elsif request.design_mode -%}
+          <p class="sc-faq__empty">Add an FAQ block, then enter a question and an answer.</p>
+        {%- endif -%}
+      </div>
+    </div>
+
+    {%- if sc_count > 0 -%}
+      <script>
+        (function () {
+          if (window.__scFaqAccordionBound) return;
+          window.__scFaqAccordionBound = true;
+
+          function setOpen(item, open) {
+            var btn = item.querySelector('[data-sc-faq-trigger]');
+            var panel = item.querySelector('.sc-faq__panel');
+            if (!btn || !panel) return;
+            if (!open && panel.contains(document.activeElement)) btn.focus();
+            btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+            item.classList.toggle('is-open', open);
+            if (open) {
+              panel.removeAttribute('inert');
+              panel.setAttribute('aria-hidden', 'false');
+            } else {
+              panel.setAttribute('inert', '');
+              panel.setAttribute('aria-hidden', 'true');
+            }
+          }
+
+          function publish(root, btn, expanded) {
+            var question = (btn.getAttribute('data-sc-faq-question') || '').replace(/\s+/g, ' ').trim();
+            var data = {
+              section_id: root.getAttribute('data-sc-section') || '',
+              question: question.slice(0, 160),
+              index: Number(btn.getAttribute('data-sc-faq-index')) || 0,
+              expanded: expanded,
+              page_type: root.getAttribute('data-sc-page') || ''
+            };
+            try {
+              document.dispatchEvent(new CustomEvent('sc:faq-toggle', { bubbles: true, detail: data }));
+            } catch (err) {}
+            try {
+              window.dataLayer = window.dataLayer || [];
+              window.dataLayer.push({
+                event: 'sc_faq_toggle',
+                section_id: data.section_id,
+                question: data.question,
+                index: data.index,
+                expanded: data.expanded,
+                page_type: data.page_type
+              });
+            } catch (err) {}
+            try {
+              if (window.Shopify && window.Shopify.analytics && typeof window.Shopify.analytics.publish === 'function') {
+                window.Shopify.analytics.publish('sc_faq_toggle', data);
+              }
+            } catch (err) {}
+          }
+
+          document.addEventListener('click', function (e) {
+            var target = e.target;
+            if (!target || !target.closest) return;
+            var btn = target.closest('[data-sc-faq-trigger]');
+            if (!btn) return;
+            var item = btn.closest('.sc-faq__item');
+            var root = btn.closest('[data-sc-faq]');
+            if (!item || !root) return;
+            var open = btn.getAttribute('aria-expanded') === 'true';
+            var multiple = root.getAttribute('data-sc-faq-multiple') === 'true';
+            if (!multiple && !open) {
+              var others = root.querySelectorAll('.sc-faq__item');
+              for (var i = 0; i < others.length; i++) {
+                if (others[i] !== item) setOpen(others[i], false);
+              }
+            }
+            setOpen(item, !open);
+            publish(root, btn, !open);
+          });
+
+          document.addEventListener('keydown', function (e) {
+            var target = e.target;
+            if (!target || !target.closest) return;
+            var btn = target.closest('[data-sc-faq-trigger]');
+            if (!btn) return;
+            var root = btn.closest('[data-sc-faq]');
+            if (!root) return;
+            var key = e.key;
+            if (key !== 'ArrowDown' && key !== 'ArrowUp' && key !== 'Home' && key !== 'End') return;
+            var triggers = root.querySelectorAll('[data-sc-faq-trigger]');
+            if (!triggers.length) return;
+            var index = -1;
+            for (var i = 0; i < triggers.length; i++) {
+              if (triggers[i] === btn) index = i;
+            }
+            if (index < 0) return;
+            var next = null;
+            if (key === 'ArrowDown') next = triggers[index + 1] || triggers[0];
+            else if (key === 'ArrowUp') next = triggers[index - 1] || triggers[triggers.length - 1];
+            else if (key === 'Home') next = triggers[0];
+            else if (key === 'End') next = triggers[triggers.length - 1];
+            if (!next || next === btn) return;
+            e.preventDefault();
+            next.focus();
+          });
+        })();
+      </script>
+    {%- endif -%}
+  {%- endif -%}
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "SC – FAQ accordion",
+  "tag": "section",
+  "class": "sc-faq-section",
+  "disabled_on": {
+    "groups": ["header"]
+  },
+  "settings": [
+    { "type": "header", "content": "Content" },
+    { "type": "checkbox", "id": "enabled", "label": "Show section", "default": true },
+    { "type": "text", "id": "heading", "label": "Heading", "default": "Frequently asked questions" },
+    { "type": "richtext", "id": "intro", "label": "Introductory text" },
+    {
+      "type": "select",
+      "id": "heading_alignment",
+      "label": "Heading alignment",
+      "default": "center",
+      "options": [
+        { "value": "left", "label": "Left" },
+        { "value": "center", "label": "Center" }
+      ]
+    },
+    {
+      "type": "range",
+      "id": "content_width",
+      "label": "Content width",
+      "min": 480,
+      "max": 1200,
+      "step": 20,
+      "unit": "px",
+      "default": 760
+    },
+
+    { "type": "header", "content": "Accordion" },
+    {
+      "type": "checkbox",
+      "id": "open_first",
+      "label": "Open the first question",
+      "default": true,
+      "info": "The first question that has an answer is expanded when the page loads. The others start closed."
+    },
+    {
+      "type": "checkbox",
+      "id": "allow_multiple",
+      "label": "Allow multiple answers to stay open",
+      "default": false,
+      "info": "Off: opening a question closes the one that is already open. On: visitors can open several at once."
+    },
+    {
+      "type": "select",
+      "id": "icon_style",
+      "label": "Icon",
+      "default": "plus",
+      "options": [
+        { "value": "plus", "label": "Plus / minus" },
+        { "value": "chevron", "label": "Chevron" }
+      ]
+    },
+    {
+      "type": "select",
+      "id": "icon_position",
+      "label": "Icon position",
+      "default": "right",
+      "options": [
+        { "value": "right", "label": "Right" },
+        { "value": "left", "label": "Left" }
+      ]
+    },
+    {
+      "type": "select",
+      "id": "border_mode",
+      "label": "Border style",
+      "default": "box",
+      "options": [
+        { "value": "box", "label": "Box" },
+        { "value": "lines", "label": "Dividers only" },
+        { "value": "none", "label": "None" }
+      ],
+      "info": "Box: outer border. Dividers only: lines between questions. None: no borders."
+    },
+    {
+      "type": "range",
+      "id": "border_width",
+      "label": "Border width",
+      "min": 0,
+      "max": 4,
+      "step": 1,
+      "unit": "px",
+      "default": 1,
+      "info": "Set to 0 to hide borders even when Border style is Box or Dividers only."
+    },
+    {
+      "type": "range",
+      "id": "item_gap",
+      "label": "Space between questions",
+      "min": 0,
+      "max": 40,
+      "step": 2,
+      "unit": "px",
+      "default": 0,
+      "info": "With Border style = Box: 0 keeps one shared box; above 0 makes each question its own box."
+    },
+    {
+      "type": "range",
+      "id": "border_radius",
+      "label": "Corner radius",
+      "min": 0,
+      "max": 32,
+      "step": 1,
+      "unit": "px",
+      "default": 8
+    },
+    {
+      "type": "range",
+      "id": "question_padding",
+      "label": "Question row padding",
+      "min": 8,
+      "max": 36,
+      "step": 1,
+      "unit": "px",
+      "default": 18,
+      "info": "Vertical padding inside each question row. Also used under the answer."
+    },
+
+    { "type": "header", "content": "Typography" },
+    {
+      "type": "range",
+      "id": "heading_size",
+      "label": "Heading size",
+      "min": 20,
+      "max": 56,
+      "step": 1,
+      "unit": "px",
+      "default": 36
+    },
+    {
+      "type": "range",
+      "id": "question_size",
+      "label": "Question size",
+      "min": 14,
+      "max": 28,
+      "step": 1,
+      "unit": "px",
+      "default": 18
+    },
+    {
+      "type": "range",
+      "id": "answer_size",
+      "label": "Answer size",
+      "min": 13,
+      "max": 22,
+      "step": 1,
+      "unit": "px",
+      "default": 16
+    },
+
+    { "type": "header", "content": "Colours" },
+    { "type": "color", "id": "background_color", "label": "Section background", "default": "#FFFFFF" },
+    { "type": "checkbox", "id": "transparent_background", "label": "Transparent section background", "default": false },
+    { "type": "color", "id": "item_background", "label": "Question background", "default": "#FFFFFF" },
+    { "type": "checkbox", "id": "transparent_item_background", "label": "Transparent question background", "default": false },
+    { "type": "color", "id": "text_color", "label": "Heading and question colour", "default": "#141414" },
+    { "type": "color", "id": "answer_color", "label": "Answer colour", "default": "#4A4A4A" },
+    { "type": "color", "id": "icon_color", "label": "Icon colour", "default": "#141414" },
+    { "type": "color", "id": "border_color", "label": "Border colour", "default": "#E4E4E4" },
+    {
+      "type": "color",
+      "id": "hover_background",
+      "label": "Hover background",
+      "default": "#F5F5F5",
+      "info": "Desktop only. Soft grey works on most white or light backgrounds."
+    },
+    {
+      "type": "checkbox",
+      "id": "disable_hover_background",
+      "label": "Disable hover background",
+      "default": false
+    },
+
+    { "type": "header", "content": "Spacing" },
+    {
+      "type": "range",
+      "id": "padding_top",
+      "label": "Top spacing",
+      "min": 0,
+      "max": 120,
+      "step": 4,
+      "unit": "px",
+      "default": 48
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom",
+      "label": "Bottom spacing",
+      "min": 0,
+      "max": 120,
+      "step": 4,
+      "unit": "px",
+      "default": 48
+    }
+  ],
+  "blocks": [
+    {
+      "type": "faq",
+      "name": "FAQ",
+      "settings": [
+        { "type": "checkbox", "id": "enabled", "label": "Show this question", "default": true },
+        { "type": "text", "id": "question", "label": "Question", "default": "Question" },
+        { "type": "richtext", "id": "answer", "label": "Answer", "default": "<p>Answer</p>" }
+      ]
+    }
+  ],
+  "presets": [
+    {
+      "name": "SC – FAQ accordion",
+      "blocks": [
+        {
+          "type": "faq",
+          "settings": {
+            "question": "How long does shipping take?",
+            "answer": "<p>Orders ship within 1-2 business days. Most deliveries arrive in 3-5 business days. You will receive a tracking link by email once the order is on its way.</p>"
+          }
+        },
+        {
+          "type": "faq",
+          "settings": {
+            "question": "What is your return policy?",
+            "answer": "<p>You can return unused items within 30 days of delivery for a refund or exchange. Start a return from your order confirmation email and we will send you a label.</p>"
+          }
+        },
+        {
+          "type": "faq",
+          "settings": {
+            "question": "How do I choose the right size?",
+            "answer": "<p>Use the size guide on the product page for measurements and fit notes. If you are between sizes, the guide says which way to go. Support can also help you choose.</p>"
+          }
+        },
+        {
+          "type": "faq",
+          "settings": {
+            "question": "How can I track my order?",
+            "answer": "<p>Open the tracking link in your shipping email, or sign in and view the order status. Tracking usually appears within a few hours of the order shipping.</p>"
+          }
+        }
+      ]
+    }
+  ]
+}
+{% endschema %}
