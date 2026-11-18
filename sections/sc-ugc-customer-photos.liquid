@@ -1,0 +1,1052 @@
+{%- comment -%}
+  SC – UGC Customer Photo & Review
+  ScriptCommerce CRO section. Self-contained, theme-independent (Dawn, Horizon, any OS 2.0 theme).
+
+  Gallery of real customer photos with an optional star rating, review, customer name and
+  "shop this look" link per photo, plus an optional CTA button under the gallery.
+  - One block per customer photo: add, edit, remove and reorder in the theme editor.
+  - Rating (0 = hidden), review, name and link are all optional per block.
+  - Blocks without a photo are skipped on the storefront (a placeholder shows in the editor).
+  - Mobile can show a grid or a swipeable row.
+  - Optional lightbox: clicking a photo opens it large with the full review, with prev/next.
+  - No apps, metafields or theme JS/CSS required. CSS is scoped to the section id.
+{%- endcomment -%}
+
+{%- liquid
+  assign s = section.settings
+  assign sid = section.id
+  assign root = '#ScUgc-' | append: sid
+
+  assign heading = s.heading | strip
+  assign subtitle = s.subtitle | strip
+  assign has_header = false
+  if heading != blank or subtitle != blank
+    assign has_header = true
+  endif
+
+  assign cta_label = s.cta_label | strip
+  assign show_cta = false
+  if s.show_cta and cta_label != blank
+    assign show_cta = true
+  endif
+
+  assign bg = s.background_color
+  if s.transparent_background or bg == blank
+    assign bg = 'transparent'
+  endif
+  assign card_bg = s.card_background | default: '#FFFFFF'
+
+  assign cols_d = s.columns_desktop
+  assign cols_t = cols_d
+  if cols_t > 3
+    assign cols_t = 3
+  endif
+  assign cols_m = s.columns_mobile | plus: 0
+
+  case s.aspect_ratio
+    when 'portrait'
+      assign ratio = '4 / 5'
+    when 'tall'
+      assign ratio = '2 / 3'
+    when 'landscape'
+      assign ratio = '4 / 3'
+    when 'adapt'
+      assign ratio = 'auto'
+    else
+      assign ratio = '1 / 1'
+  endcase
+
+  assign heading_size_m = s.heading_size | times: 0.75 | round: 0
+  if heading_size_m < 22
+    assign heading_size_m = 22
+  endif
+  if heading_size_m > s.heading_size
+    assign heading_size_m = s.heading_size
+  endif
+  assign pad_top_m = s.padding_top | times: 0.75 | round: 0
+  assign pad_bottom_m = s.padding_bottom | times: 0.75 | round: 0
+  assign gap_m = s.gap
+  if gap_m > 16
+    assign gap_m = 16
+  endif
+
+  assign img_vw_t = 100 | divided_by: cols_t
+  assign img_vw_m = 100 | divided_by: cols_m
+  if s.mobile_layout == 'slider'
+    assign img_vw_m = 85 | divided_by: cols_m
+  endif
+
+  case s.text_alignment
+    when 'center'
+      assign flex_align = 'center'
+    when 'right'
+      assign flex_align = 'flex-end'
+    else
+      assign flex_align = 'flex-start'
+  endcase
+-%}
+{%- capture img_sizes -%}(min-width: 990px) calc(min({{ s.content_width }}px, 100vw) / {{ cols_d }}), (min-width: 750px) {{ img_vw_t }}vw, {{ img_vw_m }}vw{%- endcapture -%}
+
+{%- capture sc_star_svg -%}<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 2.6l2.85 6.08 6.65.78-4.92 4.56 1.3 6.58L12 17.3l-5.88 3.3 1.3-6.58L2.5 9.46l6.65-.78z"/></svg>{%- endcapture -%}
+
+{%- if s.enabled == false -%}
+  {%- if request.design_mode -%}
+    <div style="padding:16px;margin:8px auto;max-width:720px;border:1px dashed #b5b5b5;border-radius:8px;font:14px/1.4 sans-serif;color:#555;text-align:center;">
+      SC – UGC Customer Photo &amp; Review is hidden. Turn on “Show section” to display it.
+    </div>
+  {%- endif -%}
+{%- else -%}
+  {%- capture sc_items -%}
+    {%- assign sc_count = 0 -%}
+    {%- for block in section.blocks -%}
+      {%- liquid
+        assign b = block.settings
+        if b.enabled == false
+          continue
+        endif
+        if b.image == blank and request.design_mode == false
+          continue
+        endif
+
+        assign sc_count = sc_count | plus: 1
+        assign name = b.customer_name | strip
+        assign meta = b.customer_meta | strip
+        assign review = b.review | strip
+        assign rating = b.rating | default: 0
+        assign fill_pct = rating | times: 20
+
+        assign alt = b.image_alt | strip
+        if alt == blank and b.image != blank
+          assign alt = b.image.alt | strip
+        endif
+        if alt == blank
+          if name != blank
+            assign alt = 'Customer photo from ' | append: name
+          else
+            assign alt = 'Customer photo'
+          endif
+        endif
+
+        assign has_body = false
+        if rating > 0 or review != blank or name != blank or b.link != blank
+          assign has_body = true
+        endif
+      -%}
+      <li class="sc-ugc__item" {{ block.shopify_attributes }}>
+        <figure class="sc-ugc__card">
+          {%- capture media -%}
+            {%- if b.image != blank -%}
+              {{
+                b.image
+                | image_url: width: 1200
+                | image_tag:
+                  loading: 'lazy',
+                  widths: '300, 450, 600, 800, 1000, 1200',
+                  sizes: img_sizes,
+                  alt: alt,
+                  class: 'sc-ugc__img'
+              }}
+            {%- else -%}
+              {{ 'image' | placeholder_svg_tag: 'sc-ugc__img sc-ugc__img--placeholder' }}
+            {%- endif -%}
+          {%- endcapture -%}
+
+          {%- if s.enable_lightbox and b.image != blank -%}
+            <button
+              type="button"
+              class="sc-ugc__media"
+              data-sc-ugc-open
+              data-full="{{ b.image | image_url: width: 1800 }}"
+              data-alt="{{ alt | escape }}"
+              aria-label="Enlarge photo{% if name != blank %} from {{ name | escape }}{% endif %}"
+            >
+              {{ media }}
+            </button>
+          {%- elsif b.link != blank -%}
+            <a href="{{ b.link }}" class="sc-ugc__media">{{ media }}</a>
+          {%- else -%}
+            <div class="sc-ugc__media">{{ media }}</div>
+          {%- endif -%}
+
+          {%- if has_body -%}
+            <figcaption class="sc-ugc__body">
+              {%- if rating > 0 and s.show_ratings -%}
+                <span class="sc-ugc__stars" role="img" aria-label="Rated {{ rating }} out of 5">
+                  <span class="sc-ugc__stars-base">
+                    {%- for i in (1..5) -%}{{ sc_star_svg }}{%- endfor -%}
+                  </span>
+                  <span class="sc-ugc__stars-fill" style="width: {{ fill_pct }}%;">
+                    {%- for i in (1..5) -%}{{ sc_star_svg }}{%- endfor -%}
+                  </span>
+                </span>
+              {%- endif -%}
+
+              {%- if review != blank -%}
+                <blockquote class="sc-ugc__review">{{ review | escape | newline_to_br }}</blockquote>
+              {%- endif -%}
+
+              {%- if name != blank or meta != blank or b.verified -%}
+                <p class="sc-ugc__author">
+                  {%- if name != blank -%}<span class="sc-ugc__name">{{ name | escape }}</span>{%- endif -%}
+                  {%- if meta != blank -%}<span class="sc-ugc__meta">{{ meta | escape }}</span>{%- endif -%}
+                  {%- if b.verified and s.verified_label != blank -%}
+                    <span class="sc-ugc__verified">
+                      <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M8 1a7 7 0 100 14A7 7 0 008 1zm3.2 5.3l-3.9 4a.7.7 0 01-1 0L4.8 8.8a.7.7 0 111-1l1 1 3.4-3.5a.7.7 0 111 1z"/></svg>
+                      {{- s.verified_label | escape -}}
+                    </span>
+                  {%- endif -%}
+                </p>
+              {%- endif -%}
+
+              {%- if b.link != blank and s.shop_label != blank -%}
+                <a href="{{ b.link }}" class="sc-ugc__shop">{{ s.shop_label | escape }}<span aria-hidden="true"> →</span></a>
+              {%- endif -%}
+            </figcaption>
+          {%- endif -%}
+        </figure>
+      </li>
+    {%- endfor -%}
+  {%- endcapture -%}
+
+  {%- if sc_count > 0 or request.design_mode -%}
+    <section
+      id="ScUgc-{{ sid }}"
+      class="sc-ugc sc-ugc--{{ s.card_style }} sc-ugc--m-{{ s.mobile_layout }}{% if ratio == 'auto' %} sc-ugc--adapt{% endif %}{% if s.hover_zoom %} sc-ugc--zoom{% endif %}"
+      {% if heading != blank %}aria-labelledby="ScUgcHeading-{{ sid }}"{% else %}aria-label="Customer photos"{% endif %}
+    >
+      <style>
+        {{ root }} {
+          --sc-ugc-width: {{ s.content_width }}px;
+          --sc-ugc-bg: {{ bg }};
+          --sc-ugc-heading: {{ s.heading_color | default: '#1A1A1A' }};
+          --sc-ugc-text: {{ s.text_color | default: '#3A3A3A' }};
+          --sc-ugc-muted: {{ s.muted_color | default: '#6B6B6B' }};
+          --sc-ugc-star: {{ s.star_color | default: '#1A1A1A' }};
+          --sc-ugc-star-empty: {{ s.star_empty_color | default: '#D4D4D4' }};
+          --sc-ugc-card-bg: {{ card_bg }};
+          --sc-ugc-border: {{ s.border_color | default: '#E4E4E4' }};
+          --sc-ugc-divider: {{ s.divider_color | default: '#CCCCCC' }};
+          --sc-ugc-btn-bg: {{ s.button_background | default: '#1A1A1A' }};
+          --sc-ugc-btn-text: {{ s.button_text | default: '#FFFFFF' }};
+          --sc-ugc-h: {{ s.heading_size }}px;
+          --sc-ugc-h-m: {{ heading_size_m }}px;
+          --sc-ugc-review: {{ s.review_size }}px;
+          --sc-ugc-cols-d: {{ cols_d }};
+          --sc-ugc-cols-t: {{ cols_t }};
+          --sc-ugc-cols-m: {{ cols_m }};
+          --sc-ugc-gap: {{ s.gap }}px;
+          --sc-ugc-gap-m: {{ gap_m }}px;
+          --sc-ugc-ratio: {{ ratio }};
+          --sc-ugc-radius: {{ s.image_radius }}px;
+          --sc-ugc-btn-radius: {{ s.button_radius }}px;
+          --sc-ugc-lines: {% if s.review_lines > 0 %}{{ s.review_lines }}{% else %}none{% endif %};
+          --sc-ugc-pt: {{ s.padding_top }}px;
+          --sc-ugc-pb: {{ s.padding_bottom }}px;
+          --sc-ugc-pt-m: {{ pad_top_m }}px;
+          --sc-ugc-pb-m: {{ pad_bottom_m }}px;
+          --sc-ugc-align: {{ s.text_alignment }};
+
+          display: block;
+          background: var(--sc-ugc-bg);
+          color: var(--sc-ugc-text);
+          padding: var(--sc-ugc-pt) 0 var(--sc-ugc-pb);
+          box-sizing: border-box;
+          font-family: inherit;
+        }
+        {{ root }} *, {{ root }} *::before, {{ root }} *::after { box-sizing: border-box; }
+        {{ root }} .sc-ugc__inner {
+          max-width: var(--sc-ugc-width);
+          margin: 0 auto;
+          padding: 0 20px;
+        }
+
+        /* Header */
+        {{ root }} .sc-ugc__header {
+          text-align: {{ s.heading_alignment }};
+          margin: 0 0 36px;
+        }
+        {{ root }} .sc-ugc__heading {
+          margin: 0;
+          color: var(--sc-ugc-heading);
+          font-family: inherit;
+          font-size: var(--sc-ugc-h);
+          font-weight: {{ s.heading_weight }};
+          line-height: 1.2;
+          letter-spacing: normal;
+          text-transform: none;
+        }
+        {{ root }} .sc-ugc__divider {
+          display: block;
+          width: {{ s.divider_width }}px;
+          max-width: 60%;
+          height: 3px;
+          margin: 14px 0 0;
+          background: var(--sc-ugc-divider);
+          border-radius: 2px;
+        }
+        {{ root }} .sc-ugc__header--center .sc-ugc__divider { margin-left: auto; margin-right: auto; }
+        {{ root }} .sc-ugc__header--right .sc-ugc__divider { margin-left: auto; }
+        {{ root }} .sc-ugc__subtitle {
+          margin: 14px 0 0;
+          color: var(--sc-ugc-muted);
+          font-size: 16px;
+          line-height: 1.55;
+        }
+        {{ root }} .sc-ugc__header--center .sc-ugc__subtitle { margin-left: auto; margin-right: auto; max-width: 640px; }
+        {{ root }} .sc-ugc__header--right .sc-ugc__subtitle { margin-left: auto; max-width: 640px; }
+
+        /* Grid */
+        {{ root }} .sc-ugc__grid {
+          list-style: none;
+          margin: 0;
+          padding: 0;
+          display: grid;
+          grid-template-columns: repeat(var(--sc-ugc-cols-d), minmax(0, 1fr));
+          gap: var(--sc-ugc-gap);
+          align-items: start;
+        }
+        {{ root }} .sc-ugc__item { margin: 0; padding: 0; min-width: 0; }
+        {{ root }} .sc-ugc__card {
+          margin: 0;
+          height: 100%;
+          display: flex;
+          flex-direction: column;
+          text-align: var(--sc-ugc-align);
+        }
+        {{ root }}.sc-ugc--card .sc-ugc__card {
+          background: var(--sc-ugc-card-bg);
+          border: 1px solid var(--sc-ugc-border);
+          border-radius: var(--sc-ugc-radius);
+          overflow: hidden;
+        }
+
+        /* Media */
+        {{ root }} .sc-ugc__media {
+          display: block;
+          position: relative;
+          width: 100%;
+          margin: 0;
+          padding: 0;
+          border: 0;
+          background: #F2F2F2;
+          aspect-ratio: var(--sc-ugc-ratio);
+          overflow: hidden;
+          border-radius: var(--sc-ugc-radius);
+          cursor: default;
+          color: inherit;
+          font: inherit;
+          text-decoration: none;
+          -webkit-appearance: none;
+          appearance: none;
+        }
+        {{ root }}.sc-ugc--card .sc-ugc__media { border-radius: 0; }
+        {{ root }} button.sc-ugc__media, {{ root }} a.sc-ugc__media { cursor: pointer; }
+        {{ root }} button.sc-ugc__media:focus-visible {
+          outline: 2px solid var(--sc-ugc-heading);
+          outline-offset: 2px;
+        }
+        {{ root }} .sc-ugc__img {
+          display: block;
+          width: 100%;
+          height: 100%;
+          max-width: none;
+          object-fit: cover;
+          transition: transform .5s ease;
+        }
+        {{ root }}.sc-ugc--adapt .sc-ugc__img { height: auto; }
+        {{ root }} .sc-ugc__img--placeholder { fill: #B9B9B9; background: #F2F2F2; aspect-ratio: 1 / 1; }
+        {{ root }}.sc-ugc--zoom .sc-ugc__media:hover .sc-ugc__img { transform: scale(1.05); }
+        {{ root }} button.sc-ugc__media::after {
+          content: "";
+          position: absolute;
+          right: 10px;
+          bottom: 10px;
+          width: 32px;
+          height: 32px;
+          border-radius: 50%;
+          background: rgba(255,255,255,.92) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23111' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='6'/%3E%3Cpath d='M20 20l-4.5-4.5M11 8.5v5M8.5 11h5'/%3E%3C/svg%3E") center / 16px no-repeat;
+          box-shadow: 0 1px 4px rgba(0,0,0,.15);
+          opacity: 0;
+          transform: translateY(4px);
+          transition: opacity .2s ease, transform .2s ease;
+        }
+        {{ root }} button.sc-ugc__media:hover::after,
+        {{ root }} button.sc-ugc__media:focus-visible::after { opacity: 1; transform: none; }
+
+        /* Body */
+        {{ root }} .sc-ugc__body {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          padding: 14px 2px 0;
+          align-items: {{ flex_align }};
+        }
+        {{ root }}.sc-ugc--card .sc-ugc__body { padding: 16px; flex: 1; }
+        {{ root }} .sc-ugc__stars {
+          position: relative;
+          display: inline-block;
+          line-height: 0;
+          font-size: {{ s.star_size }}px;
+        }
+        {{ root }} .sc-ugc__stars-base,
+        {{ root }} .sc-ugc__stars-fill { display: inline-flex; white-space: nowrap; }
+        {{ root }} .sc-ugc__stars-base { color: var(--sc-ugc-star-empty); }
+        {{ root }} .sc-ugc__stars-fill {
+          position: absolute;
+          top: 0;
+          left: 0;
+          overflow: hidden;
+          color: var(--sc-ugc-star);
+        }
+        {{ root }} .sc-ugc__stars svg {
+          flex: 0 0 auto;
+          width: 1em;
+          height: 1em;
+          fill: currentColor;
+        }
+        {{ root }} .sc-ugc__review {
+          margin: 0;
+          padding: 0;
+          border: 0;
+          quotes: none;
+          font-style: normal;
+          font-size: var(--sc-ugc-review);
+          line-height: 1.55;
+          color: var(--sc-ugc-text);
+          display: -webkit-box;
+          -webkit-box-orient: vertical;
+          -webkit-line-clamp: var(--sc-ugc-lines);
+          line-clamp: var(--sc-ugc-lines);
+          overflow: hidden;
+        }
+        {{ root }} .sc-ugc__review::before, {{ root }} .sc-ugc__review::after { content: none; }
+        {{ root }} .sc-ugc__author {
+          margin: 0;
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          justify-content: {{ flex_align }};
+          gap: 4px 8px;
+          font-size: 13px;
+          line-height: 1.4;
+          color: var(--sc-ugc-muted);
+        }
+        {{ root }} .sc-ugc__name { font-weight: 600; color: var(--sc-ugc-heading); }
+        {{ root }} .sc-ugc__verified {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          color: var(--sc-ugc-muted);
+        }
+        {{ root }} .sc-ugc__verified svg { width: 14px; height: 14px; fill: #2E9E5B; }
+        {{ root }} .sc-ugc__shop {
+          font-size: 14px;
+          font-weight: 600;
+          color: var(--sc-ugc-heading);
+          text-decoration: underline;
+          text-underline-offset: 3px;
+        }
+        {{ root }} .sc-ugc__shop:hover { text-decoration-thickness: 2px; }
+
+        /* CTA */
+        {{ root }} .sc-ugc__cta-wrap { margin-top: 44px; text-align: center; }
+        {{ root }} .sc-ugc__cta {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          min-width: 200px;
+          min-height: 50px;
+          padding: 12px 32px;
+          border: 2px solid var(--sc-ugc-btn-bg);
+          border-radius: var(--sc-ugc-btn-radius);
+          background: var(--sc-ugc-btn-bg);
+          color: var(--sc-ugc-btn-text);
+          font-family: inherit;
+          font-size: 16px;
+          font-weight: 600;
+          line-height: 1.2;
+          text-decoration: none;
+          letter-spacing: .02em;
+          transition: background-color .2s ease, color .2s ease, transform .2s ease;
+        }
+        {{ root }} .sc-ugc__cta:hover { transform: translateY(-1px); opacity: .92; }
+        {{ root }} .sc-ugc__cta--outline {
+          background: transparent;
+          color: var(--sc-ugc-btn-bg);
+        }
+        {{ root }} .sc-ugc__cta--outline:hover {
+          background: var(--sc-ugc-btn-bg);
+          color: var(--sc-ugc-btn-text);
+          opacity: 1;
+        }
+        {{ root }} .sc-ugc__cta:focus-visible { outline: 2px solid var(--sc-ugc-btn-bg); outline-offset: 3px; }
+
+        {{ root }} .sc-ugc__empty {
+          padding: 24px;
+          border: 1px dashed #B5B5B5;
+          border-radius: 8px;
+          text-align: center;
+          font-size: 14px;
+          color: #555;
+        }
+
+        /* Lightbox */
+        {{ root }} .sc-ugc__lb {
+          width: min(1040px, calc(100vw - 32px));
+          max-width: none;
+          max-height: calc(100vh - 32px);
+          margin: auto;
+          padding: 0;
+          border: 0;
+          border-radius: 12px;
+          background: #FFFFFF;
+          color: #1A1A1A;
+          overflow: hidden;
+          box-shadow: 0 20px 60px rgba(0,0,0,.35);
+        }
+        {{ root }} .sc-ugc__lb::backdrop { background: rgba(0,0,0,.72); }
+        {{ root }} .sc-ugc__lb-inner {
+          display: grid;
+          grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+          max-height: calc(100vh - 32px);
+        }
+        {{ root }} .sc-ugc__lb-media { background: #111; display: flex; align-items: center; justify-content: center; min-height: 0; }
+        {{ root }} .sc-ugc__lb-media img {
+          display: block;
+          width: 100%;
+          height: 100%;
+          max-height: calc(100vh - 32px);
+          object-fit: contain;
+        }
+        {{ root }} .sc-ugc__lb-body {
+          padding: 48px 28px 28px;
+          overflow-y: auto;
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+          text-align: left;
+          align-items: flex-start;
+        }
+        {{ root }} .sc-ugc__lb-body .sc-ugc__review { -webkit-line-clamp: none; line-clamp: none; display: block; color: #3A3A3A; font-size: 16px; }
+        {{ root }} .sc-ugc__lb-body .sc-ugc__author { justify-content: flex-start; }
+        {{ root }} .sc-ugc__lb-body .sc-ugc__name, {{ root }} .sc-ugc__lb-body .sc-ugc__shop { color: #1A1A1A; }
+        {{ root }} .sc-ugc__lb-btn {
+          position: absolute;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 40px;
+          height: 40px;
+          padding: 0;
+          border: 0;
+          border-radius: 50%;
+          background: rgba(255,255,255,.95);
+          color: #111;
+          cursor: pointer;
+          box-shadow: 0 1px 6px rgba(0,0,0,.2);
+          z-index: 2;
+        }
+        {{ root }} .sc-ugc__lb-btn svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+        {{ root }} .sc-ugc__lb-btn:focus-visible { outline: 2px solid #111; outline-offset: 2px; }
+        {{ root }} .sc-ugc__lb-close { top: 10px; right: 10px; }
+        {{ root }} .sc-ugc__lb-prev, {{ root }} .sc-ugc__lb-next { top: 50%; transform: translateY(-50%); }
+        {{ root }} .sc-ugc__lb-prev { left: 10px; }
+        {{ root }} .sc-ugc__lb-next { left: calc(58.33% - 50px); }
+        {{ root }} .sc-ugc__lb[data-single] .sc-ugc__lb-prev,
+        {{ root }} .sc-ugc__lb[data-single] .sc-ugc__lb-next { display: none; }
+
+        /* Tablet */
+        @media screen and (max-width: 989px) {
+          {{ root }} .sc-ugc__grid { grid-template-columns: repeat(var(--sc-ugc-cols-t), minmax(0, 1fr)); }
+        }
+
+        /* Mobile */
+        @media screen and (max-width: 749px) {
+          {{ root }} { padding: var(--sc-ugc-pt-m) 0 var(--sc-ugc-pb-m); }
+          {{ root }} .sc-ugc__inner { padding: 0 16px; }
+          {{ root }} .sc-ugc__header { margin-bottom: 24px; }
+          {{ root }} .sc-ugc__heading { font-size: var(--sc-ugc-h-m); }
+          {{ root }} .sc-ugc__subtitle { font-size: 15px; }
+          {{ root }} .sc-ugc__grid {
+            grid-template-columns: repeat(var(--sc-ugc-cols-m), minmax(0, 1fr));
+            gap: var(--sc-ugc-gap-m);
+          }
+          {{ root }}.sc-ugc--m-slider .sc-ugc__grid {
+            display: flex;
+            overflow-x: auto;
+            scroll-snap-type: x mandatory;
+            scroll-padding: 0 16px;
+            margin: 0 -16px;
+            padding: 0 16px 6px;
+            scrollbar-width: none;
+            -webkit-overflow-scrolling: touch;
+          }
+          {{ root }}.sc-ugc--m-slider .sc-ugc__grid::-webkit-scrollbar { display: none; }
+          {{ root }}.sc-ugc--m-slider .sc-ugc__item {
+            flex: 0 0 calc((100% - var(--sc-ugc-gap-m) * var(--sc-ugc-cols-m)) / (var(--sc-ugc-cols-m) + .2));
+            scroll-snap-align: start;
+          }
+          {{ root }} .sc-ugc__review { font-size: min(var(--sc-ugc-review), 15px); }
+          {{ root }} .sc-ugc__cta-wrap { margin-top: 32px; }
+          {{ root }} .sc-ugc__cta { width: 100%; max-width: 360px; }
+          {{ root }} button.sc-ugc__media::after { opacity: 1; transform: none; width: 28px; height: 28px; background-size: 14px; }
+
+          {{ root }} .sc-ugc__lb { border-radius: 10px; }
+          {{ root }} .sc-ugc__lb-inner { grid-template-columns: 1fr; overflow-y: auto; }
+          {{ root }} .sc-ugc__lb-media img { max-height: 62vh; }
+          {{ root }} .sc-ugc__lb-body { padding: 20px; }
+          {{ root }} .sc-ugc__lb-prev, {{ root }} .sc-ugc__lb-next { top: 31vh; }
+          {{ root }} .sc-ugc__lb-next { left: auto; right: 10px; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          {{ root }} .sc-ugc__img, {{ root }} .sc-ugc__cta, {{ root }} button.sc-ugc__media::after { transition: none; }
+          {{ root }}.sc-ugc--zoom .sc-ugc__media:hover .sc-ugc__img { transform: none; }
+        }
+      </style>
+
+      <div class="sc-ugc__inner">
+        {%- if has_header -%}
+          <div class="sc-ugc__header sc-ugc__header--{{ s.heading_alignment }}">
+            {%- if heading != blank -%}
+              <{{ s.heading_tag }} id="ScUgcHeading-{{ sid }}" class="sc-ugc__heading">{{ heading | escape }}</{{ s.heading_tag }}>
+              {%- if s.show_divider -%}<span class="sc-ugc__divider" aria-hidden="true"></span>{%- endif -%}
+            {%- endif -%}
+            {%- if subtitle != blank -%}
+              <p class="sc-ugc__subtitle">{{ subtitle | escape }}</p>
+            {%- endif -%}
+          </div>
+        {%- endif -%}
+
+        {%- if sc_count > 0 -%}
+          <ul class="sc-ugc__grid" role="list">
+            {{ sc_items }}
+          </ul>
+        {%- else -%}
+          <div class="sc-ugc__empty">Add a “Customer photo” block and upload an image to build the gallery.</div>
+        {%- endif -%}
+
+        {%- if show_cta -%}
+          <div class="sc-ugc__cta-wrap">
+            <a
+              {% if s.cta_link != blank %}href="{{ s.cta_link }}"{% else %}role="link" aria-disabled="true"{% endif %}
+              class="sc-ugc__cta sc-ugc__cta--{{ s.cta_style }}"
+            >
+              {{- cta_label | escape -}}
+            </a>
+          </div>
+        {%- endif -%}
+      </div>
+
+      {%- if s.enable_lightbox and sc_count > 0 -%}
+        <dialog class="sc-ugc__lb" aria-label="Customer photo">
+          <div class="sc-ugc__lb-inner">
+            <div class="sc-ugc__lb-media"><img alt="" width="1200" height="1200" data-sc-ugc-lb-img></div>
+            <div class="sc-ugc__lb-body" data-sc-ugc-lb-body></div>
+          </div>
+          <button type="button" class="sc-ugc__lb-btn sc-ugc__lb-close" data-sc-ugc-close aria-label="Close">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg>
+          </button>
+          <button type="button" class="sc-ugc__lb-btn sc-ugc__lb-prev" data-sc-ugc-step="-1" aria-label="Previous photo">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M15 5l-7 7 7 7"/></svg>
+          </button>
+          <button type="button" class="sc-ugc__lb-btn sc-ugc__lb-next" data-sc-ugc-step="1" aria-label="Next photo">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 5l7 7-7 7"/></svg>
+          </button>
+        </dialog>
+
+        <script>
+          (function () {
+            var root = document.getElementById('ScUgc-{{ sid }}');
+            if (!root || root.dataset.scUgcReady) return;
+            root.dataset.scUgcReady = '1';
+
+            var dialog = root.querySelector('.sc-ugc__lb');
+            if (!dialog || typeof dialog.showModal !== 'function') return;
+            var img = dialog.querySelector('[data-sc-ugc-lb-img]');
+            var body = dialog.querySelector('[data-sc-ugc-lb-body]');
+            var triggers = Array.prototype.slice.call(root.querySelectorAll('[data-sc-ugc-open]'));
+            var index = 0;
+            var lastFocus = null;
+
+            if (triggers.length < 2) dialog.setAttribute('data-single', '');
+
+            function show(i) {
+              index = (i + triggers.length) % triggers.length;
+              var t = triggers[index];
+              img.src = t.getAttribute('data-full');
+              img.alt = t.getAttribute('data-alt') || '';
+              var caption = t.parentNode.querySelector('.sc-ugc__body');
+              body.innerHTML = caption ? caption.innerHTML : '';
+              body.hidden = !caption;
+            }
+
+            triggers.forEach(function (t, i) {
+              t.addEventListener('click', function () {
+                lastFocus = t;
+                show(i);
+                dialog.showModal();
+                document.documentElement.style.overflow = 'hidden';
+              });
+            });
+
+            dialog.addEventListener('click', function (e) {
+              var step = e.target.closest('[data-sc-ugc-step]');
+              if (step) { show(index + Number(step.getAttribute('data-sc-ugc-step'))); return; }
+              if (e.target.closest('[data-sc-ugc-close]') || e.target === dialog) dialog.close();
+            });
+
+            dialog.addEventListener('keydown', function (e) {
+              if (triggers.length < 2) return;
+              if (e.key === 'ArrowRight') { e.preventDefault(); show(index + 1); }
+              if (e.key === 'ArrowLeft') { e.preventDefault(); show(index - 1); }
+            });
+
+            dialog.addEventListener('close', function () {
+              document.documentElement.style.overflow = '';
+              if (lastFocus) lastFocus.focus();
+            });
+          })();
+        </script>
+      {%- endif -%}
+    </section>
+  {%- endif -%}
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "SC – UGC photos & reviews",
+  "tag": "div",
+  "class": "sc-ugc-section",
+  "max_blocks": 24,
+  "settings": [
+    { "type": "header", "content": "Content" },
+    { "type": "checkbox", "id": "enabled", "label": "Show section", "default": true },
+    { "type": "text", "id": "heading", "label": "Heading", "default": "Real customers, real photos" },
+    {
+      "type": "select",
+      "id": "heading_tag",
+      "label": "Heading tag",
+      "options": [
+        { "value": "h2", "label": "H2" },
+        { "value": "h3", "label": "H3" },
+        { "value": "p", "label": "Paragraph" }
+      ],
+      "default": "h2",
+      "info": "Use H2 unless the page already has this level of heading nearby."
+    },
+    { "type": "text", "id": "subtitle", "label": "Subtitle" },
+    {
+      "type": "select",
+      "id": "heading_alignment",
+      "label": "Heading alignment",
+      "options": [
+        { "value": "left", "label": "Left" },
+        { "value": "center", "label": "Center" },
+        { "value": "right", "label": "Right" }
+      ],
+      "default": "center"
+    },
+    { "type": "checkbox", "id": "show_divider", "label": "Show line under heading", "default": true },
+    {
+      "type": "range",
+      "id": "divider_width",
+      "label": "Line width",
+      "min": 40,
+      "max": 400,
+      "step": 10,
+      "unit": "px",
+      "default": 330
+    },
+
+    { "type": "header", "content": "Gallery" },
+    {
+      "type": "range",
+      "id": "columns_desktop",
+      "label": "Columns on desktop",
+      "min": 1,
+      "max": 6,
+      "step": 1,
+      "default": 4,
+      "info": "Tablet uses up to 3 columns."
+    },
+    {
+      "type": "select",
+      "id": "columns_mobile",
+      "label": "Columns on mobile",
+      "options": [
+        { "value": "1", "label": "1" },
+        { "value": "2", "label": "2" }
+      ],
+      "default": "2"
+    },
+    {
+      "type": "select",
+      "id": "mobile_layout",
+      "label": "Mobile layout",
+      "options": [
+        { "value": "grid", "label": "Grid" },
+        { "value": "slider", "label": "Swipe row" }
+      ],
+      "default": "slider"
+    },
+    {
+      "type": "select",
+      "id": "aspect_ratio",
+      "label": "Image aspect ratio",
+      "options": [
+        { "value": "square", "label": "Square (1:1)" },
+        { "value": "portrait", "label": "Portrait (4:5)" },
+        { "value": "tall", "label": "Tall (2:3)" },
+        { "value": "landscape", "label": "Landscape (4:3)" },
+        { "value": "adapt", "label": "Adapt to image" }
+      ],
+      "default": "square"
+    },
+    {
+      "type": "range",
+      "id": "gap",
+      "label": "Space between photos",
+      "min": 0,
+      "max": 48,
+      "step": 2,
+      "unit": "px",
+      "default": 24
+    },
+    {
+      "type": "range",
+      "id": "image_radius",
+      "label": "Corner radius",
+      "min": 0,
+      "max": 32,
+      "step": 2,
+      "unit": "px",
+      "default": 4
+    },
+    {
+      "type": "select",
+      "id": "card_style",
+      "label": "Card style",
+      "options": [
+        { "value": "plain", "label": "Plain" },
+        { "value": "card", "label": "Card with background and border" }
+      ],
+      "default": "plain"
+    },
+    { "type": "checkbox", "id": "hover_zoom", "label": "Zoom photo on hover", "default": true },
+    {
+      "type": "checkbox",
+      "id": "enable_lightbox",
+      "label": "Open photo in a popup on click",
+      "default": true,
+      "info": "Shows the large photo with the full review and previous/next arrows."
+    },
+
+    { "type": "header", "content": "Reviews" },
+    { "type": "checkbox", "id": "show_ratings", "label": "Show star ratings", "default": true },
+    {
+      "type": "range",
+      "id": "star_size",
+      "label": "Star size",
+      "min": 12,
+      "max": 32,
+      "step": 1,
+      "unit": "px",
+      "default": 20
+    },
+    {
+      "type": "range",
+      "id": "review_lines",
+      "label": "Max review lines",
+      "min": 0,
+      "max": 10,
+      "step": 1,
+      "default": 3,
+      "info": "0 shows the full review. The popup always shows the full review."
+    },
+    {
+      "type": "select",
+      "id": "text_alignment",
+      "label": "Review alignment",
+      "options": [
+        { "value": "left", "label": "Left" },
+        { "value": "center", "label": "Center" },
+        { "value": "right", "label": "Right" }
+      ],
+      "default": "left"
+    },
+    { "type": "text", "id": "verified_label", "label": "Verified badge text", "default": "Verified buyer" },
+    { "type": "text", "id": "shop_label", "label": "Photo link text", "default": "Shop this look", "info": "Shown when a photo block has a link." },
+
+    { "type": "header", "content": "Button" },
+    { "type": "checkbox", "id": "show_cta", "label": "Show button", "default": true },
+    { "type": "text", "id": "cta_label", "label": "Button label", "default": "Shop now" },
+    { "type": "url", "id": "cta_link", "label": "Button link" },
+    {
+      "type": "select",
+      "id": "cta_style",
+      "label": "Button style",
+      "options": [
+        { "value": "outline", "label": "Outline" },
+        { "value": "solid", "label": "Solid" }
+      ],
+      "default": "outline"
+    },
+    {
+      "type": "range",
+      "id": "button_radius",
+      "label": "Button corner radius",
+      "min": 0,
+      "max": 30,
+      "step": 2,
+      "unit": "px",
+      "default": 8
+    },
+
+    { "type": "header", "content": "Typography" },
+    {
+      "type": "range",
+      "id": "heading_size",
+      "label": "Heading size",
+      "min": 20,
+      "max": 60,
+      "step": 1,
+      "unit": "px",
+      "default": 40
+    },
+    {
+      "type": "select",
+      "id": "heading_weight",
+      "label": "Heading weight",
+      "options": [
+        { "value": "400", "label": "Regular" },
+        { "value": "500", "label": "Medium" },
+        { "value": "600", "label": "Semibold" },
+        { "value": "700", "label": "Bold" }
+      ],
+      "default": "500"
+    },
+    {
+      "type": "range",
+      "id": "review_size",
+      "label": "Review text size",
+      "min": 12,
+      "max": 20,
+      "step": 1,
+      "unit": "px",
+      "default": 15
+    },
+
+    { "type": "header", "content": "Colours" },
+    { "type": "color", "id": "background_color", "label": "Section background", "default": "#FFFFFF" },
+    { "type": "checkbox", "id": "transparent_background", "label": "Transparent section background", "default": false },
+    { "type": "color", "id": "heading_color", "label": "Heading and name", "default": "#1A1A1A" },
+    { "type": "color", "id": "text_color", "label": "Review text", "default": "#3A3A3A" },
+    { "type": "color", "id": "muted_color", "label": "Subtitle and details", "default": "#6B6B6B" },
+    { "type": "color", "id": "divider_color", "label": "Heading line", "default": "#CCCCCC" },
+    { "type": "color", "id": "star_color", "label": "Stars", "default": "#1A1A1A" },
+    { "type": "color", "id": "star_empty_color", "label": "Empty stars", "default": "#D4D4D4" },
+    { "type": "color", "id": "card_background", "label": "Card background", "default": "#FFFFFF" },
+    { "type": "color", "id": "border_color", "label": "Card border", "default": "#E4E4E4" },
+    { "type": "color", "id": "button_background", "label": "Button colour", "default": "#1A1A1A", "info": "Border and text colour for the outline style." },
+    { "type": "color", "id": "button_text", "label": "Button text", "default": "#FFFFFF" },
+
+    { "type": "header", "content": "Layout and spacing" },
+    {
+      "type": "range",
+      "id": "content_width",
+      "label": "Content width",
+      "min": 800,
+      "max": 1600,
+      "step": 20,
+      "unit": "px",
+      "default": 1200
+    },
+    {
+      "type": "range",
+      "id": "padding_top",
+      "label": "Top padding",
+      "min": 0,
+      "max": 120,
+      "step": 4,
+      "unit": "px",
+      "default": 56
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom",
+      "label": "Bottom padding",
+      "min": 0,
+      "max": 120,
+      "step": 4,
+      "unit": "px",
+      "default": 56
+    }
+  ],
+  "blocks": [
+    {
+      "type": "photo",
+      "name": "Customer photo",
+      "settings": [
+        { "type": "checkbox", "id": "enabled", "label": "Show this photo", "default": true },
+        { "type": "image_picker", "id": "image", "label": "Customer photo" },
+        { "type": "text", "id": "image_alt", "label": "Image alt text", "info": "Describe the photo for screen readers and SEO. Falls back to the image's alt text, then the customer name." },
+        {
+          "type": "range",
+          "id": "rating",
+          "label": "Star rating",
+          "min": 0,
+          "max": 5,
+          "step": 0.5,
+          "default": 5,
+          "info": "Set to 0 to hide the stars for this photo."
+        },
+        { "type": "textarea", "id": "review", "label": "Review or quote" },
+        { "type": "text", "id": "customer_name", "label": "Customer name" },
+        { "type": "text", "id": "customer_meta", "label": "Customer details", "info": "Optional, e.g. a city or the product they bought." },
+        { "type": "checkbox", "id": "verified", "label": "Show verified badge", "default": true },
+        { "type": "url", "id": "link", "label": "Link", "info": "Optional product or collection shown in this photo." }
+      ]
+    }
+  ],
+  "presets": [
+    {
+      "name": "SC – UGC photos & reviews",
+      "blocks": [
+        {
+          "type": "photo",
+          "settings": {
+            "rating": 5,
+            "review": "The fit is perfect and the fabric feels even better than the photos. Already ordered a second one.",
+            "customer_name": "Priya S."
+          }
+        },
+        {
+          "type": "photo",
+          "settings": {
+            "rating": 5,
+            "review": "Arrived in two days and looks exactly like the listing. Great quality for the price.",
+            "customer_name": "Daniel R."
+          }
+        },
+        {
+          "type": "photo",
+          "settings": {
+            "rating": 4,
+            "review": "Really happy with it. Sizing runs slightly large, so go one size down.",
+            "customer_name": "Aisha K."
+          }
+        },
+        {
+          "type": "photo",
+          "settings": {
+            "rating": 5,
+            "review": "Got so many compliments the first day I wore it. Will be back for more colours.",
+            "customer_name": "Marco T."
+          }
+        }
+      ]
+    }
+  ]
+}
+{% endschema %}
