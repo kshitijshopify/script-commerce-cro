@@ -1,0 +1,905 @@
+{%- comment -%}
+  SC – Collection Quick Add to Cart with Size Picker  (single self-contained file)
+
+  Bag icon over the product card image → size-picker overlay (white tiles + close X)
+  → picked size's exact variant is added to cart (qty 1) → theme mini cart opens.
+  Single-variant products are added directly. Sold-out sizes trigger the available
+  Back-in-Stock flow (never added to cart). Customer stays on the collection page.
+
+  Everything (Liquid + CSS + JS + icons) lives in this snippet.
+
+  ── Install in any OS 2.0 theme (Dawn, Horizon, …) ──────────────────────────────
+  1. config/settings_schema.json (any group, e.g. "Cards"):
+       { "type": "checkbox", "id": "product_add_to_cart_custom",
+         "label": "Enable quick add to cart (custom)", "default": true }
+
+  2. layout/theme.liquid, just before </body> (prints CSS + JS once, only when enabled):
+       {% render 'sc-quick-add-size-picker', mode: 'assets' %}
+
+  3. Product card, INSIDE the image wrapper (an element with position: relative,
+     outside any stacking context that sits below the card link):
+       {% render 'sc-quick-add-size-picker', card_product: card_product, section_id: section_id %}
+     Optional: hide the theme's native quick-add on the card when
+     settings.product_add_to_cart_custom is on, to avoid duplicate buttons.
+
+  @param {string}  [mode]         - 'assets' prints the shared <style>/<script> only.
+  @param {product} [card_product] - The product of the card (card mode).
+  @param {string}  [section_id]   - Used to build unique element IDs (card mode).
+
+  JS hooks: 'sc:quick-add:notify' (cancelable, BIS takeover), window.SCQuickAdd.onSoldOut,
+  'sc:quick-add:added'. Listens to 'sc:card-swatch-change' to keep sizes in sync with colour.
+{%- endcomment -%}
+
+{%- if mode == 'assets' -%}
+  {%- if settings.product_add_to_cart_custom -%}
+    <style>
+      /* SC – Collection Quick Add to Cart with Size Picker */
+      .sc-qa {
+        --sc-qa-gap: 0.6rem;
+        --sc-qa-pad: 0.8rem;
+        --sc-qa-tile-size: 3rem;
+        --sc-qa-text: #121212;
+        --sc-qa-tile-bg: #ffffff;
+        --sc-qa-panel-bg: rgba(230, 230, 230, 0.92);
+        position: absolute;
+        inset: 0;
+        z-index: 3;
+        pointer-events: none;
+        font-size: 1.4rem;
+        line-height: 1.2;
+      }
+
+      .sc-qa > * {
+        position: relative;
+        z-index: 1;
+        pointer-events: auto;
+      }
+
+      /*
+        Themes (e.g. Dawn) stretch the card title link over the whole card with
+        an ::after overlay (z-index: 1). Lift the image wrapper above it so the
+        bag icon / size tiles are clickable, and keep the image clickable via our
+        own transparent product link (.sc-qa__link).
+      */
+      :has(> .sc-qa) {
+        z-index: 2;
+      }
+
+      .sc-qa > .sc-qa__link {
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+        display: block;
+      }
+
+      .sc-qa__icon {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+
+      /* Bag icon – bottom right of the image */
+      .sc-qa__trigger {
+        position: absolute;
+        right: var(--sc-qa-pad);
+        bottom: var(--sc-qa-pad);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 4rem;
+        height: 4rem;
+        padding: 0.9rem;
+        margin: 0;
+        border: 0;
+        border-radius: 50%;
+        background: transparent;
+        color: var(--sc-qa-text);
+        cursor: pointer;
+        transition: opacity 0.2s ease, transform 0.2s ease;
+      }
+
+      .sc-qa__trigger:hover {
+        transform: scale(1.08);
+      }
+
+      .sc-qa__trigger:focus-visible,
+      .sc-qa__tile:focus-visible,
+      .sc-qa__close:focus-visible {
+        outline: 2px solid var(--sc-qa-text);
+        outline-offset: 2px;
+      }
+
+      .sc-qa__trigger--soldout {
+        opacity: 0.5;
+      }
+
+      .sc-qa.is-open .sc-qa__trigger {
+        opacity: 0;
+        visibility: hidden;
+      }
+
+      .sc-qa.is-loading .sc-qa__trigger,
+      .sc-qa.is-loading .sc-qa__tile {
+        cursor: progress;
+      }
+
+      .sc-qa.is-loading .sc-qa__trigger .sc-qa__icon {
+        animation: sc-qa-pulse 0.9s ease-in-out infinite;
+      }
+
+      /* Size picker overlay – bottom strip, never covers the whole image */
+      .sc-qa__panel {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        display: flex;
+        align-items: center;
+        gap: var(--sc-qa-gap);
+        max-height: 100%;
+        padding: var(--sc-qa-pad);
+        box-sizing: border-box;
+        background: var(--sc-qa-panel-bg);
+        -webkit-backdrop-filter: blur(4px);
+        backdrop-filter: blur(4px);
+        animation: sc-qa-in 0.2s ease;
+      }
+
+      .sc-qa__panel[hidden] {
+        display: none;
+      }
+
+      .sc-qa__tiles {
+        display: flex;
+        flex: 1 1 auto;
+        flex-wrap: wrap;
+        gap: var(--sc-qa-gap);
+        min-width: 0;
+        max-height: calc(var(--sc-qa-tile-size) * 2 + var(--sc-qa-gap));
+        overflow-y: auto;
+      }
+
+      .sc-qa__tile {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: var(--sc-qa-tile-size);
+        height: var(--sc-qa-tile-size);
+        padding: 0 0.8rem;
+        margin: 0;
+        border: 1px solid transparent;
+        border-radius: 0;
+        background: var(--sc-qa-tile-bg);
+        color: var(--sc-qa-text);
+        font: inherit;
+        font-size: 1.4rem;
+        letter-spacing: 0.02em;
+        white-space: nowrap;
+        cursor: pointer;
+        transition: border-color 0.15s ease, background-color 0.15s ease;
+      }
+
+      .sc-qa__tile:hover {
+        border-color: var(--sc-qa-text);
+      }
+
+      .sc-qa__tile.is-active {
+        background: var(--sc-qa-text);
+        color: var(--sc-qa-tile-bg);
+      }
+
+      /* Unavailable sizes: muted + diagonal strike */
+      .sc-qa__tile--soldout {
+        color: rgba(18, 18, 18, 0.4);
+        background: rgba(255, 255, 255, 0.65);
+      }
+
+      .sc-qa__tile--soldout::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(
+          to top right,
+          transparent calc(50% - 0.5px),
+          rgba(18, 18, 18, 0.35) 50%,
+          transparent calc(50% + 0.5px)
+        );
+        pointer-events: none;
+      }
+
+      .sc-qa__tile--soldout:hover {
+        border-color: rgba(18, 18, 18, 0.35);
+      }
+
+      .sc-qa__close {
+        flex: 0 0 auto;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 3.2rem;
+        height: 3.2rem;
+        padding: 0.9rem;
+        margin: 0 0 0 auto;
+        border: 0;
+        background: transparent;
+        color: var(--sc-qa-text);
+        cursor: pointer;
+      }
+
+      .sc-qa__msg {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 100%;
+        margin: 0;
+        padding: 0.6rem var(--sc-qa-pad);
+        background: var(--sc-qa-text);
+        color: #ffffff;
+        font-size: 1.2rem;
+        text-align: center;
+      }
+
+      .sc-qa__msg:empty {
+        display: none;
+      }
+
+      .sc-qa__msg--floating {
+        bottom: calc(var(--sc-qa-pad) + 4.4rem);
+        left: auto;
+        right: var(--sc-qa-pad);
+        max-width: calc(100% - 2 * var(--sc-qa-pad));
+      }
+
+      @media screen and (max-width: 749px) {
+        .sc-qa {
+          --sc-qa-gap: 0.4rem;
+          --sc-qa-pad: 0.5rem;
+          --sc-qa-tile-size: 3.6rem;
+        }
+
+        .sc-qa__trigger {
+          width: 3.6rem;
+          height: 3.6rem;
+          padding: 0.8rem;
+        }
+
+        .sc-qa__tile {
+          padding: 0 0.5rem;
+          font-size: 1.3rem;
+        }
+
+        .sc-qa__close {
+          width: 2.8rem;
+          height: 2.8rem;
+          padding: 0.8rem;
+        }
+      }
+
+      @keyframes sc-qa-in {
+        from {
+          opacity: 0;
+          transform: translateY(0.6rem);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+
+      @keyframes sc-qa-pulse {
+        50% {
+          opacity: 0.35;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .sc-qa__panel,
+        .sc-qa.is-loading .sc-qa__trigger .sc-qa__icon {
+          animation: none;
+        }
+      }
+    </style>
+    <script>
+      /**
+       * SC – Collection Quick Add to Cart with Size Picker
+       *
+       * Markup: snippets/sc-quick-add-size-picker.liquid
+       * - Bag icon opens a size overlay; a tile click adds that exact variant (qty 1).
+       * - Single-variant products are added straight from the bag icon.
+       * - Sold-out sizes trigger a Back-in-Stock flow (never added to cart).
+       * - Delegated listeners: works for cards loaded later (filters, pagination, infinite scroll).
+       * - Cart UI: Dawn cart drawer / notification (Section Rendering API + pubsub),
+       *   Horizon (`cart:update` + cart-drawer-component), generic `cart:refresh` /
+       *   `cart:updated` events, and header bubble refresh as a fallback.
+       */
+      (function () {
+        if (window.__scQuickAddSizePicker) return;
+        window.__scQuickAddSizePicker = true;
+
+        var ROOT = (window.Shopify && window.Shopify.routes && window.Shopify.routes.root) || '/';
+        var CARD_SELECTOR = '.product-card-wrapper, .card-wrapper, product-card, .product-card, .grid__item, li';
+
+        /* ---------------- Helpers ---------------- */
+
+        function getData(wrap) {
+          if (wrap._scqa) return wrap._scqa;
+          var node = wrap.querySelector('[data-sc-qa-json]');
+          var data = null;
+          try {
+            data = node ? JSON.parse(node.textContent) : null;
+          } catch (e) {
+            data = null;
+          }
+          wrap._scqa = data;
+          return data;
+        }
+
+        function cardOf(wrap) {
+          return wrap.closest(CARD_SELECTOR) || wrap.parentElement;
+        }
+
+        function showMsg(wrap, text) {
+          var msg = wrap.querySelector('[data-sc-qa-msg]');
+          if (!msg) return;
+          clearTimeout(wrap._scqaMsgTimer);
+          msg.textContent = text || '';
+          if (text) {
+            wrap._scqaMsgTimer = setTimeout(function () {
+              msg.textContent = '';
+            }, 4000);
+          }
+        }
+
+        /** Variant for a picker value, keeping every other option at the card's current values. */
+        function variantFor(data, pick, value) {
+          var exact = null;
+          var fallback = null;
+          for (var i = 0; i < data.variants.length; i++) {
+            var v = data.variants[i];
+            if (v.options[pick] !== value) continue;
+            var same = true;
+            for (var j = 0; j < v.options.length; j++) {
+              if (j !== pick && v.options[j] !== data.base[j]) {
+                same = false;
+                break;
+              }
+            }
+            if (same) {
+              exact = v;
+              break;
+            }
+            if (!fallback || (!fallback.available && v.available)) fallback = v;
+          }
+          return exact || fallback;
+        }
+
+        function refreshTiles(wrap) {
+          var data = getData(wrap);
+          if (!data) return;
+          var pick = parseInt(wrap.getAttribute('data-pick'), 10) || 0;
+          wrap.querySelectorAll('[data-sc-qa-tile]').forEach(function (tile) {
+            var v = variantFor(data, pick, tile.getAttribute('data-value'));
+            if (!v) return;
+            tile.setAttribute('data-variant-id', v.id);
+            tile.setAttribute('data-available', v.available ? 'true' : 'false');
+            tile.classList.toggle('sc-qa__tile--soldout', !v.available);
+            var label = tile.getAttribute('aria-label') || '';
+            var base = label.split(' – ')[0] || tile.getAttribute('data-value');
+            tile.setAttribute(
+              'aria-label',
+              base + ' – ' + (v.available ? wrap.getAttribute('data-label-add') : wrap.getAttribute('data-label-soldout'))
+            );
+          });
+        }
+
+        /* ---------------- Open / close ---------------- */
+
+        function openPanel(wrap) {
+          closeAll(wrap, false);
+          var panel = wrap.querySelector('[data-sc-qa-panel]');
+          if (!panel) return;
+          panel.hidden = false;
+          wrap.classList.add('is-open');
+          var trigger = wrap.querySelector('[data-sc-qa-open]');
+          if (trigger) trigger.setAttribute('aria-expanded', 'true');
+          var first = panel.querySelector('[data-sc-qa-tile][data-available="true"]') || panel.querySelector('[data-sc-qa-tile]');
+          if (first) first.focus({ preventScroll: true });
+        }
+
+        function closePanel(wrap, restoreFocus) {
+          var panel = wrap.querySelector('[data-sc-qa-panel]');
+          if (!panel || panel.hidden) return;
+          panel.hidden = true;
+          wrap.classList.remove('is-open');
+          showMsg(wrap, '');
+          var trigger = wrap.querySelector('[data-sc-qa-open]');
+          if (trigger) {
+            trigger.setAttribute('aria-expanded', 'false');
+            if (restoreFocus) trigger.focus({ preventScroll: true });
+          }
+        }
+
+        function closeAll(except, restoreFocus) {
+          document.querySelectorAll('[data-sc-qa].is-open').forEach(function (wrap) {
+            if (wrap !== except) closePanel(wrap, restoreFocus);
+          });
+        }
+
+        /* ---------------- Back in stock ---------------- */
+
+        function triggerBackInStock(wrap, variantId) {
+          var productId = Number(wrap.getAttribute('data-product-id'));
+          var detail = {
+            productId: productId,
+            variantId: Number(variantId),
+            handle: wrap.getAttribute('data-product-handle'),
+            url: wrap.getAttribute('data-product-url'),
+          };
+
+          // 1. Any app/theme code can take over: listen and call event.preventDefault().
+          var evt = new CustomEvent('sc:quick-add:notify', { bubbles: true, cancelable: true, detail: detail });
+          if (!wrap.dispatchEvent(evt)) return true;
+
+          // 2. Optional global hook.
+          var hook = window.SCQuickAdd && window.SCQuickAdd.onSoldOut;
+          if (typeof hook === 'function') {
+            try {
+              if (hook(detail) !== false) return true;
+            } catch (e) {
+              /* fall through */
+            }
+          }
+
+          // 3. Back in Stock (backinstock.org) public API.
+          if (window.BIS && window.BIS.popup && typeof window.BIS.popup.show === 'function') {
+            try {
+              window.BIS.popup.show({ withProductId: productId, withVariantId: Number(variantId) });
+              return true;
+            } catch (e) {
+              /* fall through */
+            }
+          }
+
+          // 4. A BIS trigger element rendered by an app inside this card.
+          var card = cardOf(wrap);
+          var trigger =
+            card &&
+            card.querySelector('[data-sc-bis-trigger], .BIS_trigger, [data-bis-trigger], .klaviyo-bis-trigger, .notify-me-trigger');
+          if (trigger) {
+            trigger.setAttribute('data-variant-id', variantId);
+            trigger.click();
+            return true;
+          }
+
+          return false;
+        }
+
+        /* ---------------- Cart ---------------- */
+
+        function dawnCartElement() {
+          var els = [document.querySelector('cart-notification'), document.querySelector('cart-drawer')];
+          for (var i = 0; i < els.length; i++) {
+            var el = els[i];
+            if (el && typeof el.renderContents === 'function' && typeof el.getSectionsToRender === 'function') return el;
+          }
+          return null;
+        }
+
+        function parseHTML(html) {
+          return new DOMParser().parseFromString(html, 'text/html');
+        }
+
+        function refreshBubble() {
+          var bubble = document.getElementById('cart-icon-bubble');
+          if (!bubble) return Promise.resolve();
+          return fetch(ROOT + '?sections=cart-icon-bubble', { headers: { Accept: 'application/json' } })
+            .then(function (r) {
+              return r.json();
+            })
+            .then(function (sections) {
+              if (!sections || !sections['cart-icon-bubble']) return;
+              var doc = parseHTML(sections['cart-icon-bubble']);
+              bubble.innerHTML = (doc.querySelector('.shopify-section') || doc.body).innerHTML;
+            })
+            .catch(function () {});
+        }
+
+        function addToCart(wrap, variantId, sourceEl) {
+          if (!variantId || wrap.getAttribute('data-busy') === 'true') return;
+          wrap.setAttribute('data-busy', 'true');
+          wrap.classList.add('is-loading');
+          if (sourceEl) sourceEl.classList.add('is-active');
+          showMsg(wrap, '');
+
+          var cartEl = dawnCartElement();
+          var body = { id: Number(variantId), quantity: 1 };
+          if (cartEl) {
+            body.sections = cartEl.getSectionsToRender().map(function (s) {
+              return s.id;
+            });
+            body.sections_url = window.location.pathname;
+          }
+
+          fetch(ROOT + 'cart/add.js', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            body: JSON.stringify(body),
+          })
+            .then(function (response) {
+              return response
+                .json()
+                .catch(function () {
+                  return {};
+                })
+                .then(function (data) {
+                  if (!response.ok || data.status) {
+                    throw new Error(data.description || data.message || wrap.getAttribute('data-msg-error'));
+                  }
+                  return data;
+                });
+            })
+            .then(function (data) {
+              return fetch(ROOT + 'cart.js', { headers: { Accept: 'application/json' } })
+                .then(function (r) {
+                  return r.json();
+                })
+                .catch(function () {
+                  return null;
+                })
+                .then(function (cart) {
+                  onAdded(wrap, variantId, data, cart, cartEl);
+                });
+            })
+            .catch(function (error) {
+              showMsg(wrap, (error && error.message) || wrap.getAttribute('data-msg-error'));
+            })
+            .finally(function () {
+              wrap.removeAttribute('data-busy');
+              wrap.classList.remove('is-loading');
+              if (sourceEl) sourceEl.classList.remove('is-active');
+            });
+        }
+
+        function onAdded(wrap, variantId, data, cart, cartEl) {
+          var productId = Number(wrap.getAttribute('data-product-id'));
+          var itemCount = cart ? cart.item_count : undefined;
+          var opened = false;
+
+          closePanel(wrap, false);
+
+          // Dawn: drawer / notification re-render + open from the same request.
+          if (cartEl && data.sections) {
+            try {
+              if (cartEl.tagName.toLowerCase() === 'cart-drawer') cartEl.classList.remove('is-empty');
+              cartEl.renderContents(data);
+              opened = true;
+            } catch (e) {
+              /* fall through to generic refresh */
+            }
+          }
+
+          // Dawn pubsub (cart page sections, other subscribers).
+          // (PUB_SUB_EVENTS is a top-level const in Dawn, so it is not a window property.)
+          var pubEvents = typeof PUB_SUB_EVENTS !== 'undefined' ? PUB_SUB_EVENTS : window.PUB_SUB_EVENTS;
+          if (typeof window.publish === 'function' && pubEvents && pubEvents.cartUpdate) {
+            try {
+              window.publish(pubEvents.cartUpdate, {
+                source: 'sc-quick-add',
+                productVariantId: Number(variantId),
+                cartData: data,
+              });
+            } catch (e) {
+              /* ignore */
+            }
+          }
+
+          // Horizon + other OS 2.0 themes listening to generic cart events.
+          var doc = document.documentElement;
+          try {
+            document.dispatchEvent(
+              new CustomEvent('cart:update', {
+                bubbles: true,
+                detail: {
+                  resource: cart || data,
+                  sourceId: 'sc-quick-add',
+                  data: { source: 'sc-quick-add', itemCount: itemCount, productId: productId, variantId: Number(variantId) },
+                },
+              })
+            );
+            doc.dispatchEvent(new CustomEvent('cart:updated', { bubbles: true, detail: { cart: cart } }));
+            if (!opened) {
+              doc.dispatchEvent(new CustomEvent('cart:refresh', { bubbles: true, detail: { cart: cart, openMiniCart: true } }));
+            }
+          } catch (e) {
+            /* ignore */
+          }
+          document.dispatchEvent(
+            new CustomEvent('sc:quick-add:added', { detail: { productId: productId, variantId: Number(variantId), cart: cart, item: data } })
+          );
+
+          if (!opened) {
+            // Horizon cart drawer.
+            var hz = document.querySelector('cart-drawer-component');
+            if (hz) {
+              var openFn = hz.open || hz.showDialog;
+              if (typeof openFn === 'function') {
+                try {
+                  openFn.call(hz);
+                  opened = true;
+                } catch (e) {
+                  /* ignore */
+                }
+              }
+            }
+          }
+
+          if (!opened) {
+            refreshBubble();
+            showMsg(wrap, wrap.getAttribute('data-msg-added'));
+          }
+        }
+
+        /* ---------------- Events (delegated, registered once) ---------------- */
+
+        document.addEventListener('click', function (event) {
+          var target = event.target;
+          if (!target || !target.closest) return;
+
+          var wrap = target.closest('[data-sc-qa]');
+
+          if (!wrap) {
+            // Outside click closes any open picker (except clicks inside the cart drawer opening).
+            closeAll(null, false);
+            return;
+          }
+
+          var opener = target.closest('[data-sc-qa-open]');
+          var direct = target.closest('[data-sc-qa-add]');
+          var tile = target.closest('[data-sc-qa-tile]');
+          var close = target.closest('[data-sc-qa-close]');
+
+          if (opener || direct || tile || close || target.closest('[data-sc-qa-panel]')) {
+            // Keep the card link from navigating.
+            event.preventDefault();
+            event.stopPropagation();
+          }
+
+          if (close) {
+            closePanel(wrap, true);
+            return;
+          }
+
+          if (opener) {
+            if (wrap.classList.contains('is-open')) closePanel(wrap, false);
+            else openPanel(wrap);
+            return;
+          }
+
+          var btn = tile || direct;
+          if (!btn) return;
+          var variantId = btn.getAttribute('data-variant-id');
+
+          if (btn.getAttribute('data-available') !== 'true') {
+            if (!triggerBackInStock(wrap, variantId)) {
+              showMsg(wrap, wrap.getAttribute('data-msg-soldout'));
+            }
+            return;
+          }
+
+          addToCart(wrap, variantId, tile);
+        });
+
+        document.addEventListener('keydown', function (event) {
+          var target = event.target;
+          if (event.key === 'Escape') {
+            var openWrap = (target && target.closest && target.closest('[data-sc-qa].is-open')) || document.querySelector('[data-sc-qa].is-open');
+            if (openWrap) closePanel(openWrap, true);
+            return;
+          }
+
+          // Arrow-key navigation between size tiles.
+          if ((event.key === 'ArrowRight' || event.key === 'ArrowLeft') && target && target.matches && target.matches('[data-sc-qa-tile]')) {
+            var tiles = Array.prototype.slice.call(target.parentElement.querySelectorAll('[data-sc-qa-tile]'));
+            var i = tiles.indexOf(target) + (event.key === 'ArrowRight' ? 1 : -1);
+            if (i < 0) i = tiles.length - 1;
+            if (i >= tiles.length) i = 0;
+            tiles[i].focus();
+            event.preventDefault();
+          }
+        });
+
+        // Close when focus leaves an open picker (keyboard users tabbing away).
+        document.addEventListener('focusin', function (event) {
+          var open = document.querySelectorAll('[data-sc-qa].is-open');
+          open.forEach(function (wrap) {
+            if (!wrap.contains(event.target)) closePanel(wrap, false);
+          });
+        });
+
+        // Keep tiles in sync when the card's colour changes (SC card swatches).
+        document.addEventListener('sc:card-swatch-change', function (event) {
+          var card = event.target && event.target.closest ? event.target.closest(CARD_SELECTOR) : null;
+          var wrap = card && card.querySelector('[data-sc-qa]');
+          if (!wrap || !event.detail) return;
+          var data = getData(wrap);
+          if (!data) return;
+          var id = Number(event.detail.variantId);
+          for (var i = 0; i < data.variants.length; i++) {
+            if (data.variants[i].id === id) {
+              data.base = data.variants[i].options.slice();
+              refreshTiles(wrap);
+              break;
+            }
+          }
+        });
+      })();
+    </script>
+  {%- endif -%}
+{%- else -%}
+  {%- if settings.product_add_to_cart_custom and card_product and card_product != empty -%}
+    {%- capture scqa_icon_bag -%}
+      <svg class="sc-qa__icon" xmlns="http://www.w3.org/2000/svg" width="18" height="22" viewBox="0 0 18 22" fill="none" aria-hidden="true" focusable="false">
+        <path fill-rule="evenodd" clip-rule="evenodd" d="M14.927 6.00011H2.79897C2.27197 6.00011 2.50037 6.00004 2.00037 6.00005L1 21.0001C1 21.0001 1.00005 21.0001 3.00097 21.0001H14.725C15.882 21.0001 16.5004 21.0001 17.0004 21.0001L16.0004 6C15.5004 6 15.454 6.00011 14.927 6.00011Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="square"/>
+        <path d="M11.8639 8V4C11.8639 2.343 10.5209 1 8.86391 1H8.86292C7.20591 1 5.86292 2.343 5.86292 4V8" stroke="currentColor" stroke-width="1.5" stroke-linecap="square"/>
+      </svg>
+    {%- endcapture -%}
+    {%- capture scqa_icon_close -%}
+      <svg class="sc-qa__icon" xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true" focusable="false">
+        <path d="M1 1.16357L11.6367 11.8003" stroke="currentColor" stroke-linecap="round"/>
+        <path d="M11.6367 1L0.999992 11.6367" stroke="currentColor" stroke-linecap="round"/>
+      </svg>
+    {%- endcapture -%}
+
+    {%- liquid
+      assign scqa_uid = 'ScQa-' | append: section_id | append: '-' | append: card_product.id
+      assign scqa_base = card_product.selected_or_first_available_variant
+      assign scqa_multi = false
+      if card_product.has_only_default_variant == false and card_product.variants.size > 1
+        assign scqa_multi = true
+      endif
+
+      comment
+        Pick the option that represents size (any position). Falls back to the
+        first option with more than one value (e.g. products with only Colour).
+      endcomment
+      assign scqa_size_names = 'size,sizes,größe,groesse,grösse,gröse,taille,talla,tamaño,taglia,maat,maten,storlek,størrelse,koko,rozmiar,velikost,méret,tamanho,beden,mărime,razmer,サイズ,尺码,尺寸,사이즈'
+      assign scqa_size_names = scqa_size_names | split: ','
+      assign scqa_pick = -1
+      for scqa_opt in card_product.options_with_values
+        assign scqa_opt_name = scqa_opt.name | downcase | strip
+        if scqa_size_names contains scqa_opt_name
+          assign scqa_pick = forloop.index0
+          break
+        endif
+      endfor
+      if scqa_pick == -1
+        for scqa_opt in card_product.options_with_values
+          if scqa_opt.values.size > 1
+            assign scqa_pick = forloop.index0
+            break
+          endif
+        endfor
+      endif
+      if scqa_pick == -1
+        assign scqa_pick = 0
+      endif
+      assign scqa_option = card_product.options_with_values[scqa_pick]
+      assign scqa_option_count = card_product.options_with_values.size | minus: 1
+
+      assign scqa_label_add = 'products.product.add_to_cart' | t
+      assign scqa_label_sold = 'products.product.sold_out' | t
+      assign scqa_label_close = 'accessibility.close' | t
+    -%}
+
+    <div
+      class="sc-qa"
+      data-sc-qa
+      data-product-id="{{ card_product.id }}"
+      data-product-handle="{{ card_product.handle }}"
+      data-product-url="{{ card_product.url }}"
+      data-pick="{{ scqa_pick }}"
+      data-label-add="{{ scqa_label_add | escape }}"
+      data-label-soldout="{{ scqa_label_sold | escape }}"
+      data-msg-added="Added to cart"
+      data-msg-error="Could not add to cart. Please try again."
+      data-msg-soldout="{{ scqa_label_sold | escape }} – this size is currently unavailable."
+    >
+      <a class="sc-qa__link" href="{{ card_product.url }}" tabindex="-1" aria-hidden="true"></a>
+      {%- if scqa_multi -%}
+        <button
+          type="button"
+          class="sc-qa__trigger"
+          data-sc-qa-open
+          aria-haspopup="true"
+          aria-expanded="false"
+          aria-controls="{{ scqa_uid }}"
+          aria-label="{{ 'products.product.choose_options' | t | escape }}: {{ card_product.title | escape }}"
+        >
+          {{- scqa_icon_bag -}}
+        </button>
+
+        <div
+          class="sc-qa__panel"
+          id="{{ scqa_uid }}"
+          role="group"
+          aria-label="{{ scqa_option.name | escape }} – {{ card_product.title | escape }}"
+          data-sc-qa-panel
+          hidden
+        >
+          <div class="sc-qa__tiles" data-sc-qa-tiles>
+            {%- for scqa_value in scqa_option.values -%}
+              {%- liquid
+                comment
+                  Exact variant: this tile value + the card's current values for every other option.
+                  Fallback (combination missing): any variant with this value, preferring an available one.
+                endcomment
+                assign scqa_exact = nil
+                assign scqa_fallback = nil
+                for scqa_v in card_product.variants
+                  if scqa_v.options[scqa_pick] != scqa_value
+                    continue
+                  endif
+                  assign scqa_same = true
+                  for scqa_i in (0..scqa_option_count)
+                    if scqa_i != scqa_pick and scqa_v.options[scqa_i] != scqa_base.options[scqa_i]
+                      assign scqa_same = false
+                    endif
+                  endfor
+                  if scqa_same
+                    assign scqa_exact = scqa_v
+                    break
+                  endif
+                  if scqa_fallback == nil
+                    assign scqa_fallback = scqa_v
+                  elsif scqa_fallback.available == false and scqa_v.available
+                    assign scqa_fallback = scqa_v
+                  endif
+                endfor
+                assign scqa_tile_variant = scqa_exact | default: scqa_fallback
+              -%}
+              <button
+                type="button"
+                class="sc-qa__tile{% unless scqa_tile_variant.available %} sc-qa__tile--soldout{% endunless %}"
+                data-sc-qa-tile
+                data-value="{{ scqa_value | escape }}"
+                data-variant-id="{{ scqa_tile_variant.id }}"
+                data-available="{{ scqa_tile_variant.available }}"
+                aria-label="{{ scqa_value | escape }}{% unless scqa_tile_variant.available %} – {{ scqa_label_sold | escape }}{% else %} – {{ scqa_label_add | escape }}{% endunless %}"
+              >
+                {{- scqa_value | escape -}}
+              </button>
+            {%- endfor -%}
+          </div>
+          <button type="button" class="sc-qa__close" data-sc-qa-close aria-label="{{ scqa_label_close | escape }}">
+            {{- scqa_icon_close -}}
+          </button>
+          <p class="sc-qa__msg" data-sc-qa-msg role="status" aria-live="polite"></p>
+        </div>
+
+        <script type="application/json" data-sc-qa-json>
+          {
+            "base": {{ scqa_base.options | json }},
+            "variants": [
+              {%- for scqa_v in card_product.variants -%}
+                {"id":{{ scqa_v.id }},"available":{{ scqa_v.available | json }},"options":{{ scqa_v.options | json }}}{% unless forloop.last %},{% endunless %}
+              {%- endfor -%}
+            ]
+          }
+        </script>
+      {%- else -%}
+        <button
+          type="button"
+          class="sc-qa__trigger{% unless scqa_base.available %} sc-qa__trigger--soldout{% endunless %}"
+          data-sc-qa-add
+          data-variant-id="{{ scqa_base.id }}"
+          data-available="{{ scqa_base.available }}"
+          aria-label="{% if scqa_base.available %}{{ scqa_label_add | escape }}{% else %}{{ scqa_label_sold | escape }}{% endif %}: {{ card_product.title | escape }}"
+        >
+          {{- scqa_icon_bag -}}
+        </button>
+        <p class="sc-qa__msg sc-qa__msg--floating" data-sc-qa-msg role="status" aria-live="polite"></p>
+      {%- endif -%}
+    </div>
+  {%- endif -%}
+{%- endif -%}

@@ -42,6 +42,15 @@
     if ratio == 0 or ratio == null
       assign ratio = 1
     endif
+
+    # SC quick add (custom) replaces the native "standard" quick-add button to avoid duplicates.
+    assign sc_quick_add_custom = false
+    if settings.product_add_to_cart_custom and quick_add != 'bulk'
+      assign sc_quick_add_custom = true
+      if quick_add == 'standard'
+        assign quick_add = 'none'
+      endif
+    endif
   -%}
 
   <product-component view-event-payload="{{ card_product | standard_event_data: 'view', context: product_view_context | escape }}">
@@ -110,6 +119,9 @@
                 {%- endif -%}
               </div>
             </div>
+            {%- if sc_quick_add_custom -%}
+              {% render 'sc-quick-add-size-picker', card_product: card_product, section_id: section_id %}
+            {%- endif -%}
           {%- endif -%}
           <div class="card__content">
             <div class="card__information">
