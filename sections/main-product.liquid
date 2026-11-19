@@ -702,6 +702,8 @@
                   {% render 'sc-pdp-variant-cards', block: block, product: product, section: section %}
                 {%- when 'sc_pdp_quantity_discounts' -%}
                   {% render 'sc-pdp-quantity-discounts', block: block, product: product, section: section %}
+                {%- when 'sc_bulletpoints' -%}
+                  {% render 'sc-pdp-bulletpoints', block: block, product: product %}
                 {%- when 'sc_payment_icons_bar' -%}
                   {% render 'sc-payment-icons-bar', placement: 'pdp', product: product, block: block %}
                 {%- when 'icon-with-text' -%}
@@ -4915,6 +4917,321 @@
         {
           "type": "paragraph",
           "content": "Shows accepted payment methods. Icon source, selection and order are global – edit them in Theme settings → SC – Payment icons bar, so the product page and cart always match."
+        }
+      ]
+    },
+    {
+      "type": "sc_bulletpoints",
+      "name": "SC – PDP Bulletpoints",
+      "limit": 1,
+      "settings": [
+        {
+          "type": "header",
+          "content": "Content"
+        },
+        {
+          "type": "paragraph",
+          "content": "Bullets come from a product metafield (Single line text – List of values). Default: standard.cro_pdp_bulletpoints. Formatting: **bold**, *italic*, __underline__."
+        },
+        {
+          "type": "text",
+          "id": "metafield_key",
+          "label": "Metafield (namespace.key)",
+          "default": "standard.cro_pdp_bulletpoints",
+          "info": "List of single line text (recommended). Single/multi-line text also works – one bullet per line."
+        },
+        {
+          "type": "range",
+          "id": "max_items",
+          "min": 1,
+          "max": 10,
+          "step": 1,
+          "label": "Maximum bullets",
+          "default": 5
+        },
+        {
+          "type": "textarea",
+          "id": "fallback_bullets",
+          "label": "Fallback bullets",
+          "info": "Optional. One bullet per line. Shown only when the product has no metafield bullets."
+        },
+        {
+          "type": "checkbox",
+          "id": "enable_formatting",
+          "label": "Allow **bold**, *italic*, __underline__",
+          "default": true
+        },
+        {
+          "type": "header",
+          "content": "Spacing"
+        },
+        {
+          "type": "range",
+          "id": "space_top",
+          "min": 0,
+          "max": 32,
+          "step": 1,
+          "unit": "px",
+          "label": "Space top",
+          "default": 16
+        },
+        {
+          "type": "range",
+          "id": "space_bottom",
+          "min": 0,
+          "max": 32,
+          "step": 1,
+          "unit": "px",
+          "label": "Space bottom",
+          "default": 16
+        },
+        {
+          "type": "range",
+          "id": "gap_items",
+          "min": 0,
+          "max": 16,
+          "step": 1,
+          "unit": "px",
+          "label": "Gap between items",
+          "default": 3
+        },
+        {
+          "type": "header",
+          "content": "Container"
+        },
+        {
+          "type": "checkbox",
+          "id": "show_border",
+          "label": "Show border",
+          "default": true
+        },
+        {
+          "type": "color",
+          "id": "border_color",
+          "label": "Border color",
+          "default": "#EEEAE9"
+        },
+        {
+          "type": "range",
+          "id": "border_radius",
+          "min": 0,
+          "max": 16,
+          "step": 1,
+          "unit": "px",
+          "label": "Corner radius",
+          "default": 6
+        },
+        {
+          "type": "range",
+          "id": "box_padding",
+          "min": 0,
+          "max": 32,
+          "step": 1,
+          "unit": "px",
+          "label": "Inner padding",
+          "default": 16,
+          "info": "Used when the border or a background is shown."
+        },
+        {
+          "type": "color",
+          "id": "background",
+          "label": "Background",
+          "default": "rgba(0,0,0,0)",
+          "info": "Transparent = no box background."
+        },
+        {
+          "type": "color",
+          "id": "text_color",
+          "label": "Text color",
+          "default": "rgba(0,0,0,0)",
+          "info": "Transparent = theme text color."
+        },
+        {
+          "type": "header",
+          "content": "List style"
+        },
+        {
+          "type": "select",
+          "id": "list_style",
+          "label": "List style",
+          "default": "svg",
+          "options": [
+            {
+              "value": "disc",
+              "label": "Disc"
+            },
+            {
+              "value": "circle",
+              "label": "Circle"
+            },
+            {
+              "value": "decimal",
+              "label": "Decimal (1, 2, 3)"
+            },
+            {
+              "value": "svg",
+              "label": "Icon (SVG / image)"
+            }
+          ]
+        },
+        {
+          "type": "header",
+          "content": "Icon",
+          "info": "Used when List style = Icon."
+        },
+        {
+          "type": "select",
+          "id": "icon_source",
+          "label": "Icon source",
+          "default": "auto",
+          "options": [
+            {
+              "value": "auto",
+              "label": "Auto (image → SVG → default)"
+            },
+            {
+              "value": "default",
+              "label": "Default icon"
+            },
+            {
+              "value": "svg",
+              "label": "Custom SVG"
+            },
+            {
+              "value": "image",
+              "label": "Uploaded image"
+            }
+          ],
+          "info": "If the selected source is empty or invalid, the default icon is shown."
+        },
+        {
+          "type": "select",
+          "id": "default_icon",
+          "label": "Default icon",
+          "default": "check",
+          "options": [
+            {
+              "value": "check",
+              "label": "Check (thin)"
+            },
+            {
+              "value": "check_circle",
+              "label": "Check in filled circle"
+            },
+            {
+              "value": "check_circle_outline",
+              "label": "Check in outlined circle"
+            }
+          ]
+        },
+        {
+          "type": "image_picker",
+          "id": "icon_as_image",
+          "label": "Icon as image"
+        },
+        {
+          "type": "html",
+          "id": "icon_as_svg",
+          "label": "Icon as SVG",
+          "info": "Paste one <svg>…</svg>. Scripts, event handlers, links and <style> are not allowed – invalid SVG falls back to the default icon. Use fill/stroke=\"currentColor\" to follow Icon color."
+        },
+        {
+          "type": "range",
+          "id": "icon_as_size",
+          "min": 5,
+          "max": 24,
+          "step": 1,
+          "unit": "px",
+          "label": "Icon size",
+          "default": 14
+        },
+        {
+          "type": "range",
+          "id": "icon_width",
+          "min": 5,
+          "max": 36,
+          "step": 1,
+          "unit": "px",
+          "label": "Icon box size",
+          "default": 18,
+          "info": "Box around the icon (useful with Icon background)."
+        },
+        {
+          "type": "color",
+          "id": "icon_color",
+          "label": "Icon / marker color",
+          "default": "rgba(0,0,0,0)",
+          "info": "Transparent = text color."
+        },
+        {
+          "type": "color",
+          "id": "icon_background",
+          "label": "Icon background",
+          "default": "rgba(0,0,0,0)"
+        },
+        {
+          "type": "range",
+          "id": "icon_margin_right",
+          "min": 0,
+          "max": 32,
+          "step": 1,
+          "unit": "px",
+          "label": "Icon right margin",
+          "default": 8
+        },
+        {
+          "type": "header",
+          "content": "Typography"
+        },
+        {
+          "type": "range",
+          "id": "font_size",
+          "min": 0,
+          "max": 24,
+          "step": 1,
+          "unit": "px",
+          "label": "Font size (desktop)",
+          "default": 16,
+          "info": "0 = theme default size."
+        },
+        {
+          "type": "range",
+          "id": "font_size_mobile",
+          "min": 0,
+          "max": 20,
+          "step": 1,
+          "unit": "px",
+          "label": "Font size (mobile)",
+          "default": 16,
+          "info": "0 = same as desktop. Applies below 750px."
+        },
+        {
+          "type": "select",
+          "id": "font_weight",
+          "label": "Font weight",
+          "default": "inherit",
+          "options": [
+            {
+              "value": "inherit",
+              "label": "Theme default"
+            },
+            {
+              "value": "400",
+              "label": "Regular"
+            },
+            {
+              "value": "500",
+              "label": "Medium"
+            },
+            {
+              "value": "600",
+              "label": "Semibold"
+            },
+            {
+              "value": "700",
+              "label": "Bold"
+            }
+          ]
         }
       ]
     },
