@@ -488,6 +488,13 @@
     "name": "t:settings_schema.cards.name",
     "settings": [
       {
+        "type": "checkbox",
+        "id": "product_add_to_cart_custom",
+        "label": "Enable quick add to cart (custom)",
+        "info": "Shows a bag icon on product card images with a size picker. Replaces the section-level \"Enable quick add\" button on the same cards to avoid duplicates.",
+        "default": true
+      },
+      {
         "type": "select",
         "id": "card_style",
         "options": [
