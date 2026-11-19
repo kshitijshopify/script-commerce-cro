@@ -94,6 +94,9 @@
       </span>
     </button>
   </modal-opener>
+  {%- if sc_badge_product and position == 1 -%}
+    {%- render 'sc-product-labels', product: sc_badge_product, placement: 'pdp' -%}
+  {%- endif -%}
 
   {%- if media.media_type != 'image' -%}
     {%- if media.media_type == 'model' -%}

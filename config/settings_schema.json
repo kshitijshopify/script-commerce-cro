@@ -2848,5 +2848,174 @@
         "default": "#ffffff"
       }
     ]
+  },
+  {
+    "name": "SC – Product Badges",
+    "settings": [
+      {
+        "type": "checkbox",
+        "id": "sc_badges_enable",
+        "label": "Enable product badges",
+        "default": true
+      },
+      {
+        "type": "checkbox",
+        "id": "sc_badges_show_pdp",
+        "label": "Show on product page media",
+        "default": true
+      },
+      {
+        "type": "checkbox",
+        "id": "sc_badges_hide_theme_badges",
+        "label": "Hide theme's default card badges",
+        "info": "Avoids duplicate Sale / Sold out badges on product cards.",
+        "default": true
+      },
+      {
+        "type": "select",
+        "id": "sc_badges_position",
+        "label": "Position",
+        "options": [
+          {
+            "value": "top_left",
+            "label": "Top left"
+          },
+          {
+            "value": "top_right",
+            "label": "Top right"
+          },
+          {
+            "value": "bottom_left",
+            "label": "Bottom left"
+          },
+          {
+            "value": "bottom_right",
+            "label": "Bottom right"
+          }
+        ],
+        "default": "top_left"
+      },
+      {
+        "type": "range",
+        "id": "sc_badges_radius",
+        "label": "Corner radius",
+        "min": 0,
+        "max": 100,
+        "step": 1,
+        "unit": "px",
+        "default": 0
+      },
+      {
+        "type": "header",
+        "content": "Custom label 1"
+      },
+      {
+        "type": "paragraph",
+        "content": "Product tag format: __label:Bestseller"
+      },
+      {
+        "type": "color",
+        "id": "sc_badges_label_color",
+        "label": "Text color",
+        "default": "#ffffff"
+      },
+      {
+        "type": "color",
+        "id": "sc_badges_label_bg",
+        "label": "Background color",
+        "default": "#2b2b2b"
+      },
+      {
+        "type": "header",
+        "content": "Custom label 2"
+      },
+      {
+        "type": "paragraph",
+        "content": "Product tag format: __label2:New"
+      },
+      {
+        "type": "color",
+        "id": "sc_badges_label2_color",
+        "label": "Text color",
+        "default": "#ffffff"
+      },
+      {
+        "type": "color",
+        "id": "sc_badges_label2_bg",
+        "label": "Background color",
+        "default": "#1e316a"
+      },
+      {
+        "type": "paragraph",
+        "content": "Per-badge colors: create a metaobject \"product_badge\" with fields badge_name, color, background_color. Matching entries override these colors."
+      },
+      {
+        "type": "header",
+        "content": "Sold out badge"
+      },
+      {
+        "type": "checkbox",
+        "id": "sc_badges_show_sold_out",
+        "label": "Show sold out badge",
+        "default": true
+      },
+      {
+        "type": "color",
+        "id": "sc_badges_sold_out_color",
+        "label": "Text color",
+        "default": "#ffffff"
+      },
+      {
+        "type": "color",
+        "id": "sc_badges_sold_out_bg",
+        "label": "Background color",
+        "default": "#8a8a8a"
+      },
+      {
+        "type": "header",
+        "content": "Discount badge"
+      },
+      {
+        "type": "checkbox",
+        "id": "sc_badges_show_discount",
+        "label": "Show discount badge",
+        "default": true
+      },
+      {
+        "type": "select",
+        "id": "sc_badges_discount_mode",
+        "label": "Discount mode",
+        "options": [
+          {
+            "value": "percentage",
+            "label": "Percentage"
+          },
+          {
+            "value": "amount",
+            "label": "Amount"
+          }
+        ],
+        "default": "percentage"
+      },
+      {
+        "type": "text",
+        "id": "sc_badges_discount_text",
+        "label": "Discount text",
+        "info": "Use [amount] for the saving, e.g. -[amount] or Save [amount].",
+        "default": "-[amount]"
+      },
+      {
+        "type": "color",
+        "id": "sc_badges_discount_color",
+        "label": "Text color",
+        "default": "#ffffff"
+      },
+      {
+        "type": "color",
+        "id": "sc_badges_discount_bg",
+        "label": "Background color",
+        "default": "#c0392b"
+      }
+    ]
   }
 ]

@@ -119,6 +119,7 @@
                 {%- endif -%}
               </div>
             </div>
+            {%- render 'sc-product-labels', product: card_product, placement: 'card' -%}
             {%- if sc_quick_add_custom -%}
               {% render 'sc-quick-add-size-picker', card_product: card_product, section_id: section_id %}
             {%- endif -%}
