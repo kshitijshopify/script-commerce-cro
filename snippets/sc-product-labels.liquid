@@ -1,0 +1,161 @@
+{% comment %}
+  SC – Product Badges (tag-driven image labels)
+  ------------------------------------------------------------------
+  Small text badges over product images: custom tag labels, Sold out
+  and Discount. Settings live in Theme settings → "SC – Product Badges".
+
+  Install (any OS 2.0 theme):
+    1. layout/theme.liquid, before </body>:
+         {% render 'sc-product-labels', mode: 'assets' %}
+    2. Product card, inside the image wrapper (must be position: relative):
+         {% render 'sc-product-labels', product: card_product, placement: 'card' %}
+    3. PDP, inside the first media wrapper (position: relative):
+         {% render 'sc-product-labels', product: product, placement: 'pdp' %}
+
+  Tags:
+    __label:Bestseller   → style "Custom label 1"
+    __label2:New         → style "Custom label 2"
+  Optional metaobject `product_badge` (badge_name, color, background_color)
+  overrides colors per badge name (case-insensitive match).
+
+  Params:
+    mode       - 'assets' outputs the CSS only (render once per page)
+    product    - product object
+    placement  - 'card' (default) | 'pdp'
+{% endcomment %}
+
+{%- if mode == 'assets' -%}
+  {%- if settings.sc_badges_enable -%}
+    {%- liquid
+      assign sc_r = settings.sc_badges_radius | default: 0
+    -%}
+    <style>
+      .sc-badges {
+        position: absolute;
+        z-index: 2;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+        max-width: calc(100% - 20px);
+        pointer-events: none;
+        top: 10px;
+        left: 10px;
+      }
+      .sc-badges--top_right { left: auto; right: 10px; align-items: flex-end; }
+      .sc-badges--bottom_left { top: auto; bottom: 10px; }
+      .sc-badges--bottom_right { top: auto; left: auto; bottom: 10px; right: 10px; align-items: flex-end; }
+      .sc-badges__item {
+        display: inline-block;
+        max-width: 100%;
+        padding: 4px 8px;
+        border-radius: {{ sc_r }}px;
+        background: var(--sc-badge-bg, #1e316a);
+        color: var(--sc-badge-fg, #ffffff);
+        font-family: inherit;
+        font-size: 10px;
+        font-weight: 700;
+        line-height: 1.3;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .sc-badges__item--custom { --sc-badge-bg: {{ settings.sc_badges_label_bg }}; --sc-badge-fg: {{ settings.sc_badges_label_color }}; }
+      .sc-badges__item--custom2 { --sc-badge-bg: {{ settings.sc_badges_label2_bg }}; --sc-badge-fg: {{ settings.sc_badges_label2_color }}; }
+      .sc-badges__item--sold-out { --sc-badge-bg: {{ settings.sc_badges_sold_out_bg }}; --sc-badge-fg: {{ settings.sc_badges_sold_out_color }}; }
+      .sc-badges__item--discount { --sc-badge-bg: {{ settings.sc_badges_discount_bg }}; --sc-badge-fg: {{ settings.sc_badges_discount_color }}; }
+      .sc-badges__item[style] { background: var(--sc-badge-bg); color: var(--sc-badge-fg); }
+      @media screen and (min-width: 750px) {
+        .sc-badges { top: 14px; left: 14px; }
+        .sc-badges--top_right { left: auto; right: 14px; }
+        .sc-badges--bottom_left { top: auto; bottom: 14px; }
+        .sc-badges--bottom_right { top: auto; left: auto; bottom: 14px; right: 14px; }
+        .sc-badges__item { font-size: 12px; padding: 5px 10px; }
+      }
+      {%- if settings.sc_badges_hide_theme_badges %}
+        .card__badge { display: none !important; }
+      {%- endif %}
+    </style>
+  {%- endif -%}
+{%- else -%}
+  {%- liquid
+    assign sc_badges_render = false
+    if settings.sc_badges_enable and product != blank
+      assign sc_badges_render = true
+    endif
+    if placement == 'pdp' and settings.sc_badges_show_pdp == false
+      assign sc_badges_render = false
+    endif
+    assign sc_badge_defs = shop.metaobjects.product_badge.values
+  -%}
+{%- endif -%}
+
+{%- if sc_badges_render -%}
+
+{%- capture sc_badges_html -%}
+  {%- for tag in product.tags -%}
+    {%- if tag contains '__label' and tag contains ':' -%}
+      {%- liquid
+        assign sc_label = tag | split: ':' | last | strip
+        if sc_label == blank
+          continue
+        endif
+        assign sc_label_key = sc_label | downcase
+        assign sc_fg = ''
+        assign sc_bg = ''
+        for entry in sc_badge_defs
+          assign sc_entry_name = entry.badge_name.value | default: entry.badge_name | append: '' | strip | downcase
+          if sc_entry_name == sc_label_key
+            assign sc_fg = entry.color.value | default: entry.color | append: ''
+            assign sc_bg = entry.background_color.value | default: entry.background_color | append: ''
+            break
+          endif
+        endfor
+        assign sc_style_class = 'custom'
+        if tag contains '__label2'
+          assign sc_style_class = 'custom2'
+        endif
+      -%}
+      <span
+        class="sc-badges__item sc-badges__item--{{ sc_style_class }}"
+        {% if sc_fg != blank or sc_bg != blank %}
+          style="{% if sc_fg != blank %}--sc-badge-fg: {{ sc_fg }};{% endif %}{% if sc_bg != blank %}--sc-badge-bg: {{ sc_bg }};{% endif %}"
+        {% endif %}
+      >
+        {{- sc_label | escape -}}
+      </span>
+    {%- endif -%}
+  {%- endfor -%}
+
+  {%- if product.available == false -%}
+    {%- if settings.sc_badges_show_sold_out -%}
+      <span class="sc-badges__item sc-badges__item--sold-out">{{ 'products.product.sold_out' | t }}</span>
+    {%- endif -%}
+  {%- elsif settings.sc_badges_show_discount -%}
+    {%- liquid
+      assign sc_variant = product.selected_or_first_available_variant
+      assign sc_compare = sc_variant.compare_at_price | default: 0
+      assign sc_price = sc_variant.price
+    -%}
+    {%- if sc_compare > sc_price -%}
+      {%- liquid
+        if settings.sc_badges_discount_mode == 'amount'
+          assign sc_savings = sc_compare | minus: sc_price | money_without_trailing_zeros
+        else
+          assign sc_savings = sc_compare | minus: sc_price | times: 100.0 | divided_by: sc_compare | round | append: '%'
+        endif
+        assign sc_discount_text = settings.sc_badges_discount_text | default: '-[amount]' | replace: '[amount]', sc_savings
+      -%}
+      <span class="sc-badges__item sc-badges__item--discount">{{ sc_discount_text }}</span>
+    {%- endif -%}
+  {%- endif -%}
+{%- endcapture -%}
+
+{%- if sc_badges_html != blank -%}
+  <div class="sc-badges sc-badges--{{ settings.sc_badges_position | default: 'top_left' }}">
+    {{- sc_badges_html -}}
+  </div>
+{%- endif -%}
+{%- endif -%}
