@@ -27,6 +27,36 @@
           "type": "price",
           "settings": {}
         },
+        "sc_bulletpoints": {
+          "type": "sc_bulletpoints",
+          "settings": {
+            "metafield_key": "standard.cro_pdp_bulletpoints",
+            "max_items": 5,
+            "fallback_bullets": "",
+            "enable_formatting": true,
+            "space_top": 16,
+            "space_bottom": 16,
+            "gap_items": 3,
+            "show_border": true,
+            "border_color": "#eeeae9",
+            "border_radius": 6,
+            "box_padding": 16,
+            "background": "rgba(0,0,0,0)",
+            "text_color": "rgba(0,0,0,0)",
+            "list_style": "svg",
+            "icon_source": "auto",
+            "default_icon": "check",
+            "icon_as_svg": "",
+            "icon_as_size": 14,
+            "icon_width": 18,
+            "icon_color": "rgba(0,0,0,0)",
+            "icon_background": "rgba(0,0,0,0)",
+            "icon_margin_right": 8,
+            "font_size": 16,
+            "font_size_mobile": 16,
+            "font_weight": "inherit"
+          }
+        },
         "variant_picker": {
           "type": "variant_picker",
           "disabled": true,
@@ -39,72 +69,22 @@
           "type": "sc_pdp_variant_cards",
           "settings": {
             "enable": true,
-            "hide_theme_picker": true,
-            "theme_picker_selector": "",
-            "hide_sold_out": false,
-            "sold_out_text": "Sold out",
-            "sold_out_opacity": 55,
-            "show_heading": true,
             "heading_text": "[option]: [value]",
-            "heading_size": 15,
-            "heading_size_mobile": 14,
-            "heading_color": "#6b6b6b",
-            "heading_value_color": "#1a1a1a",
-            "title_source": "variant_title",
             "show_price": false,
-            "show_compare_at": true,
             "show_unit_price": true,
-            "unit_price_fallback": true,
-            "unit_source": "auto",
-            "unit_format": "[price]/[unit]",
             "mass_unit": "kg",
-            "volume_unit": "l",
-            "qty_metafield": "custom.unit_quantity",
-            "qty_metafield_unit": "kg",
-            "qty_metafield_unit_label": "pc",
-            "show_savings": true,
-            "savings_basis": "unit_price",
-            "savings_reference": "first",
-            "savings_rounding": "round",
-            "savings_min": 1,
             "savings_text": "Save [percent]%",
-            "savings_style": "bar",
             "savings_bg": "#4a4a4a",
             "savings_color": "#ffffff",
-            "savings_size": 14,
-            "show_popular": true,
-            "popular_metafield": "custom.popular_variant",
             "popular_label": "Bestseller",
             "popular_bg": "#f5a623",
             "popular_color": "#1a1a1a",
-            "popular_size": 13,
-            "popular_border": "",
             "columns_desktop": 4,
-            "columns_tablet": 4,
-            "mobile_layout": "scroll",
-            "mobile_card_width": 40,
-            "columns_mobile": 2,
-            "gap": 10,
-            "gap_mobile": 8,
-            "text_align": "center",
-            "mobile_breakpoint": 750,
-            "card_padding_y": 14,
-            "card_padding_x": 8,
             "card_radius": 10,
-            "border_width": 1,
-            "selected_border_width": 3,
-            "card_bg": "#ffffff",
             "card_border": "#d4d4d4",
+            "selected_border": "#1a1a1a",
             "card_text": "#1a1a1a",
             "card_muted": "#7a7a7a",
-            "selected_bg": "#ffffff",
-            "selected_border": "#1a1a1a",
-            "hover_border": "#8c8c8c",
-            "title_size": 16,
-            "title_size_mobile": 15,
-            "title_weight": "500",
-            "price_size": 15,
-            "price_size_mobile": 14,
             "margin_top": 8,
             "margin_bottom": 20
           }
@@ -466,34 +446,6 @@
           "settings": {
             "share_label": "Share"
           }
-        },
-        "sc_bulletpoints": {
-          "type": "sc_bulletpoints",
-          "settings": {
-            "metafield_key": "standard.cro_pdp_bulletpoints",
-            "max_items": 5,
-            "enable_formatting": true,
-            "space_top": 16,
-            "space_bottom": 16,
-            "gap_items": 3,
-            "show_border": true,
-            "border_color": "#EEEAE9",
-            "border_radius": 6,
-            "box_padding": 16,
-            "background": "rgba(0,0,0,0)",
-            "text_color": "rgba(0,0,0,0)",
-            "list_style": "svg",
-            "icon_source": "auto",
-            "default_icon": "check",
-            "icon_as_size": 14,
-            "icon_width": 18,
-            "icon_color": "rgba(0,0,0,0)",
-            "icon_background": "rgba(0,0,0,0)",
-            "icon_margin_right": 8,
-            "font_size": 16,
-            "font_size_mobile": 16,
-            "font_weight": "inherit"
-          }
         }
       },
       "block_order": [
@@ -528,6 +480,103 @@
         "enable_video_looping": false,
         "padding_top": 36,
         "padding_bottom": 12
+      }
+    },
+    "sc_pdp_product_tabs_qWKKc3": {
+      "type": "sc-pdp-product-tabs",
+      "blocks": {
+        "description_nPta76": {
+          "type": "description",
+          "settings": {
+            "title": "Description",
+            "area_expanded": true
+          }
+        },
+        "faq_fkJJK8": {
+          "type": "faq",
+          "settings": {
+            "title": "FAQ's",
+            "area_expanded": false,
+            "faq_title_1": "How long does shipping take?",
+            "faq_content_1": "<p>Most orders arrive within 3–5 business days.</p>",
+            "faq_open_default_1": false,
+            "faq_title_2": "Can I return my order?",
+            "faq_content_2": "<p>Yes, returns are accepted within 30 days of delivery.</p>",
+            "faq_open_default_2": false,
+            "faq_title_3": "",
+            "faq_content_3": "",
+            "faq_open_default_3": false,
+            "faq_title_4": "",
+            "faq_content_4": "",
+            "faq_open_default_4": false,
+            "faq_title_5": "",
+            "faq_content_5": "",
+            "faq_open_default_5": false,
+            "faq_title_6": "",
+            "faq_content_6": "",
+            "faq_open_default_6": false,
+            "faq_title_7": "",
+            "faq_content_7": "",
+            "faq_open_default_7": false,
+            "faq_title_8": "",
+            "faq_content_8": "",
+            "faq_open_default_8": false,
+            "faq_title_9": "",
+            "faq_content_9": "",
+            "faq_open_default_9": false,
+            "faq_title_10": "",
+            "faq_content_10": "",
+            "faq_open_default_10": false,
+            "faq_title_11": "",
+            "faq_content_11": "",
+            "faq_open_default_11": false,
+            "faq_title_12": "",
+            "faq_content_12": "",
+            "faq_open_default_12": false
+          }
+        },
+        "content_yTmycE": {
+          "type": "content",
+          "settings": {
+            "title": "Shipping",
+            "area_expanded": false,
+            "content": "<p>Free shipping on all orders. Orders are processed within 1–2 business days.</p>",
+            "page": ""
+          }
+        },
+        "liquid_FxKt3P": {
+          "type": "liquid",
+          "settings": {
+            "title": "Size",
+            "area_expanded": false,
+            "liquid": ""
+          }
+        }
+      },
+      "block_order": [
+        "description_nPta76",
+        "faq_fkJJK8",
+        "content_yTmycE",
+        "liquid_FxKt3P"
+      ],
+      "name": "SC PDP Product Tabs",
+      "settings": {
+        "section_width": "container",
+        "enable_custom_max_width": true,
+        "custom_max_width": 930,
+        "text_color": "",
+        "background": "",
+        "border_color": "",
+        "tab_font_size": 13,
+        "tab_gap": 56,
+        "space_top": 60,
+        "space_bottom": 60,
+        "space_left": 0,
+        "space_right": 0,
+        "space_top_mobile": 40,
+        "space_bottom_mobile": 40,
+        "space_left_mobile": 0,
+        "space_right_mobile": 0
       }
     },
     "sc_sticky_atc_KMbGMa": {
@@ -651,6 +700,7 @@
   },
   "order": [
     "main",
+    "sc_pdp_product_tabs_qWKKc3",
     "sc_sticky_atc_KMbGMa",
     "disclosures",
     "related-products"
