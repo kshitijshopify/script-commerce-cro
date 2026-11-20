@@ -1,0 +1,718 @@
+{%- comment -%}
+  SC – PDP Product Tabs
+  Horizontal tabs on desktop (>= 750px), accordion on mobile.
+  Both layouts share ONE rendered copy of each block's content (no duplicated
+  Custom Liquid / app embeds). Self-contained: Liquid + CSS + JS in this file.
+
+  Blocks: Description (product.description) · FAQ (up to 12 Q&A) ·
+          Content (rich text or linked Page) · Custom Liquid (tables, metafields, apps)
+  Tip: rich text settings can't hold tables – use a linked Page or a Custom Liquid block.
+{%- endcomment -%}
+
+{%- liquid
+  assign s = section.settings
+  assign sid = section.id
+
+  assign text_color = blank
+  if s.text_color != blank and s.text_color.alpha != 0
+    assign text_color = s.text_color
+  endif
+
+  assign bg_color = blank
+  if s.background != blank and s.background.alpha != 0
+    assign bg_color = s.background
+  endif
+
+  assign border_color = blank
+  if s.border_color != blank and s.border_color.alpha != 0
+    assign border_color = s.border_color
+  endif
+-%}
+
+<style>
+  #sc-pt-{{ sid }} {
+    --sc-pt-pt: {{ s.space_top }}px;
+    --sc-pt-pb: {{ s.space_bottom }}px;
+    --sc-pt-pl: {{ s.space_left }}px;
+    --sc-pt-pr: {{ s.space_right }}px;
+    --sc-pt-pt-m: {{ s.space_top_mobile }}px;
+    --sc-pt-pb-m: {{ s.space_bottom_mobile }}px;
+    --sc-pt-pl-m: {{ s.space_left_mobile }}px;
+    --sc-pt-pr-m: {{ s.space_right_mobile }}px;
+    --sc-pt-tab-size: {{ s.tab_font_size }}px;
+    --sc-pt-tab-gap: {{ s.tab_gap }}px;
+    --sc-pt-border: {% if border_color != blank %}{{ border_color }}{% else %}rgba(127, 127, 127, 0.3){% endif %};
+    --sc-pt-max: {% if s.enable_custom_max_width %}{{ s.custom_max_width }}px{% else %}none{% endif %};
+    {%- if text_color != blank %}color: {{ text_color }};{% endif %}
+    {%- if bg_color != blank %}background: {{ bg_color }};{% endif %}
+    display: block;
+    padding: var(--sc-pt-pt-m) var(--sc-pt-pr-m) var(--sc-pt-pb-m) var(--sc-pt-pl-m);
+  }
+  @media screen and (min-width: 750px) {
+    #sc-pt-{{ sid }} { padding: var(--sc-pt-pt) var(--sc-pt-pr) var(--sc-pt-pb) var(--sc-pt-pl); }
+  }
+
+  #sc-pt-{{ sid }} .sc-pt__container { width: 100%; margin: 0 auto; box-sizing: border-box; }
+  #sc-pt-{{ sid }} .sc-pt__container--container { max-width: 1200px; padding: 0 20px; }
+  #sc-pt-{{ sid }} .sc-pt__inner { max-width: var(--sc-pt-max); margin: 0 auto; }
+
+  /* Button reset (themes often style <button> globally) */
+  #sc-pt-{{ sid }} .sc-pt__btn {
+    -webkit-appearance: none; appearance: none;
+    background: none; border: 0; border-radius: 0; box-shadow: none;
+    margin: 0; padding: 0; min-height: 0; min-width: 0;
+    color: inherit; font: inherit; text-align: left; text-decoration: none;
+    cursor: pointer; touch-action: manipulation;
+  }
+  #sc-pt-{{ sid }} .sc-pt__btn:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
+  #sc-pt-{{ sid }} .sc-pt__btn::before,
+  #sc-pt-{{ sid }} .sc-pt__btn::after { content: none; }
+
+  #sc-pt-{{ sid }} .sc-pt__label {
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-size: var(--sc-pt-tab-size);
+    line-height: 1.3;
+  }
+
+  /* ---------- Desktop tab nav ---------- */
+  #sc-pt-{{ sid }} .sc-pt__nav { display: none; }
+
+  /* ---------- Collapse (grid 0fr -> 1fr height animation) ---------- */
+  #sc-pt-{{ sid }} .sc-pt__collapse {
+    display: grid;
+    grid-template-rows: 0fr;
+    visibility: hidden;
+    transition: grid-template-rows 0.35s ease, visibility 0s linear 0.35s;
+  }
+  #sc-pt-{{ sid }} .is-open > .sc-pt__collapse {
+    grid-template-rows: 1fr;
+    visibility: visible;
+    transition: grid-template-rows 0.35s ease, visibility 0s linear 0s;
+  }
+  #sc-pt-{{ sid }} .sc-pt__collapse-inner { overflow: hidden; min-height: 0; }
+
+  /* ---------- Accordion heading (mobile blocks + FAQ items) ---------- */
+  #sc-pt-{{ sid }} .sc-pt__toggle {
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    width: 100%; padding: 18px 0;
+  }
+  #sc-pt-{{ sid }} .sc-pt__toggle .sc-pt__label { opacity: 0.65; transition: opacity 0.25s ease; }
+  #sc-pt-{{ sid }} .sc-pt__toggle[aria-expanded="true"] .sc-pt__label,
+  #sc-pt-{{ sid }} .sc-pt__toggle:hover .sc-pt__label { opacity: 1; }
+  #sc-pt-{{ sid }} .sc-pt__icon {
+    flex: 0 0 auto; width: 14px; height: 14px;
+    transition: transform 0.3s ease;
+  }
+  #sc-pt-{{ sid }} .sc-pt__toggle[aria-expanded="true"] .sc-pt__icon { transform: rotate(180deg); }
+
+  #sc-pt-{{ sid }} .sc-pt__item { border-top: 1px solid var(--sc-pt-border); }
+  #sc-pt-{{ sid }} .sc-pt__item:last-child { border-bottom: 1px solid var(--sc-pt-border); }
+
+  #sc-pt-{{ sid }} .sc-pt__panel { padding: 0 0 20px; }
+
+  /* FAQ items inside a block */
+  #sc-pt-{{ sid }} .sc-pt__faq + .sc-pt__faq { border-top: 1px solid var(--sc-pt-border); }
+  #sc-pt-{{ sid }} .sc-pt__faq .sc-pt__toggle { padding: 14px 0; }
+  #sc-pt-{{ sid }} .sc-pt__faq .sc-pt__label { text-transform: none; letter-spacing: normal; font-size: calc(var(--sc-pt-tab-size) + 2px); }
+  #sc-pt-{{ sid }} .sc-pt__faq .sc-pt__answer { padding: 0 0 16px; }
+
+  /* ---------- Content (rich text, pages, tables) ---------- */
+  #sc-pt-{{ sid }} .sc-pt__content { overflow-x: auto; line-height: 1.6; }
+  #sc-pt-{{ sid }} .sc-pt__content > :first-child { margin-top: 0; }
+  #sc-pt-{{ sid }} .sc-pt__content > :last-child { margin-bottom: 0; }
+  #sc-pt-{{ sid }} .sc-pt__content img,
+  #sc-pt-{{ sid }} .sc-pt__content video,
+  #sc-pt-{{ sid }} .sc-pt__content iframe { max-width: 100%; height: auto; }
+  #sc-pt-{{ sid }} .sc-pt__content table { width: 100%; border-collapse: collapse; margin: 0 0 1em; }
+  #sc-pt-{{ sid }} .sc-pt__content th,
+  #sc-pt-{{ sid }} .sc-pt__content td {
+    border: 1px solid var(--sc-pt-border); padding: 0.75em 1em; text-align: left; vertical-align: top;
+  }
+  #sc-pt-{{ sid }} .sc-pt__content th { font-weight: 600; }
+  #sc-pt-{{ sid }} .sc-pt__note { opacity: 0.6; font-style: italic; }
+
+  /* ---------- Desktop ---------- */
+  @media screen and (min-width: 750px) {
+    #sc-pt-{{ sid }} .sc-pt__nav {
+      display: flex; gap: var(--sc-pt-tab-gap);
+      position: relative;
+      border-bottom: 1px solid var(--sc-pt-border);
+      overflow-x: auto; scrollbar-width: none;
+    }
+    #sc-pt-{{ sid }} .sc-pt__nav::-webkit-scrollbar { display: none; }
+    #sc-pt-{{ sid }} .sc-pt__tab { flex: 0 0 auto; padding: 0 0 18px; white-space: nowrap; }
+    #sc-pt-{{ sid }} .sc-pt__tab .sc-pt__label { opacity: 0.6; transition: opacity 0.25s ease; }
+    #sc-pt-{{ sid }} .sc-pt__tab:hover .sc-pt__label { opacity: 0.85; }
+    #sc-pt-{{ sid }} .sc-pt__tab[aria-selected="true"] .sc-pt__label { opacity: 1; }
+    #sc-pt-{{ sid }} .sc-pt__indicator {
+      position: absolute; left: 0; bottom: 0; height: 2px; width: 0;
+      background: currentColor; pointer-events: none;
+      transition: transform 0.3s ease, width 0.3s ease;
+    }
+    #sc-pt-{{ sid }} .sc-pt__nav:not([data-ready]) .sc-pt__indicator { transition: none; }
+
+    #sc-pt-{{ sid }} .sc-pt__items { margin-top: 32px; }
+    #sc-pt-{{ sid }} .sc-pt__item { display: none; border: 0; }
+    #sc-pt-{{ sid }} .sc-pt__item.is-active { display: block; animation: sc-pt-fade-{{ sid }} 0.4s ease; }
+    #sc-pt-{{ sid }} .sc-pt__item > .sc-pt__toggle { display: none; }
+    #sc-pt-{{ sid }} .sc-pt__item > .sc-pt__collapse { grid-template-rows: 1fr; visibility: visible; transition: none; }
+    #sc-pt-{{ sid }} .sc-pt__item > .sc-pt__collapse > .sc-pt__collapse-inner { overflow: visible; }
+    #sc-pt-{{ sid }} .sc-pt__panel { padding: 0; }
+    #sc-pt-{{ sid }} .sc-pt__faq:first-child .sc-pt__toggle { padding-top: 0; }
+  }
+
+  @keyframes sc-pt-fade-{{ sid }} {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: none; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    #sc-pt-{{ sid }} *, #sc-pt-{{ sid }} *::before, #sc-pt-{{ sid }} *::after {
+      animation: none !important; transition: none !important;
+    }
+  }
+</style>
+
+{%- capture sc_pt_chevron -%}
+  <svg class="sc-pt__icon" viewBox="0 0 14 14" fill="none" aria-hidden="true" focusable="false"><path d="M2 5l5 5 5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+{%- endcapture -%}
+
+<sc-product-tabs id="sc-pt-{{ sid }}" class="sc-pt">
+  <div class="sc-pt__container sc-pt__container--{{ s.section_width }}">
+    <div class="sc-pt__inner">
+      {%- if section.blocks.size > 0 -%}
+        {%- comment -%} Desktop tab nav {%- endcomment -%}
+        <div class="sc-pt__nav" role="tablist" data-sc-pt-nav>
+          {%- for block in section.blocks -%}
+            {%- assign tab_title = block.settings.title | default: block.type | capitalize -%}
+            <button
+              type="button"
+              class="sc-pt__btn sc-pt__tab"
+              id="ScPtTab-{{ sid }}-{{ block.id }}"
+              role="tab"
+              aria-selected="{% if forloop.first %}true{% else %}false{% endif %}"
+              aria-controls="ScPtPanel-{{ sid }}-{{ block.id }}"
+              tabindex="{% if forloop.first %}0{% else %}-1{% endif %}"
+              data-sc-pt-tab
+            >
+              <span class="sc-pt__label">{{ tab_title | escape }}</span>
+            </button>
+          {%- endfor -%}
+          <span class="sc-pt__indicator" aria-hidden="true" data-sc-pt-indicator></span>
+        </div>
+
+        {%- comment -%} Shared content: accordion items on mobile, tab panels on desktop {%- endcomment -%}
+        <div class="sc-pt__items">
+          {%- for block in section.blocks -%}
+            {%- assign tab_title = block.settings.title | default: block.type | capitalize -%}
+            <div
+              class="sc-pt__item{% if forloop.first %} is-active{% endif %}{% if block.settings.area_expanded %} is-open{% endif %}"
+              data-sc-pt-item
+              data-sc-pt-acc
+              {{ block.shopify_attributes }}
+            >
+              <button
+                type="button"
+                class="sc-pt__btn sc-pt__toggle"
+                aria-expanded="{% if block.settings.area_expanded %}true{% else %}false{% endif %}"
+                aria-controls="ScPtPanel-{{ sid }}-{{ block.id }}"
+                data-sc-pt-toggle
+              >
+                <span class="sc-pt__label">{{ tab_title | escape }}</span>
+                {{ sc_pt_chevron }}
+              </button>
+
+              <div class="sc-pt__collapse">
+                <div class="sc-pt__collapse-inner">
+                  <div
+                    class="sc-pt__panel"
+                    id="ScPtPanel-{{ sid }}-{{ block.id }}"
+                    role="tabpanel"
+                    aria-labelledby="ScPtTab-{{ sid }}-{{ block.id }}"
+                  >
+                    {%- case block.type -%}
+                      {%- when 'description' -%}
+                        <div class="sc-pt__content">
+                          {%- if product != blank and product.description != blank -%}
+                            {{- product.description -}}
+                          {%- elsif request.design_mode -%}
+                            <p class="sc-pt__note">The product description will appear here on product pages.</p>
+                          {%- endif -%}
+                        </div>
+
+                      {%- when 'content' -%}
+                        <div class="sc-pt__content">
+                          {%- if block.settings.page != blank -%}
+                            {{- block.settings.page.content -}}
+                          {%- else -%}
+                            {{- block.settings.content -}}
+                          {%- endif -%}
+                        </div>
+
+                      {%- when 'liquid' -%}
+                        <div class="sc-pt__content">{{- block.settings.liquid -}}</div>
+
+                      {%- when 'faq' -%}
+                        <div class="sc-pt__faqs">
+                          {%- for i in (1..12) -%}
+                            {%- assign q_key = 'faq_title_' | append: i -%}
+                            {%- assign a_key = 'faq_content_' | append: i -%}
+                            {%- assign o_key = 'faq_open_default_' | append: i -%}
+                            {%- assign q = block.settings[q_key] -%}
+                            {%- assign a = block.settings[a_key] -%}
+                            {%- assign o = block.settings[o_key] -%}
+                            {%- if q != blank or a != blank -%}
+                              <div class="sc-pt__faq{% if o %} is-open{% endif %}" data-sc-pt-acc>
+                                <button
+                                  type="button"
+                                  class="sc-pt__btn sc-pt__toggle"
+                                  aria-expanded="{% if o %}true{% else %}false{% endif %}"
+                                  aria-controls="ScPtFaq-{{ sid }}-{{ block.id }}-{{ i }}"
+                                  data-sc-pt-toggle
+                                >
+                                  <span class="sc-pt__label">{{ q | escape }}</span>
+                                  {{ sc_pt_chevron }}
+                                </button>
+                                <div class="sc-pt__collapse" id="ScPtFaq-{{ sid }}-{{ block.id }}-{{ i }}">
+                                  <div class="sc-pt__collapse-inner">
+                                    <div class="sc-pt__answer sc-pt__content">{{ a }}</div>
+                                  </div>
+                                </div>
+                              </div>
+                            {%- endif -%}
+                          {%- endfor -%}
+                        </div>
+                    {%- endcase -%}
+                  </div>
+                </div>
+              </div>
+            </div>
+          {%- endfor -%}
+        </div>
+      {%- endif -%}
+    </div>
+  </div>
+</sc-product-tabs>
+
+<script>
+  (function () {
+    if (customElements.get('sc-product-tabs')) return;
+
+    class ScProductTabs extends HTMLElement {
+      connectedCallback() {
+        this.nav = this.querySelector('[data-sc-pt-nav]');
+        this.tabs = Array.from(this.querySelectorAll('[data-sc-pt-tab]'));
+        this.items = Array.from(this.querySelectorAll('[data-sc-pt-item]'));
+        this.indicator = this.querySelector('[data-sc-pt-indicator]');
+        if (!this.tabs.length) return;
+
+        this.tabs.forEach((tab, i) => {
+          tab.addEventListener('click', () => this.activate(i));
+          tab.addEventListener('keydown', (e) => this.onKey(e, i));
+        });
+
+        this.querySelectorAll('[data-sc-pt-toggle]').forEach((btn) => {
+          btn.addEventListener('click', () => this.toggle(btn));
+        });
+
+        this.moveIndicator = this.moveIndicator.bind(this);
+        if ('ResizeObserver' in window) {
+          this.ro = new ResizeObserver(this.moveIndicator);
+          this.ro.observe(this.nav);
+        } else {
+          window.addEventListener('resize', this.moveIndicator);
+        }
+        if (document.fonts && document.fonts.ready) document.fonts.ready.then(this.moveIndicator);
+        this.moveIndicator();
+        requestAnimationFrame(() => this.nav.setAttribute('data-ready', ''));
+
+        this.onBlockSelect = this.onBlockSelect.bind(this);
+        document.addEventListener('shopify:block:select', this.onBlockSelect);
+      }
+
+      disconnectedCallback() {
+        if (this.ro) this.ro.disconnect();
+        window.removeEventListener('resize', this.moveIndicator);
+        document.removeEventListener('shopify:block:select', this.onBlockSelect);
+      }
+
+      activate(index, focus) {
+        this.tabs.forEach((tab, i) => {
+          const active = i === index;
+          tab.setAttribute('aria-selected', active ? 'true' : 'false');
+          tab.setAttribute('tabindex', active ? '0' : '-1');
+          this.items[i].classList.toggle('is-active', active);
+        });
+        if (focus) this.tabs[index].focus();
+        this.moveIndicator();
+      }
+
+      onKey(e, i) {
+        const n = this.tabs.length;
+        let next = null;
+        if (e.key === 'ArrowRight') next = (i + 1) % n;
+        else if (e.key === 'ArrowLeft') next = (i - 1 + n) % n;
+        else if (e.key === 'Home') next = 0;
+        else if (e.key === 'End') next = n - 1;
+        if (next === null) return;
+        e.preventDefault();
+        this.activate(next, true);
+      }
+
+      moveIndicator() {
+        const active = this.tabs.find((t) => t.getAttribute('aria-selected') === 'true');
+        if (!active || !this.indicator) return;
+        this.indicator.style.width = active.offsetWidth + 'px';
+        this.indicator.style.transform = 'translateX(' + active.offsetLeft + 'px)';
+      }
+
+      toggle(btn, forceOpen) {
+        const wrap = btn.closest('[data-sc-pt-acc]');
+        const open = forceOpen === undefined ? btn.getAttribute('aria-expanded') !== 'true' : forceOpen;
+        btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        wrap.classList.toggle('is-open', open);
+      }
+
+      onBlockSelect(e) {
+        if (!this.contains(e.target)) return;
+        const index = this.items.indexOf(e.target.closest('[data-sc-pt-item]'));
+        if (index < 0) return;
+        this.activate(index);
+        const btn = this.items[index].querySelector(':scope > [data-sc-pt-toggle]');
+        if (btn) this.toggle(btn, true);
+      }
+    }
+
+    customElements.define('sc-product-tabs', ScProductTabs);
+  })();
+</script>
+
+{% schema %}
+{
+  "name": "SC PDP Product Tabs",
+  "tag": "section",
+  "class": "sc-pt-section",
+  "enabled_on": {
+    "templates": ["product"]
+  },
+  "settings": [
+    {
+      "type": "header",
+      "content": "Layout"
+    },
+    {
+      "type": "select",
+      "id": "section_width",
+      "label": "Section width",
+      "options": [
+        { "value": "container", "label": "Container" },
+        { "value": "full", "label": "Full" }
+      ],
+      "default": "container"
+    },
+    {
+      "type": "checkbox",
+      "id": "enable_custom_max_width",
+      "label": "Custom max-width",
+      "default": true
+    },
+    {
+      "type": "range",
+      "id": "custom_max_width",
+      "min": 150,
+      "max": 1500,
+      "step": 15,
+      "unit": "px",
+      "label": "Max-width",
+      "default": 930
+    },
+    {
+      "type": "header",
+      "content": "Style"
+    },
+    {
+      "type": "color",
+      "id": "text_color",
+      "label": "Text color",
+      "info": "Leave empty/transparent to use the theme's text color."
+    },
+    {
+      "type": "color",
+      "id": "background",
+      "label": "Background",
+      "info": "Leave empty/transparent to use the theme's background."
+    },
+    {
+      "type": "color",
+      "id": "border_color",
+      "label": "Divider color",
+      "info": "Leave empty for a subtle default."
+    },
+    {
+      "type": "range",
+      "id": "tab_font_size",
+      "min": 10,
+      "max": 22,
+      "step": 1,
+      "unit": "px",
+      "label": "Tab title size",
+      "default": 13
+    },
+    {
+      "type": "range",
+      "id": "tab_gap",
+      "min": 12,
+      "max": 120,
+      "step": 4,
+      "unit": "px",
+      "label": "Space between tabs (desktop)",
+      "default": 56
+    },
+    {
+      "type": "header",
+      "content": "Section spacing"
+    },
+    {
+      "type": "range",
+      "id": "space_top",
+      "min": 0,
+      "max": 200,
+      "step": 5,
+      "unit": "px",
+      "label": "Top",
+      "default": 60
+    },
+    {
+      "type": "range",
+      "id": "space_bottom",
+      "min": 0,
+      "max": 200,
+      "step": 5,
+      "unit": "px",
+      "label": "Bottom",
+      "default": 60
+    },
+    {
+      "type": "range",
+      "id": "space_left",
+      "min": 0,
+      "max": 100,
+      "step": 5,
+      "unit": "px",
+      "label": "Left",
+      "default": 0
+    },
+    {
+      "type": "range",
+      "id": "space_right",
+      "min": 0,
+      "max": 100,
+      "step": 5,
+      "unit": "px",
+      "label": "Right",
+      "default": 0
+    },
+    {
+      "type": "header",
+      "content": "Section spacing (Mobile)"
+    },
+    {
+      "type": "range",
+      "id": "space_top_mobile",
+      "min": 0,
+      "max": 100,
+      "step": 5,
+      "unit": "px",
+      "label": "Top (mobile)",
+      "default": 40
+    },
+    {
+      "type": "range",
+      "id": "space_bottom_mobile",
+      "min": 0,
+      "max": 100,
+      "step": 5,
+      "unit": "px",
+      "label": "Bottom (mobile)",
+      "default": 40
+    },
+    {
+      "type": "range",
+      "id": "space_left_mobile",
+      "min": 0,
+      "max": 50,
+      "step": 2,
+      "unit": "px",
+      "label": "Left (mobile)",
+      "default": 0
+    },
+    {
+      "type": "range",
+      "id": "space_right_mobile",
+      "min": 0,
+      "max": 50,
+      "step": 2,
+      "unit": "px",
+      "label": "Right (mobile)",
+      "default": 0
+    }
+  ],
+  "blocks": [
+    {
+      "type": "description",
+      "name": "Description",
+      "limit": 1,
+      "settings": [
+        {
+          "type": "text",
+          "id": "title",
+          "label": "Title",
+          "default": "Description"
+        },
+        {
+          "type": "checkbox",
+          "id": "area_expanded",
+          "label": "Expanded by default (mobile)",
+          "default": true
+        },
+        {
+          "type": "paragraph",
+          "content": "Shows the product description automatically."
+        }
+      ]
+    },
+    {
+      "type": "faq",
+      "name": "FAQ",
+      "settings": [
+        {
+          "type": "text",
+          "id": "title",
+          "label": "Title",
+          "default": "FAQ's"
+        },
+        {
+          "type": "checkbox",
+          "id": "area_expanded",
+          "label": "Expanded by default (mobile)",
+          "default": false
+        },
+        {"type":"header","content":"FAQ item 01"},
+        {"type":"text","id":"faq_title_1","label":"Question","default":"How long does shipping take?"},
+        {"type":"richtext","id":"faq_content_1","label":"Answer","default":"<p>Most orders arrive within 3–5 business days.</p>"},
+        {"type":"checkbox","id":"faq_open_default_1","label":"Open by default","default":false},
+        {"type":"header","content":"FAQ item 02"},
+        {"type":"text","id":"faq_title_2","label":"Question","default":"Can I return my order?"},
+        {"type":"richtext","id":"faq_content_2","label":"Answer","default":"<p>Yes, returns are accepted within 30 days of delivery.</p>"},
+        {"type":"checkbox","id":"faq_open_default_2","label":"Open by default","default":false},
+        {"type":"header","content":"FAQ item 03"},
+        {"type":"text","id":"faq_title_3","label":"Question"},
+        {"type":"richtext","id":"faq_content_3","label":"Answer"},
+        {"type":"checkbox","id":"faq_open_default_3","label":"Open by default","default":false},
+        {"type":"header","content":"FAQ item 04"},
+        {"type":"text","id":"faq_title_4","label":"Question"},
+        {"type":"richtext","id":"faq_content_4","label":"Answer"},
+        {"type":"checkbox","id":"faq_open_default_4","label":"Open by default","default":false},
+        {"type":"header","content":"FAQ item 05"},
+        {"type":"text","id":"faq_title_5","label":"Question"},
+        {"type":"richtext","id":"faq_content_5","label":"Answer"},
+        {"type":"checkbox","id":"faq_open_default_5","label":"Open by default","default":false},
+        {"type":"header","content":"FAQ item 06"},
+        {"type":"text","id":"faq_title_6","label":"Question"},
+        {"type":"richtext","id":"faq_content_6","label":"Answer"},
+        {"type":"checkbox","id":"faq_open_default_6","label":"Open by default","default":false},
+        {"type":"header","content":"FAQ item 07"},
+        {"type":"text","id":"faq_title_7","label":"Question"},
+        {"type":"richtext","id":"faq_content_7","label":"Answer"},
+        {"type":"checkbox","id":"faq_open_default_7","label":"Open by default","default":false},
+        {"type":"header","content":"FAQ item 08"},
+        {"type":"text","id":"faq_title_8","label":"Question"},
+        {"type":"richtext","id":"faq_content_8","label":"Answer"},
+        {"type":"checkbox","id":"faq_open_default_8","label":"Open by default","default":false},
+        {"type":"header","content":"FAQ item 09"},
+        {"type":"text","id":"faq_title_9","label":"Question"},
+        {"type":"richtext","id":"faq_content_9","label":"Answer"},
+        {"type":"checkbox","id":"faq_open_default_9","label":"Open by default","default":false},
+        {"type":"header","content":"FAQ item 10"},
+        {"type":"text","id":"faq_title_10","label":"Question"},
+        {"type":"richtext","id":"faq_content_10","label":"Answer"},
+        {"type":"checkbox","id":"faq_open_default_10","label":"Open by default","default":false},
+        {"type":"header","content":"FAQ item 11"},
+        {"type":"text","id":"faq_title_11","label":"Question"},
+        {"type":"richtext","id":"faq_content_11","label":"Answer"},
+        {"type":"checkbox","id":"faq_open_default_11","label":"Open by default","default":false},
+        {"type":"header","content":"FAQ item 12"},
+        {"type":"text","id":"faq_title_12","label":"Question"},
+        {"type":"richtext","id":"faq_content_12","label":"Answer"},
+        {"type":"checkbox","id":"faq_open_default_12","label":"Open by default","default":false}
+      ]
+    },
+    {
+      "type": "content",
+      "name": "Content",
+      "settings": [
+        {
+          "type": "text",
+          "id": "title",
+          "label": "Title",
+          "default": "Shipping"
+        },
+        {
+          "type": "checkbox",
+          "id": "area_expanded",
+          "label": "Expanded by default (mobile)",
+          "default": false
+        },
+        {
+          "type": "richtext",
+          "id": "content",
+          "label": "Content",
+          "default": "<p>Free shipping on all orders. Orders are processed within 1–2 business days.</p>"
+        },
+        {
+          "type": "page",
+          "id": "page",
+          "label": "Content from page",
+          "info": "If selected, the page content is shown instead of the text above. Use a page for tables."
+        }
+      ]
+    },
+    {
+      "type": "liquid",
+      "name": "Custom Liquid",
+      "settings": [
+        {
+          "type": "text",
+          "id": "title",
+          "label": "Title",
+          "default": "Size"
+        },
+        {
+          "type": "checkbox",
+          "id": "area_expanded",
+          "label": "Expanded by default (mobile)",
+          "default": false
+        },
+        {
+          "type": "liquid",
+          "id": "liquid",
+          "label": "Custom Liquid",
+          "info": "HTML, tables, app snippets or metafields, e.g. {{ product.metafields.custom.size_guide | metafield_tag }}"
+        }
+      ]
+    }
+  ],
+  "presets": [
+    {
+      "name": "SC PDP Product Tabs",
+      "blocks": [
+        { "type": "description" },
+        { "type": "faq" },
+        { "type": "content" },
+        { "type": "liquid" }
+      ]
+    }
+  ]
+}
+{% endschema %}
