@@ -5147,15 +5147,21 @@
           "content": "Content"
         },
         {
+          "type": "checkbox",
+          "id": "enable",
+          "label": "Show bulletpoints",
+          "default": true
+        },
+        {
           "type": "paragraph",
-          "content": "Bullets come from a product metafield (Single line text – List of values). Default: standard.cro_pdp_bulletpoints. Formatting: **bold**, *italic*, __underline__."
+          "content": "Place under the price. A product metafield replaces the bullets below when it has a value. Title, icon, colours and spacing always come from these settings. Metafield: custom.cro_pdp_bulletpoints — Single line text, list of values. Each value is Lead | explanation."
         },
         {
           "type": "text",
           "id": "metafield_key",
           "label": "Metafield (namespace.key)",
-          "default": "standard.cro_pdp_bulletpoints",
-          "info": "List of single line text (recommended). Single/multi-line text also works – one bullet per line."
+          "default": "custom.cro_pdp_bulletpoints",
+          "info": "Single line text, list of values. One value per bullet: Lead | explanation. A value with no | is a plain line. When this metafield has any value, it replaces every theme-editor bullet."
         },
         {
           "type": "range",
@@ -5164,13 +5170,111 @@
           "max": 10,
           "step": 1,
           "label": "Maximum bullets",
-          "default": 5
+          "default": 6
+        },
+        {
+          "type": "header",
+          "content": "Title"
+        },
+        {
+          "type": "richtext",
+          "id": "heading",
+          "label": "Title",
+          "default": "<p>Why you'll love it</p>"
+        },
+        {
+          "type": "range",
+          "id": "heading_size",
+          "min": 14,
+          "max": 28,
+          "step": 1,
+          "unit": "px",
+          "label": "Title size",
+          "default": 18
+        },
+        {
+          "type": "header",
+          "content": "Bullets"
+        },
+        {
+          "type": "paragraph",
+          "content": "Shown when this product's metafield is empty. The lead is bold. Leave a row blank to hide it."
+        },
+        {
+          "type": "text",
+          "id": "bullet_1_lead",
+          "label": "Bullet 1 lead",
+          "default": "All-mountain shape"
+        },
+        {
+          "type": "text",
+          "id": "bullet_1_text",
+          "label": "Bullet 1 text",
+          "default": "Stable on groomers and in softer snow."
+        },
+        {
+          "type": "text",
+          "id": "bullet_2_lead",
+          "label": "Bullet 2 lead",
+          "default": "Sintered base"
+        },
+        {
+          "type": "text",
+          "id": "bullet_2_text",
+          "label": "Bullet 2 text",
+          "default": "Holds wax and stays fast between tunes."
+        },
+        {
+          "type": "text",
+          "id": "bullet_3_lead",
+          "label": "Bullet 3 lead",
+          "default": "Durable edges"
+        },
+        {
+          "type": "text",
+          "id": "bullet_3_text",
+          "label": "Bullet 3 text",
+          "default": "Grip on hardpack without catching."
+        },
+        {
+          "type": "text",
+          "id": "bullet_4_lead",
+          "label": "Bullet 4 lead",
+          "default": "Lightweight core"
+        },
+        {
+          "type": "text",
+          "id": "bullet_4_text",
+          "label": "Bullet 4 text",
+          "default": "Easy to turn from the first run to the last."
+        },
+        {
+          "type": "text",
+          "id": "bullet_5_lead",
+          "label": "Bullet 5 lead",
+          "default": "365-day guarantee"
+        },
+        {
+          "type": "text",
+          "id": "bullet_5_text",
+          "label": "Bullet 5 text",
+          "default": "Ride it at home, or send it back."
+        },
+        {
+          "type": "text",
+          "id": "bullet_6_lead",
+          "label": "Bullet 6 lead"
+        },
+        {
+          "type": "text",
+          "id": "bullet_6_text",
+          "label": "Bullet 6 text"
         },
         {
           "type": "textarea",
           "id": "fallback_bullets",
-          "label": "Fallback bullets",
-          "info": "Optional. One bullet per line. Shown only when the product has no metafield bullets."
+          "label": "Extra bullets",
+          "info": "Optional. One per line, after the six rows: Lead | explanation. Also replaced when the metafield has a value."
         },
         {
           "type": "checkbox",
@@ -5210,7 +5314,7 @@
           "step": 1,
           "unit": "px",
           "label": "Gap between items",
-          "default": 3
+          "default": 10
         },
         {
           "type": "header",
@@ -5236,7 +5340,7 @@
           "step": 1,
           "unit": "px",
           "label": "Corner radius",
-          "default": 6
+          "default": 8
         },
         {
           "type": "range",
@@ -5253,7 +5357,7 @@
           "type": "color",
           "id": "background",
           "label": "Background",
-          "default": "rgba(0,0,0,0)",
+          "default": "#FAF3F1",
           "info": "Transparent = no box background."
         },
         {
@@ -5325,8 +5429,12 @@
           "type": "select",
           "id": "default_icon",
           "label": "Default icon",
-          "default": "check",
+          "default": "sparkle",
           "options": [
+            {
+              "value": "sparkle",
+              "label": "Sparkle"
+            },
             {
               "value": "check",
               "label": "Check (thin)"

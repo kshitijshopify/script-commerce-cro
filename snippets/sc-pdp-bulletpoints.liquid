@@ -1,47 +1,34 @@
-{%- comment -%}
-  SC – PDP Bulletpoints (USP list with custom icons)
-  ----------------------------------------------------------------------------
-  Self-contained PDP block: Liquid + scoped CSS, no JavaScript, no theme dependencies.
-  Shows a short, scannable list of product benefits near the title / variant picker / ATC.
+{% doc %}
+  PDP bullet list with a title, a bold lead, a short explanation, and an icon.
 
-  Usage (inside any product section's block loop):
-    {%- when 'sc_bulletpoints' -%}
-      {% render 'sc-pdp-bulletpoints', block: block, product: product %}
+  @param {object} block - Block whose settings match the sc_bulletpoints schema
+  @param {object} product - The current product
 
-  Accepts:
-  - block:   {Object} block whose settings match the "sc_bulletpoints" schema
-             (sections/main-product.liquid).
-  - product: {Object} the current product.
+  Bullets: a product metafield replaces the theme-editor bullets when it has any value.
+  Title, icon, colours, spacing and typography always come from the theme editor.
 
-  Data source (in this order):
-  1. Product metafield set in "Metafield" (default standard.cro_pdp_bulletpoints),
-     type "Single line text – List of values". Single/multi-line text is also accepted
-     (one bullet per line).
-  2. "Fallback bullets" textarea (one per line) when the metafield is empty/missing.
-  Nothing renders when both are empty (a hint shows in the theme editor only).
+  Metafield (default custom.cro_pdp_bulletpoints): Single line text, list of values.
+  Each value is "Lead | explanation". A value with no | is one plain line.
 
-  Text is always escaped. Optional light formatting (when enabled):
-    **bold**   *italic*   __underline__
-
-  Custom SVG is validated: it must be a single <svg>…</svg> and may not contain scripts,
-  event handlers (on…=), links/href, <foreignObject>, <style>, <iframe> etc. Invalid SVG
-  falls back to the default icon.
-
-  Icon source "Auto" (backwards compatible with the original block):
-  uploaded image → custom SVG → default icon.
-{%- endcomment -%}
+  @example
+  {% render 'sc-pdp-bulletpoints', block: block, product: product %}
+{% enddoc %}
 
 {%- liquid
   assign s = block.settings
   assign uid = 'sc-bp-' | append: block.id
 
-  comment
-    1. Collect bullet values
-  endcomment
-  assign max_items = s.max_items | default: 5
-  assign raw_items = '' | split: ','
-  assign mf_key = s.metafield_key | strip | remove: 'product.metafields.' | default: 'standard.cro_pdp_bulletpoints'
+  assign enabled = true
+  if s.enable == false
+    assign enabled = false
+  endif
+
+  assign max_items = s.max_items | default: 6
+  assign mf_key = s.metafield_key | strip | remove: 'product.metafields.' | default: 'custom.cro_pdp_bulletpoints'
   assign mf_parts = mf_key | split: '.'
+  assign raw_items = '' | split: ','
+  assign source = 'theme'
+
   if product != blank and mf_parts.size == 2
     assign mf_ns = mf_parts.first | strip
     assign mf_k = mf_parts.last | strip
@@ -49,80 +36,114 @@
     if mf != blank
       if mf.type contains 'list.'
         assign raw_items = mf.value
+        assign source = 'metafield'
       elsif mf.type == 'single_line_text_field' or mf.type == 'multi_line_text_field'
         assign raw_items = mf.value | newline_to_br | strip_newlines | split: '<br />'
+        assign source = 'metafield'
       endif
     endif
   endif
 
-  assign source = 'metafield'
   assign has_mf_item = false
-  for v in raw_items
-    assign t = v | strip
-    if t != blank
-      assign has_mf_item = true
-      break
-    endif
-  endfor
-  if has_mf_item == false
-    assign source = 'fallback'
-    assign raw_items = s.fallback_bullets | newline_to_br | strip_newlines | split: '<br />'
+  if source == 'metafield'
+    for v in raw_items
+      if v != blank
+        assign probe = v | strip
+        if probe != blank
+          assign has_mf_item = true
+          break
+        endif
+      endif
+    endfor
   endif
 
-  comment
-    Build the escaped (and optionally formatted) list items
-  endcomment
+  if has_mf_item == false
+    assign source = 'theme'
+    assign packed_lines = ''
+    for i in (1..6)
+      assign lead_key = 'bullet_' | append: i | append: '_lead'
+      assign text_key = 'bullet_' | append: i | append: '_text'
+      assign lead_in = s[lead_key] | strip
+      assign text_in = s[text_key] | strip
+      if lead_in != blank or text_in != blank
+        assign packed_lines = packed_lines | append: lead_in | append: ' | ' | append: text_in | append: '~SC-LINE~'
+      endif
+    endfor
+    assign extra = s.fallback_bullets | newline_to_br | strip_newlines | split: '<br />'
+    for line in extra
+      assign line = line | strip
+      if line != blank
+        assign packed_lines = packed_lines | append: line | append: '~SC-LINE~'
+      endif
+    endfor
+    assign raw_items = packed_lines | split: '~SC-LINE~'
+  endif
+
   assign items_html = ''
   assign count = 0
   for v in raw_items
     if count >= max_items
       break
     endif
-    assign txt = v | strip
-    if txt == blank
+    assign line = v | strip
+    if line == blank
       continue
     endif
-    assign txt = txt | escape
 
-    if s.enable_formatting
-      assign markers = '**,__,*' | split: ','
-      for m in markers
-        unless txt contains m
-          continue
-        endunless
-        case m
-          when '**'
-            assign tag = 'strong'
-          when '__'
-            assign tag = 'u'
-          else
-            assign tag = 'em'
-        endcase
-        assign parts = txt | append: ' ' | split: m
-        assign rem = parts.size | modulo: 2
-        if rem == 1
-          assign out = ''
-          for part in parts
-            assign odd = forloop.index0 | modulo: 2
-            if odd == 1
-              assign out = out | append: '<' | append: tag | append: '>' | append: part | append: '</' | append: tag | append: '>'
-            else
-              assign out = out | append: part
-            endif
-          endfor
-          assign txt = out | strip
-        endif
-      endfor
+    assign lead = ''
+    assign body = line
+    if line contains '|'
+      assign lead = line | split: '|' | first | strip
+      assign body = line | remove_first: lead | remove_first: '|' | strip
     endif
+    assign lead = lead | escape
+    assign body = body | escape
 
-    assign items_html = items_html | append: txt | append: '~SC-BP~'
+    assign chunks = lead | append: '~SC-PART~' | append: body | split: '~SC-PART~'
+    for chunk in chunks
+      assign txt = chunk
+      if s.enable_formatting
+        assign markers = '**,__,*' | split: ','
+        for m in markers
+          unless txt contains m
+            continue
+          endunless
+          case m
+            when '**'
+              assign tag = 'strong'
+            when '__'
+              assign tag = 'u'
+            else
+              assign tag = 'em'
+          endcase
+          assign parts = txt | append: ' ' | split: m
+          assign rem = parts.size | modulo: 2
+          if rem == 1
+            assign out = ''
+            for part in parts
+              assign odd = forloop.index0 | modulo: 2
+              if odd == 1
+                assign out = out | append: '<' | append: tag | append: '>' | append: part | append: '</' | append: tag | append: '>'
+              else
+                assign out = out | append: part
+              endif
+            endfor
+            assign txt = out | strip
+          endif
+        endfor
+      endif
+      if forloop.first
+        assign lead = txt
+      else
+        assign body = txt
+      endif
+    endfor
+
+    assign items_html = items_html | append: lead | append: '~SC-L~' | append: body | append: '~SC-END~~SC-ITEM~'
     assign count = count | plus: 1
   endfor
-  assign items = items_html | split: '~SC-BP~'
+  assign items = items_html | split: '~SC-ITEM~'
 
-  comment
-    2. Settings → values
-  endcomment
   assign list_style = s.list_style | default: 'svg'
   assign is_icon = false
   if list_style == 'svg'
@@ -148,16 +169,13 @@
     assign icon_box = icon_size
   endif
 
-  comment
-    3. Icon (rendered once, reused per item)
-  endcomment
+  assign heading_html = s.heading
+  assign heading_plain = heading_html | strip_html | strip
+  assign heading_size = s.heading_size | default: 18
+
   assign icon_html = ''
   if is_icon
     assign src = s.icon_source | default: 'auto'
-
-    comment
-      Validate the custom SVG
-    endcomment
     assign svg_ok = false
     assign svg_body = s.icon_as_svg | strip
     if svg_body != blank and svg_body contains '<svg' and svg_body contains '</svg>'
@@ -224,6 +242,8 @@
         assign icon_html = svg_body
       else
         case s.default_icon
+          when 'sparkle'
+            assign icon_html = '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" focusable="false"><path fill="currentColor" d="M12 1.6 13.7 8.3 20.4 10 13.7 11.7 12 18.4 10.3 11.7 3.6 10 10.3 8.3Z"/><path fill="currentColor" d="m18.2 13.2.7 2.4 2.4.7-2.4.7-.7 2.4-.7-2.4-2.4-.7 2.4-.7Z"/></svg>'
           when 'check_circle'
             assign icon_html = '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" focusable="false"><circle cx="12" cy="12" r="12" fill="currentColor"/><path d="m7 12.5 3.2 3.2L17 9" fill="none" stroke="var(--sc-bp-check, #fff)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
           when 'check_circle_outline'
@@ -234,9 +254,6 @@
     endcase
   endif
 
-  comment
-    4. CSS variables (inline, so margins win over theme "> * + *" spacing rules)
-  endcomment
   assign style = 'margin-top:' | append: s.space_top | append: 'px;margin-bottom:' | append: s.space_bottom | append: 'px;'
   assign style = style | append: '--sc-bp-gap:' | append: s.gap_items | append: 'px;'
   assign style = style | append: '--sc-bp-pad:' | append: s.box_padding | append: 'px;'
@@ -244,6 +261,7 @@
   assign style = style | append: '--sc-bp-icon-size:' | append: icon_size | append: 'px;'
   assign style = style | append: '--sc-bp-icon-box:' | append: icon_box | append: 'px;'
   assign style = style | append: '--sc-bp-icon-gap:' | append: s.icon_margin_right | append: 'px;'
+  assign style = style | append: '--sc-bp-heading:' | append: heading_size | append: 'px;'
   if s.show_border
     if s.border_color != blank and s.border_color.alpha > 0
       assign style = style | append: '--sc-bp-border:' | append: s.border_color | append: ';'
@@ -274,22 +292,38 @@
   endif
 -%}
 
-{%- if count > 0 -%}
+{%- if enabled and count > 0 -%}
   <style>
-    .sc-bp {
-      --sc-bp-lh: 1.5;
+    #{{ uid }} {
+      --sc-bp-lh: 1.45;
       display: block;
       width: 100%;
       box-sizing: border-box;
       color: var(--sc-bp-text, inherit);
     }
-    .sc-bp--boxed {
+    #{{ uid }}.sc-bp--boxed {
       padding: var(--sc-bp-pad);
       background: var(--sc-bp-bg, transparent);
       border-radius: var(--sc-bp-radius);
     }
-    .sc-bp--bordered { border: 1px solid var(--sc-bp-border); }
-    .sc-bp .sc-bp__list {
+    #{{ uid }}.sc-bp--bordered { border: 1px solid var(--sc-bp-border); }
+    #{{ uid }} .sc-bp__heading {
+      margin: 0 0 12px;
+      font-size: var(--sc-bp-heading);
+      font-weight: 700;
+      line-height: 1.25;
+      letter-spacing: -0.01em;
+      color: inherit;
+    }
+    #{{ uid }} .sc-bp__heading :is(p, h1, h2, h3, h4) {
+      margin: 0;
+      font: inherit;
+      letter-spacing: inherit;
+      color: inherit;
+    }
+    #{{ uid }} .sc-bp__heading :is(p, h1, h2, h3, h4) + :is(p, h1, h2, h3, h4) { margin-top: 0.35em; }
+    #{{ uid }} .sc-bp__heading a { color: inherit; }
+    #{{ uid }} .sc-bp__list {
       display: flex;
       flex-direction: column;
       gap: var(--sc-bp-gap);
@@ -297,7 +331,7 @@
       padding: 0;
       list-style: none;
     }
-    .sc-bp .sc-bp__item {
+    #{{ uid }} .sc-bp__item {
       margin: 0;
       padding: 0;
       font-size: var(--sc-bp-fs, 1em);
@@ -307,15 +341,13 @@
       overflow-wrap: anywhere;
       color: inherit;
     }
-    .sc-bp .sc-bp__item strong { font-weight: 700; }
-
-    /* Icon style: icon aligned with the first line of (multi-line) text */
-    .sc-bp--svg .sc-bp__item {
+    #{{ uid }} .sc-bp__lead { font-weight: 700; }
+    #{{ uid }}.sc-bp--svg .sc-bp__item {
       display: flex;
       align-items: flex-start;
       gap: var(--sc-bp-icon-gap);
     }
-    .sc-bp__icon {
+    #{{ uid }} .sc-bp__icon {
       flex: 0 0 auto;
       display: flex;
       align-items: center;
@@ -328,8 +360,8 @@
       background: var(--sc-bp-icon-bg, transparent);
       line-height: 0;
     }
-    .sc-bp__icon svg,
-    .sc-bp__icon img {
+    #{{ uid }} .sc-bp__icon svg,
+    #{{ uid }} .sc-bp__icon img {
       display: block;
       width: var(--sc-bp-icon-size);
       height: var(--sc-bp-icon-size);
@@ -337,26 +369,23 @@
       object-fit: contain;
       margin: 0;
     }
-    .sc-bp__text {
+    #{{ uid }} .sc-bp__text {
       flex: 1 1 auto;
       min-width: 0;
       margin-top: max(0px, calc((var(--sc-bp-icon-box) - var(--sc-bp-lh) * 1em) / 2));
     }
-
-    /* Native markers: disc / circle / decimal */
-    .sc-bp--disc .sc-bp__list,
-    .sc-bp--circle .sc-bp__list { padding-left: 1.25em; }
-    .sc-bp--decimal .sc-bp__list { padding-left: 1.6em; }
-    .sc-bp--disc .sc-bp__list { list-style: disc outside; }
-    .sc-bp--circle .sc-bp__list { list-style: circle outside; }
-    .sc-bp--decimal .sc-bp__list { list-style: decimal outside; }
-    .sc-bp--disc .sc-bp__item,
-    .sc-bp--circle .sc-bp__item,
-    .sc-bp--decimal .sc-bp__item { display: list-item; }
-    .sc-bp .sc-bp__item::marker { color: var(--sc-bp-icon-color, currentColor); }
-
+    #{{ uid }}.sc-bp--disc .sc-bp__list,
+    #{{ uid }}.sc-bp--circle .sc-bp__list { padding-left: 1.25em; }
+    #{{ uid }}.sc-bp--decimal .sc-bp__list { padding-left: 1.6em; }
+    #{{ uid }}.sc-bp--disc .sc-bp__list { list-style: disc outside; }
+    #{{ uid }}.sc-bp--circle .sc-bp__list { list-style: circle outside; }
+    #{{ uid }}.sc-bp--decimal .sc-bp__list { list-style: decimal outside; }
+    #{{ uid }}.sc-bp--disc .sc-bp__item,
+    #{{ uid }}.sc-bp--circle .sc-bp__item,
+    #{{ uid }}.sc-bp--decimal .sc-bp__item { display: list-item; }
+    #{{ uid }} .sc-bp__item::marker { color: var(--sc-bp-icon-color, currentColor); }
     @media screen and (max-width: 749px) {
-      .sc-bp .sc-bp__item { font-size: var(--sc-bp-fs-m, var(--sc-bp-fs, 1em)); }
+      #{{ uid }} .sc-bp__item { font-size: var(--sc-bp-fs-m, var(--sc-bp-fs, 1em)); }
     }
   </style>
 
@@ -367,26 +396,45 @@
     data-source="{{ source }}"
     {{ block.shopify_attributes }}
   >
+    {%- if heading_plain != blank -%}
+      <div class="sc-bp__heading">{{ heading_html }}</div>
+    {%- endif -%}
     <{{ list_tag }} class="sc-bp__list"{% if is_icon %} role="list"{% endif %}>
       {%- for item in items -%}
-        <li class="sc-bp__item">
-          {%- if is_icon -%}
-            <span class="sc-bp__icon" aria-hidden="true">{{ icon_html }}</span>
-            <span class="sc-bp__text">{{ item }}</span>
-          {%- else -%}
-            {{ item }}
+        {%- if item != blank -%}
+          {%- assign pair = item | split: '~SC-L~' -%}
+          {%- assign lead = pair | first -%}
+          {%- assign body = '' -%}
+          {%- if pair.size > 1 -%}
+            {%- assign body = pair | last | remove: '~SC-END~' -%}
           {%- endif -%}
-        </li>
+          <li class="sc-bp__item">
+            {%- if is_icon -%}
+              <span class="sc-bp__icon" aria-hidden="true">{{ icon_html }}</span>
+              <span class="sc-bp__text">
+                {%- if lead != blank -%}<strong class="sc-bp__lead">{{ lead }}</strong>{%- endif -%}
+                {%- if lead != blank and body != blank -%}<span class="sc-bp__sep"> </span>{%- endif -%}
+                {%- if body != blank -%}<span class="sc-bp__detail">{{ body }}</span>{%- endif -%}
+              </span>
+            {%- else -%}
+              {%- if lead != blank -%}<strong class="sc-bp__lead">{{ lead }}</strong>{%- endif -%}
+              {%- if lead != blank and body != blank -%}<span class="sc-bp__sep"> </span>{%- endif -%}
+              {%- if body != blank -%}<span class="sc-bp__detail">{{ body }}</span>{%- endif -%}
+            {%- endif -%}
+          </li>
+        {%- endif -%}
       {%- endfor -%}
     </{{ list_tag }}>
   </div>
-{%- elsif request.design_mode -%}
+{%- elsif request.design_mode and enabled -%}
   <div
-    class="sc-bp-hint"
+    id="{{ uid }}"
+    class="sc-bp"
     {{ block.shopify_attributes }}
-    style="padding:10px;font-size:13px;opacity:.6;font-style:italic;"
+    style="padding:10px 12px;font-size:13px;opacity:.65;font-style:italic;"
   >
-    SC – PDP Bulletpoints: no bullets for this product. Fill the product metafield
-    "{{ mf_key | escape }}" (Single line text – list) or add "Fallback bullets" in the block settings.
+    Bulletpoints: add bullets in this block, or fill the product metafield "{{ mf_key | escape }}" (list of single line text, one "Lead | explanation" per value). The metafield replaces the theme-editor bullets.
   </div>
+{%- elsif request.design_mode -%}
+  <div id="{{ uid }}" class="sc-bp" {{ block.shopify_attributes }} hidden></div>
 {%- endif -%}
