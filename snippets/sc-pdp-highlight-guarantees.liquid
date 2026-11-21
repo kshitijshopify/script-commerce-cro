@@ -1,0 +1,410 @@
+{%- comment -%}
+  SC – Highlight guarantees
+  ----------------------------------------------------------------------------
+  Product-page card for a risk-reversal promise, placed under the buy buttons.
+  Optional team or founder image (top, left, or right), a bold headline, a short
+  supporting line, and a social-proof footer with an optional link.
+
+  Self-contained: Liquid + scoped CSS. No theme classes, snippets, or global
+  settings. Works in any OS 2.0 product section that renders blocks.
+
+  Usage (inside the product section block loop):
+    {%- when 'sc_highlight_guarantees' -%}
+      {% render 'sc-pdp-highlight-guarantees', block: block %}
+
+  Accepts:
+  - block: {Object} block whose settings match the "sc_highlight_guarantees" schema
+    in sections/main-product.liquid.
+{%- endcomment -%}
+
+{%- liquid
+  assign s = block.settings
+  assign uid = 'sc-hg-' | append: block.id
+
+  assign text_color = blank
+  if s.text_color != blank and s.text_color.alpha != 0
+    assign text_color = s.text_color
+  endif
+
+  assign bg_color = '#ffffff'
+  if s.background != blank and s.background.alpha != 0
+    assign bg_color = s.background
+  endif
+
+  assign border_color = '#e6e6e6'
+  if s.border_color != blank and s.border_color.alpha != 0
+    assign border_color = s.border_color
+  endif
+
+  assign footer_bg = '#8782b9'
+  if s.footer_background != blank and s.footer_background.alpha != 0
+    assign footer_bg = s.footer_background
+  endif
+
+  assign footer_color = '#ffffff'
+  if s.footer_text_color != blank and s.footer_text_color.alpha != 0
+    assign footer_color = s.footer_text_color
+  endif
+
+  assign heading_text = s.heading | strip_html | strip
+  assign content_text = s.content | strip_html | strip
+  assign footer_plain = s.footer_text | strip_html | strip
+  assign link_label = s.footer_link_text | strip
+
+  assign show_media = true
+  if s.show_image == false
+    assign show_media = false
+  endif
+
+  assign use_default_image = false
+  if show_media and s.image == blank
+    assign use_default_image = true
+  endif
+
+  assign position = 'top'
+  if show_media
+    if s.image_position == 'left' or s.image_position == 'right'
+      assign position = s.image_position
+    endif
+  endif
+
+  assign has_footer = false
+  if footer_plain != blank or link_label != blank
+    assign has_footer = true
+  endif
+
+  assign has_content = false
+  if show_media or heading_text != blank or content_text != blank or has_footer
+    assign has_content = true
+  endif
+
+  if s.image != blank and s.image.alt != blank
+    assign image_alt = s.image.alt
+  elsif heading_text != blank
+    assign image_alt = heading_text
+  else
+    assign image_alt = 'Our team'
+  endif
+  assign image_class = 'sc-hg__img is-' | append: s.image_size
+-%}
+
+{%- if s.enable and has_content -%}
+  <style>
+    #{{ uid }} {
+      --sc-hg-bg: {{ bg_color }};
+      --sc-hg-text: {% if text_color != blank %}{{ text_color }}{% else %}inherit{% endif %};
+      --sc-hg-radius: {{ s.corner_radius }}px;
+      --sc-hg-thumb-radius: {{ s.thumbnail_radius }}px;
+      --sc-hg-border: {{ border_color }};
+      --sc-hg-footer-bg: {{ footer_bg }};
+      --sc-hg-footer-text: {{ footer_color }};
+      --sc-hg-heading: {{ s.heading_size }}px;
+      --sc-hg-body: {{ s.content_size }}px;
+      --sc-hg-footer: {{ s.footer_text_size }}px;
+      container: sc-hg / inline-size;
+      display: block;
+      box-sizing: border-box;
+      width: 100%;
+      max-width: 100%;
+      margin: {{ s.space_top }}px 0 {{ s.space_bottom }}px;
+      background: var(--sc-hg-bg);
+      color: var(--sc-hg-text);
+      border-radius: var(--sc-hg-radius);
+      overflow: hidden;
+      {%- if s.show_border %}
+        border: 1px solid var(--sc-hg-border);
+      {%- endif %}
+      {%- if s.show_shadow %}
+        box-shadow: 0 1px 2px rgba(18, 18, 18, 0.05), 0 10px 24px rgba(18, 18, 18, 0.06);
+      {%- endif %}
+      font-family: inherit;
+      font-size: var(--sc-hg-body);
+      line-height: 1.45;
+      letter-spacing: normal;
+      text-transform: none;
+    }
+    #{{ uid }} *,
+    #{{ uid }} *::before,
+    #{{ uid }} *::after { box-sizing: border-box; }
+
+    #{{ uid }} .sc-hg__layout {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+    #{{ uid }}.sc-hg--left .sc-hg__layout,
+    #{{ uid }}.sc-hg--right .sc-hg__layout {
+      display: grid;
+      align-items: stretch;
+    }
+    #{{ uid }}.sc-hg--left .sc-hg__layout {
+      grid-template-columns: minmax(132px, 42%) minmax(0, 1fr);
+    }
+    #{{ uid }}.sc-hg--right .sc-hg__layout {
+      grid-template-columns: minmax(0, 1fr) minmax(132px, 42%);
+    }
+    #{{ uid }}.sc-hg--right .sc-hg__media { order: 2; }
+
+    #{{ uid }} .sc-hg__media {
+      position: relative;
+      min-width: 0;
+      overflow: hidden;
+      line-height: 0;
+      background: rgba(18, 18, 18, 0.04);
+      border-radius: var(--sc-hg-thumb-radius);
+    }
+    #{{ uid }}.sc-hg--top .sc-hg__media {
+      border-radius: var(--sc-hg-thumb-radius) var(--sc-hg-thumb-radius) 0 0;
+    }
+    #{{ uid }}.sc-hg--left .sc-hg__media,
+    #{{ uid }}.sc-hg--right .sc-hg__media {
+      border-radius: 0;
+      min-height: 168px;
+      height: 100%;
+    }
+    #{{ uid }} .sc-hg__img {
+      display: block;
+      width: 100%;
+      max-width: 100%;
+      height: auto;
+      margin: 0;
+      object-fit: cover;
+      object-position: center 32%;
+    }
+    #{{ uid }}.sc-hg--top .sc-hg__img.is-small { height: 120px; }
+    #{{ uid }}.sc-hg--top .sc-hg__img.is-medium { height: 180px; }
+    #{{ uid }}.sc-hg--top .sc-hg__img.is-large { height: 260px; }
+    #{{ uid }}.sc-hg--left .sc-hg__img,
+    #{{ uid }}.sc-hg--right .sc-hg__img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    #{{ uid }} .sc-hg__body {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+    #{{ uid }} .sc-hg__main {
+      display: grid;
+      grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.15fr);
+      gap: 16px 20px;
+      align-items: center;
+      padding: 18px 20px;
+    }
+    #{{ uid }} .sc-hg__main:not(:has(.sc-hg__content)),
+    #{{ uid }} .sc-hg__main:not(:has(.sc-hg__heading)) {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    #{{ uid }}.sc-hg--left .sc-hg__main,
+    #{{ uid }}.sc-hg--right .sc-hg__main {
+      grid-template-columns: minmax(0, 1fr);
+      align-items: flex-start;
+      gap: 10px;
+      padding: 16px;
+    }
+
+    #{{ uid }} .sc-hg__heading {
+      margin: 0;
+      font-family: inherit;
+      font-size: var(--sc-hg-heading);
+      font-weight: 700;
+      font-style: normal;
+      line-height: 1.25;
+      letter-spacing: -0.015em;
+      text-transform: none;
+      color: inherit;
+      overflow-wrap: anywhere;
+    }
+    #{{ uid }} .sc-hg__content {
+      min-width: 0;
+      font-size: var(--sc-hg-body);
+      line-height: 1.45;
+      color: inherit;
+      overflow-wrap: anywhere;
+    }
+    #{{ uid }} .sc-hg__content > * { margin: 0; }
+    #{{ uid }} .sc-hg__content > * + * { margin-top: 0.5em; }
+    #{{ uid }} .sc-hg__content a {
+      color: inherit;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+
+    #{{ uid }} .sc-hg__footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px 16px;
+      flex-wrap: wrap;
+      margin: 0;
+      padding: 10px 20px;
+      background: var(--sc-hg-footer-bg);
+      color: var(--sc-hg-footer-text);
+      font-size: var(--sc-hg-footer);
+      line-height: 1.35;
+    }
+    #{{ uid }}.sc-hg--left .sc-hg__footer,
+    #{{ uid }}.sc-hg--right .sc-hg__footer {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 4px;
+      padding: 10px 16px;
+    }
+    #{{ uid }} .sc-hg__footer-text {
+      margin: 0;
+      font-weight: 500;
+      overflow-wrap: anywhere;
+    }
+    #{{ uid }} .sc-hg__footer-text > * { margin: 0; }
+    #{{ uid }} .sc-hg__footer-link {
+      margin-left: auto;
+      color: inherit;
+      font: inherit;
+      font-weight: 600;
+      text-align: inherit;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      overflow-wrap: anywhere;
+    }
+    #{{ uid }}.sc-hg--left .sc-hg__footer-link,
+    #{{ uid }}.sc-hg--right .sc-hg__footer-link { margin-left: 0; }
+    #{{ uid }} a.sc-hg__footer-link:hover { opacity: 0.82; }
+    #{{ uid }} a.sc-hg__footer-link:focus-visible {
+      outline: 2px solid currentColor;
+      outline-offset: 3px;
+      border-radius: 2px;
+    }
+
+    /* Stack the side photo only when the card itself is phone-narrow.
+       The buy box is often ~450px, so a wider breakpoint made Left and Right look identical to Top. */
+    @container sc-hg (max-width: 360px) {
+      #{{ uid }}.sc-hg--left .sc-hg__layout,
+      #{{ uid }}.sc-hg--right .sc-hg__layout { grid-template-columns: minmax(0, 1fr); }
+      #{{ uid }}.sc-hg--right .sc-hg__media { order: 0; }
+      #{{ uid }}.sc-hg--left .sc-hg__media,
+      #{{ uid }}.sc-hg--right .sc-hg__media { min-height: 0; height: auto; }
+      #{{ uid }}.sc-hg--left .sc-hg__img,
+      #{{ uid }}.sc-hg--right .sc-hg__img {
+        position: static;
+        height: 168px;
+      }
+      #{{ uid }}.sc-hg--left .sc-hg__footer,
+      #{{ uid }}.sc-hg--right .sc-hg__footer {
+        flex-direction: row;
+        align-items: center;
+        padding: 10px 16px;
+      }
+      #{{ uid }}.sc-hg--left .sc-hg__footer-link,
+      #{{ uid }}.sc-hg--right .sc-hg__footer-link { margin-left: auto; }
+    }
+    @container sc-hg (max-width: 420px) {
+      #{{ uid }} .sc-hg__main {
+        grid-template-columns: minmax(0, 1fr);
+        align-items: flex-start;
+        gap: 8px;
+        padding: 16px;
+      }
+      #{{ uid }} .sc-hg__footer { padding: 10px 16px; }
+    }
+
+    /* Viewport fallback for browsers without container queries */
+    @media screen and (max-width: 749px) {
+      #{{ uid }} .sc-hg__main {
+        grid-template-columns: minmax(0, 1fr);
+        align-items: flex-start;
+        gap: 8px;
+        padding: 16px;
+      }
+      #{{ uid }} .sc-hg__footer { padding: 10px 16px; }
+    }
+    @media screen and (max-width: 480px) {
+      #{{ uid }}.sc-hg--left .sc-hg__layout,
+      #{{ uid }}.sc-hg--right .sc-hg__layout { grid-template-columns: minmax(0, 1fr); }
+      #{{ uid }}.sc-hg--right .sc-hg__media { order: 0; }
+      #{{ uid }}.sc-hg--left .sc-hg__media,
+      #{{ uid }}.sc-hg--right .sc-hg__media { min-height: 0; height: auto; }
+      #{{ uid }}.sc-hg--left .sc-hg__img,
+      #{{ uid }}.sc-hg--right .sc-hg__img { position: static; height: 168px; }
+      #{{ uid }}.sc-hg--left .sc-hg__footer,
+      #{{ uid }}.sc-hg--right .sc-hg__footer {
+        flex-direction: row;
+        align-items: center;
+      }
+      #{{ uid }} .sc-hg__footer-link { margin-left: auto; }
+    }
+  </style>
+
+  <div id="{{ uid }}" class="sc-hg sc-hg--{{ position }}" {{ block.shopify_attributes }}>
+    <div class="sc-hg__layout">
+      {%- if show_media -%}
+        <div class="sc-hg__media">
+          {%- if use_default_image -%}
+            <img
+              src="{{ 'sc-guarantee-team.jpg' | asset_url }}"
+              alt="{{ image_alt | escape }}"
+              class="{{ image_class }}"
+              width="1280"
+              height="720"
+              loading="lazy"
+            >
+          {%- else -%}
+            {{
+              s.image
+              | image_url: width: 1200
+              | image_tag:
+                widths: '300, 450, 600, 800, 1200',
+                sizes: '(min-width: 990px) 480px, 100vw',
+                alt: image_alt,
+                class: image_class,
+                loading: 'lazy'
+            }}
+          {%- endif -%}
+        </div>
+      {%- endif -%}
+
+      <div class="sc-hg__body">
+        {%- if heading_text != blank or content_text != blank -%}
+          <div class="sc-hg__main">
+            {%- if heading_text != blank -%}
+              <h2 class="sc-hg__heading">{{ s.heading }}</h2>
+            {%- endif -%}
+            {%- if content_text != blank -%}
+              <div class="sc-hg__content">{{ s.content }}</div>
+            {%- endif -%}
+          </div>
+        {%- endif -%}
+
+        {%- if has_footer -%}
+          <div class="sc-hg__footer">
+            {%- if footer_plain != blank -%}
+              <p class="sc-hg__footer-text">{{ s.footer_text }}</p>
+            {%- endif -%}
+            {%- if link_label != blank -%}
+              {%- if s.footer_link_url != blank -%}
+                <a
+                  class="sc-hg__footer-link"
+                  href="{{ s.footer_link_url }}"
+                  {% if s.open_in_new_tab %}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  {% endif %}
+                >
+                  {{ link_label | escape }}
+                </a>
+              {%- else -%}
+                <span class="sc-hg__footer-link">{{ link_label | escape }}</span>
+              {%- endif -%}
+            {%- endif -%}
+          </div>
+        {%- endif -%}
+      </div>
+    </div>
+  </div>
+{%- elsif request.design_mode and s.enable -%}
+  <div id="{{ uid }}" class="sc-hg" {{ block.shopify_attributes }} style="margin: {{ s.space_top }}px 0 {{ s.space_bottom }}px; padding: 14px 16px; border: 1px dashed rgba(18,18,18,0.25); border-radius: 8px; font-size: 14px;">
+    Highlight guarantee — add a heading, message, or image.
+  </div>
+{%- endif -%}

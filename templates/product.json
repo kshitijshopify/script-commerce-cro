@@ -209,6 +209,25 @@
             "show_gift_card_recipient": true
           }
         },
+        "sc_highlight_guarantees": {
+          "type": "sc_highlight_guarantees",
+          "settings": {
+            "enable": true,
+            "heading": "365-day money-back guarantee!",
+            "content": "<p>\"We stand 100% behind the quality of everything we make.\" — Founder</p>",
+            "footer_text": "300,000 happy customers",
+            "footer_link_text": "View reviews",
+            "footer_background": "#8782B9",
+            "footer_text_color": "#ffffff",
+            "background": "#ffffff",
+            "show_shadow": true,
+            "show_border": true,
+            "corner_radius": 12,
+            "show_image": true,
+            "image_position": "top",
+            "image_size": "default"
+          }
+        },
         "sc_payment_icons_bar": {
           "type": "sc_payment_icons_bar",
           "settings": {}
@@ -459,6 +478,7 @@
         "quantity_selector",
         "sc_inventory_status",
         "buy_buttons",
+        "sc_highlight_guarantees",
         "sc_payment_icons_bar",
         "sc_store_benefits",
         "sc_social_proof_banner",

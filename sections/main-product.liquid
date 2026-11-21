@@ -706,6 +706,8 @@
                   {% render 'sc-pdp-bulletpoints', block: block, product: product %}
                 {%- when 'sc_payment_icons_bar' -%}
                   {% render 'sc-payment-icons-bar', placement: 'pdp', product: product, block: block %}
+                {%- when 'sc_highlight_guarantees' -%}
+                  {% render 'sc-pdp-highlight-guarantees', block: block %}
                 {%- when 'icon-with-text' -%}
                   {% render 'icon-with-text', block: block %}
               {%- endcase -%}
@@ -2936,6 +2938,221 @@
           "step": 2,
           "unit": "px",
           "default": 16
+        }
+      ]
+    },
+    {
+      "type": "sc_highlight_guarantees",
+      "name": "SC – Highlight guarantee",
+      "limit": 1,
+      "settings": [
+        {
+          "type": "checkbox",
+          "id": "enable",
+          "label": "Show guarantee card",
+          "default": true
+        },
+        {
+          "type": "paragraph",
+          "content": "A card for a money-back promise or founder quote. Place it directly under the buy buttons. The image is optional."
+        },
+        {
+          "type": "color",
+          "id": "text_color",
+          "label": "Text color",
+          "info": "Transparent uses the surrounding text color.",
+          "default": "rgba(0,0,0,0)"
+        },
+        {
+          "type": "color",
+          "id": "background",
+          "label": "Background",
+          "default": "#ffffff"
+        },
+        {
+          "type": "range",
+          "id": "corner_radius",
+          "min": 0,
+          "max": 24,
+          "step": 1,
+          "unit": "px",
+          "label": "Corner radius",
+          "default": 12
+        },
+        {
+          "type": "checkbox",
+          "id": "show_shadow",
+          "label": "Show shadow",
+          "default": true
+        },
+        {
+          "type": "checkbox",
+          "id": "show_border",
+          "label": "Show border",
+          "default": true
+        },
+        {
+          "type": "color",
+          "id": "border_color",
+          "label": "Border color",
+          "default": "#e6e6e6"
+        },
+        {
+          "type": "range",
+          "id": "space_top",
+          "min": 0,
+          "max": 40,
+          "step": 1,
+          "unit": "px",
+          "label": "Top space",
+          "default": 16
+        },
+        {
+          "type": "range",
+          "id": "space_bottom",
+          "min": 0,
+          "max": 40,
+          "step": 1,
+          "unit": "px",
+          "label": "Bottom space",
+          "default": 16
+        },
+        {
+          "type": "header",
+          "content": "Image"
+        },
+        {
+          "type": "checkbox",
+          "id": "show_image",
+          "label": "Show image",
+          "info": "Uses a default team photo until you upload your own.",
+          "default": true
+        },
+        {
+          "type": "image_picker",
+          "id": "image",
+          "label": "Image",
+          "info": "Optional. Replaces the default team photo."
+        },
+        {
+          "type": "select",
+          "id": "image_size",
+          "label": "Size",
+          "info": "Used when the image sits on top.",
+          "options": [
+            { "value": "default", "label": "Default" },
+            { "value": "small", "label": "Small" },
+            { "value": "medium", "label": "Medium" },
+            { "value": "large", "label": "Large" }
+          ],
+          "default": "default"
+        },
+        {
+          "type": "select",
+          "id": "image_position",
+          "label": "Position",
+          "options": [
+            { "value": "top", "label": "Top" },
+            { "value": "left", "label": "Left" },
+            { "value": "right", "label": "Right" }
+          ],
+          "default": "top"
+        },
+        {
+          "type": "range",
+          "id": "thumbnail_radius",
+          "min": 0,
+          "max": 24,
+          "step": 1,
+          "unit": "px",
+          "label": "Image corner radius",
+          "default": 0
+        },
+        {
+          "type": "header",
+          "content": "Message"
+        },
+        {
+          "type": "inline_richtext",
+          "id": "heading",
+          "label": "Heading",
+          "default": "365-day money-back guarantee!"
+        },
+        {
+          "type": "range",
+          "id": "heading_size",
+          "min": 14,
+          "max": 28,
+          "step": 1,
+          "unit": "px",
+          "label": "Heading size",
+          "default": 20
+        },
+        {
+          "type": "richtext",
+          "id": "content",
+          "label": "Supporting text",
+          "default": "<p>\"We stand 100% behind the quality of everything we make.\" — Founder</p>"
+        },
+        {
+          "type": "range",
+          "id": "content_size",
+          "min": 12,
+          "max": 20,
+          "step": 1,
+          "unit": "px",
+          "label": "Text size",
+          "default": 14
+        },
+        {
+          "type": "header",
+          "content": "Footer"
+        },
+        {
+          "type": "range",
+          "id": "footer_text_size",
+          "min": 12,
+          "max": 20,
+          "step": 1,
+          "unit": "px",
+          "label": "Text size",
+          "default": 14
+        },
+        {
+          "type": "color",
+          "id": "footer_text_color",
+          "label": "Text color",
+          "default": "#ffffff"
+        },
+        {
+          "type": "color",
+          "id": "footer_background",
+          "label": "Background",
+          "default": "#8782B9"
+        },
+        {
+          "type": "inline_richtext",
+          "id": "footer_text",
+          "label": "Text",
+          "default": "300,000 happy customers"
+        },
+        {
+          "type": "text",
+          "id": "footer_link_text",
+          "label": "Link text",
+          "default": "View reviews"
+        },
+        {
+          "type": "url",
+          "id": "footer_link_url",
+          "label": "Link",
+          "info": "Leave empty to show the link text without a destination."
+        },
+        {
+          "type": "checkbox",
+          "id": "open_in_new_tab",
+          "label": "Open link in a new tab",
+          "default": false
         }
       ]
     },
