@@ -23,6 +23,16 @@
           "type": "title",
           "settings": {}
         },
+        "sc_product_teaser": {
+          "type": "sc_product_teaser",
+          "settings": {
+            "enable": true,
+            "text_size": 14,
+            "text_color": "rgba(0,0,0,0)",
+            "space_top": 6,
+            "space_bottom": 8
+          }
+        },
         "price": {
           "type": "price",
           "settings": {}
@@ -485,6 +495,7 @@
       "block_order": [
         "vendor",
         "title",
+        "sc_product_teaser",
         "price",
         "sc_bulletpoints",
         "variant_picker",

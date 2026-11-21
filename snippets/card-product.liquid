@@ -181,6 +181,7 @@
                 {{ card_product.title | escape }}
               </a>
             </h3>
+            {% render 'sc-product-teaser', product: card_product, placement: 'card' %}
             <div class="card-information">
               {%- if show_vendor -%}
                 <span class="visually-hidden">{{ 'accessibility.vendor' | t }}</span>

@@ -702,6 +702,9 @@
                   {% render 'sc-pdp-variant-cards', block: block, product: product, section: section %}
                 {%- when 'sc_pdp_quantity_discounts' -%}
                   {% render 'sc-pdp-quantity-discounts', block: block, product: product, section: section %}
+                {%- when 'sc_product_teaser' -%}
+                  {% render 'sc-product-teaser', product: product, placement: 'product', block: block %}
+                  {%- comment -%}Teaser sits under the title. Cards use the theme setting.{%- endcomment -%}
                 {%- when 'sc_bulletpoints' -%}
                   {% render 'sc-pdp-bulletpoints', block: block, product: product %}
                 {%- when 'sc_payment_icons_bar' -%}
@@ -5134,6 +5137,61 @@
         {
           "type": "paragraph",
           "content": "Shows accepted payment methods. Icon source, selection and order are global – edit them in Theme settings → SC – Payment icons bar, so the product page and cart always match."
+        }
+      ]
+    },
+    {
+      "type": "sc_product_teaser",
+      "name": "SC – Product teaser",
+      "limit": 1,
+      "settings": [
+        {
+          "type": "checkbox",
+          "id": "enable",
+          "label": "Show on the product page",
+          "default": true,
+          "info": "Collection cards have their own switch in Theme settings → SC – Product teaser."
+        },
+        {
+          "type": "paragraph",
+          "content": "A short line under the title, from the product rich text metafield custom.cro_product_teaser. Nothing is shown when that metafield is empty. Place this block under the title and above the price."
+        },
+        {
+          "type": "range",
+          "id": "text_size",
+          "min": 12,
+          "max": 20,
+          "step": 1,
+          "unit": "px",
+          "label": "Text size",
+          "default": 14
+        },
+        {
+          "type": "color",
+          "id": "text_color",
+          "label": "Text color",
+          "default": "rgba(0,0,0,0)",
+          "info": "Transparent uses the surrounding text color."
+        },
+        {
+          "type": "range",
+          "id": "space_top",
+          "min": 0,
+          "max": 24,
+          "step": 1,
+          "unit": "px",
+          "label": "Space above",
+          "default": 6
+        },
+        {
+          "type": "range",
+          "id": "space_bottom",
+          "min": 0,
+          "max": 24,
+          "step": 1,
+          "unit": "px",
+          "label": "Space below",
+          "default": 8
         }
       ]
     },
