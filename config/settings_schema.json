@@ -3017,5 +3017,59 @@
         "default": "#c0392b"
       }
     ]
+  },
+  {
+    "name": "SC – Product teaser",
+    "settings": [
+      {
+        "type": "paragraph",
+        "content": "A short line under the product title on collection cards. The text comes from a product Rich text metafield. The product page uses the SC – Product teaser block, so cards and the product page can be turned on separately. Nothing is shown when the metafield is empty."
+      },
+      {
+        "type": "text",
+        "id": "sc_teaser_metafield",
+        "label": "Metafield",
+        "default": "custom.cro_product_teaser",
+        "info": "Namespace and key. Type must be Rich text, with storefront access Read."
+      },
+      {
+        "type": "header",
+        "content": "Collection cards"
+      },
+      {
+        "type": "checkbox",
+        "id": "sc_teaser_show_card",
+        "label": "Show on collection cards",
+        "default": true,
+        "info": "Collection, search, featured, and related product cards. Does not affect the product page."
+      },
+      {
+        "type": "range",
+        "id": "sc_teaser_card_size",
+        "min": 11,
+        "max": 18,
+        "step": 1,
+        "unit": "px",
+        "label": "Card text size",
+        "default": 13
+      },
+      {
+        "type": "range",
+        "id": "sc_teaser_card_lines",
+        "min": 1,
+        "max": 3,
+        "step": 1,
+        "label": "Card lines",
+        "default": 2,
+        "info": "Extra lines are cut off on the card. The product page shows the full teaser."
+      },
+      {
+        "type": "color",
+        "id": "sc_teaser_card_color",
+        "label": "Card text color",
+        "default": "rgba(0,0,0,0)",
+        "info": "Transparent uses the card text color."
+      }
+    ]
   }
 ]
