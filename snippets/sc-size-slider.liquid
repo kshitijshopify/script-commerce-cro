@@ -1,0 +1,77 @@
+{%- comment -%}
+  SC | PDP Size Slider (Fit Scale)
+  Reads product metafield custom.sc_size_slider (reference to metaobject cro_pdp_size_slider).
+  Metaobject fields: heading, labels (list), scale_position (0-100).
+  Accepts: product, block
+{%- endcomment -%}
+
+{%- assign sc_ss_data = product.metafields.custom.sc_size_slider.value -%}
+
+{%- if sc_ss_data != blank -%}
+  {%- assign sc_id = block.id -%}
+  {%- assign sc_ss_labels = sc_ss_data.labels.value -%}
+  {%- assign sc_ss_pos = sc_ss_data.scale_position.value | default: 0 | at_least: 0 | at_most: 100 -%}
+
+  <div id="sc_ss-{{ sc_id }}" class="sc_ss" {{ block.shopify_attributes }}>
+    {%- if sc_ss_data.heading != blank -%}
+      <p class="sc_ss__heading">{{ sc_ss_data.heading | escape }}</p>
+    {%- endif -%}
+
+    <span class="sc_ss__bar" aria-hidden="true"></span>
+
+    {%- if sc_ss_labels != blank -%}
+      <ul class="sc_ss__labels">
+        {%- for sc_label in sc_ss_labels -%}
+          <li>{{ sc_label | escape }}</li>
+        {%- endfor -%}
+      </ul>
+    {%- endif -%}
+  </div>
+
+  <style>
+    #sc_ss-{{ sc_id }} {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: {{ block.settings.sc_ss_space_top }}px;
+      margin-bottom: {{ block.settings.sc_ss_space_bottom }}px;
+      border-radius: {{ block.settings.sc_ss_corner_radius }}px;
+      background-color: {{ block.settings.sc_ss_background }};
+      color: {{ block.settings.sc_ss_text_color }};
+      {% if block.settings.sc_ss_show_border %}
+        border: 1px solid {{ block.settings.sc_ss_border_color }};
+        padding: 16px;
+      {% endif %}
+    }
+    #sc_ss-{{ sc_id }} .sc_ss__heading {
+      margin: 0;
+      font-size: {{ block.settings.sc_ss_heading_size }}px;
+    }
+    #sc_ss-{{ sc_id }} .sc_ss__bar {
+      position: relative;
+      display: block;
+      width: 100%;
+      height: {{ block.settings.sc_ss_scale_size }}px;
+      background: {{ block.settings.sc_ss_scale_color }};
+      border-radius: 6px;
+    }
+    #sc_ss-{{ sc_id }} .sc_ss__bar::before {
+      content: '';
+      position: absolute;
+      top: calc(50% - 8px);
+      left: calc({{ sc_ss_pos }}% - {{ sc_ss_pos | times: 0.16 }}px);
+      width: 16px;
+      height: 16px;
+      border-radius: 9999px;
+      background: {{ block.settings.sc_ss_active_scale_color }};
+    }
+    #sc_ss-{{ sc_id }} .sc_ss__labels {
+      display: flex;
+      justify-content: space-around;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      font-size: {{ block.settings.sc_ss_content_size }}px;
+    }
+  </style>
+{%- endif -%}

@@ -19,8 +19,8 @@
             "text_style": "uppercase"
           }
         },
-        "cro_product_badges_zwUQGG": {
-          "type": "cro_product_badges",
+        "sc_product_badges_zwUQGG": {
+          "type": "sc_product_badges",
           "settings": {
             "sc_badge_space_top": 10,
             "sc_badge_space_bottom": 16,
@@ -259,6 +259,23 @@
           "settings": {
             "show_dynamic_checkout": true,
             "show_gift_card_recipient": true
+          }
+        },
+        "sc_pdp_size_slider_L3Uam9": {
+          "type": "sc_pdp_size_slider",
+          "settings": {
+            "sc_ss_space_top": 16,
+            "sc_ss_space_bottom": 16,
+            "sc_ss_heading_size": 18,
+            "sc_ss_content_size": 14,
+            "sc_ss_corner_radius": 6,
+            "sc_ss_show_border": true,
+            "sc_ss_border_color": "#eeeae9",
+            "sc_ss_text_color": "#282828",
+            "sc_ss_background": "#ffffff",
+            "sc_ss_scale_size": 4,
+            "sc_ss_scale_color": "#d9d9d9",
+            "sc_ss_active_scale_color": "#010101"
           }
         },
         "sc_highlight_guarantees": {
@@ -531,7 +548,7 @@
       },
       "block_order": [
         "vendor",
-        "cro_product_badges_zwUQGG",
+        "sc_product_badges_zwUQGG",
         "title",
         "sc_product_teaser",
         "price",
@@ -542,6 +559,7 @@
         "quantity_selector",
         "sc_inventory_status",
         "buy_buttons",
+        "sc_pdp_size_slider_L3Uam9",
         "sc_highlight_guarantees",
         "sc_payment_icons_bar",
         "sc_store_benefits",
