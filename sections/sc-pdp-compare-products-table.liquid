@@ -1,0 +1,763 @@
+{%- comment -%}
+  SC – PDP Compare Products Table
+  ScriptCommerce CRO section. Self-contained, theme-independent (Dawn, Horizon, any OS 2.0 theme). No JavaScript.
+
+  Compares 2–4 products side by side on the product page:
+  image, name, short description, price and up to 5 specification rows, all aligned across columns.
+
+  Product source
+  - "Blocks": one "Product" block per column (max 4). Pick a product, or tick "This model" to use the
+    product being viewed. Every field on the block (image, name, description, price, specs) overrides
+    the product data when filled in. The product picker also accepts a dynamic source
+    (e.g. a product reference metafield).
+  - "Product metafield": columns come from the current product's `sc_compare.products` metafield
+    (list of products). Blocks are used as a fallback when that metafield is empty.
+
+  Optional product metafields (create in Settings › Custom data › Products):
+    sc_compare.products             List of products         – compare set for this product (metafield source only)
+    sc_compare.short_description    Single / multi-line text – short description under the name
+    sc_compare.specifications       List of single line text – up to 5 specs (multi-line text, one per line, also works)
+
+  Visibility: rendered only with 2+ valid products (4 max). In the theme editor, empty blocks show as
+  placeholders and a notice explains why the section is hidden on the storefront.
+  The current product is highlighted with the "This model" label + accent underline (ticked on a block,
+  or detected automatically when a column's product is the product being viewed).
+  Rows are aligned with CSS subgrid; columns scroll horizontally when they do not fit (mobile).
+  Custom CSS: use the theme editor's built-in "Custom CSS" field of this section.
+{%- endcomment -%}
+
+{%- liquid
+  assign s = section.settings
+  assign sid = section.id
+  assign root = '#ScCpt-' | append: sid
+  assign cur = product
+  assign max_cols = 4
+
+  comment
+    1. Build the column list: block indexes (blocks source) or product handles (metafield source).
+  endcomment
+  assign use_mf = false
+  if s.source == 'metafield' and cur != blank
+    assign mf_list = cur.metafields.sc_compare.products.value
+    if mf_list != blank and mf_list.size > 0
+      assign use_mf = true
+    endif
+  endif
+
+  assign cols = ''
+  assign col_count = 0
+  assign real_count = 0
+  if use_mf
+    if s.add_current
+      assign cols = cur.handle | append: ','
+      assign col_count = 1
+      assign real_count = 1
+    endif
+    for p in mf_list
+      if col_count >= max_cols
+        break
+      endif
+      if p == blank or p.handle == blank
+        continue
+      endif
+      if s.add_current and p.id == cur.id
+        continue
+      endif
+      assign cols = cols | append: p.handle | append: ','
+      assign col_count = col_count | plus: 1
+      assign real_count = real_count | plus: 1
+    endfor
+  else
+    for b in section.blocks
+      if col_count >= max_cols
+        break
+      endif
+      assign is_real = false
+      if b.settings.product != blank or b.settings.title != blank
+        assign is_real = true
+      elsif b.settings.this_model and cur != blank
+        assign is_real = true
+      endif
+      if is_real or request.design_mode
+        assign cols = cols | append: forloop.index0 | append: ','
+        assign col_count = col_count | plus: 1
+        if is_real
+          assign real_count = real_count | plus: 1
+        endif
+      endif
+    endfor
+  endif
+  assign col_list = cols | split: ','
+
+  assign show_section = false
+  if real_count >= 2
+    assign show_section = true
+  endif
+
+  comment
+    2. Header content
+  endcomment
+  assign subheading = s.subheading | strip | escape
+  assign heading = s.heading | strip | escape
+  assign hl_word = s.heading_highlight | strip | escape
+  if hl_word != blank
+    capture hl_html
+      echo '<span class="sc-cpt__hl sc-cpt__hl--' | append: s.highlight_style | append: '">' | append: hl_word
+      if s.highlight_style == 'swoosh'
+        echo '<svg viewBox="-400 -55 730 60" fill="none" preserveAspectRatio="none" aria-hidden="true" focusable="false"><path stroke="currentColor" stroke-linecap="round" stroke-width="22" d="m -383.25 -6 c 55.25 -22 130.75 -33.5 293.25 -38 c 54.5 -0.5 195 -2.5 401 15"/></svg>'
+      endif
+      echo '</span>'
+    endcapture
+    if heading contains hl_word
+      assign heading = heading | replace_first: hl_word, hl_html
+    else
+      assign heading = heading | append: ' ' | append: hl_html | strip
+    endif
+  endif
+
+  assign dl_text = s.download_text | strip | escape
+  assign show_dl = false
+  if s.show_download and s.download_link != blank and dl_text != blank
+    assign show_dl = true
+  endif
+
+  comment
+    3. Colours (blank pickers fall back to sensible values)
+  endcomment
+  assign c_bg = s.background | default: 'transparent'
+  assign c_text = s.text_color | default: '#1a1a1a'
+  assign c_text2 = s.secondary_text_color | default: c_text
+  assign c_accent = s.accent_color | default: '#9a5a2e'
+  assign c_divider = s.divider_color | default: '#cfcfcf'
+  assign c_table = s.table_background | default: 'transparent'
+  assign c_sub = s.subheading_color | default: c_accent
+  assign c_heading = s.heading_color | default: c_text
+  assign c_hl = s.highlight_color | default: c_accent
+  assign c_img_bg = s.image_background | default: 'transparent'
+  assign c_cur_bg = s.current_column_background | default: 'transparent'
+  assign c_other_name = c_text
+  if s.accent_other_names
+    assign c_other_name = c_accent
+  endif
+
+  assign max_w = '100%'
+  if s.enable_custom_max_width
+    assign max_w = s.custom_max_width | append: 'px'
+  endif
+
+  case s.image_ratio
+    when 'square'
+      assign ratio = '1 / 1'
+    when 'portrait'
+      assign ratio = '4 / 5'
+    when 'wide'
+      assign ratio = '16 / 9'
+    else
+      assign ratio = '4 / 3'
+  endcase
+-%}
+
+{%- if show_section or request.design_mode -%}
+<style>
+  {{ root }} {
+    --sc-cpt-bg: {{ c_bg }};
+    --sc-cpt-text: {{ c_text }};
+    --sc-cpt-text2: {{ c_text2 }};
+    --sc-cpt-accent: {{ c_accent }};
+    --sc-cpt-divider: {{ c_divider }};
+    --sc-cpt-table-bg: {{ c_table }};
+    --sc-cpt-table-radius: {{ s.table_radius }}px;
+    --sc-cpt-table-pad: {{ s.table_padding }}px;
+    --sc-cpt-max-w: {{ max_w }};
+    --sc-cpt-pt: {{ s.space_top }}px;
+    --sc-cpt-pb: {{ s.space_bottom }}px;
+    --sc-cpt-pl: {{ s.space_left }}px;
+    --sc-cpt-pr: {{ s.space_right }}px;
+    --sc-cpt-sub-c: {{ c_sub }};
+    --sc-cpt-sub-fs: {{ s.subheading_size }}px;
+    --sc-cpt-sub-ls: {{ s.subheading_letter_spacing }}px;
+    --sc-cpt-h-c: {{ c_heading }};
+    --sc-cpt-h-fs: {{ s.heading_size }}px;
+    --sc-cpt-hl-c: {{ c_hl }};
+    --sc-cpt-align: {{ s.heading_alignment }};
+    --sc-cpt-cols: {{ col_count }};
+    --sc-cpt-col-min: 200px;
+    --sc-cpt-col-max: {{ s.column_max_width }}px;
+    --sc-cpt-gap: {{ s.column_gap }}px;
+    --sc-cpt-justify: {{ s.table_alignment }};
+    --sc-cpt-ratio: {{ ratio }};
+    --sc-cpt-img-bg: {{ c_img_bg }};
+    --sc-cpt-cur-bg: {{ c_cur_bg }};
+    --sc-cpt-other-name: {{ c_other_name }};
+    --sc-cpt-name-fs: {{ s.name_size }}px;
+    --sc-cpt-desc-fs: {{ s.description_size }}px;
+    --sc-cpt-price-fs: {{ s.price_size }}px;
+    --sc-cpt-spec-fs: {{ s.spec_size }}px;
+    --sc-cpt-dl-radius: {{ s.download_radius }}px;
+    display: block;
+    background: var(--sc-cpt-bg);
+    color: var(--sc-cpt-text);
+  }
+  @media screen and (max-width: 749px) {
+    {{ root }} {
+      --sc-cpt-pt: {{ s.space_top_mobile }}px;
+      --sc-cpt-pb: {{ s.space_bottom_mobile }}px;
+      --sc-cpt-pl: {{ s.space_left_mobile }}px;
+      --sc-cpt-pr: {{ s.space_right_mobile }}px;
+      --sc-cpt-sub-fs: {{ s.subheading_size_mobile }}px;
+      --sc-cpt-h-fs: {{ s.heading_size_mobile }}px;
+      --sc-cpt-col-min: {{ s.column_width_mobile }}px;
+      --sc-cpt-col-max: {{ s.column_width_mobile }}px;
+      --sc-cpt-table-pad: {{ s.table_padding_mobile }}px;
+    }
+  }
+
+  {{ root }} *, {{ root }} *::before, {{ root }} *::after { box-sizing: border-box; }
+  {{ root }} .sc-cpt__inner {
+    max-width: var(--sc-cpt-max-w);
+    margin: 0 auto;
+    padding: var(--sc-cpt-pt) var(--sc-cpt-pr) var(--sc-cpt-pb) var(--sc-cpt-pl);
+  }
+
+  /* Header */
+  {{ root }} .sc-cpt__header { text-align: var(--sc-cpt-align); margin-bottom: clamp(24px, 4vw, 48px); }
+  {{ root }} .sc-cpt__header--dl { display: grid; grid-template-columns: 1fr auto 1fr; align-items: start; column-gap: 16px; }
+  {{ root }} .sc-cpt__header--dl .sc-cpt__titles { grid-column: 2; }
+  {{ root }} .sc-cpt__header--dl.sc-cpt__header--side .sc-cpt__titles { grid-column: 1 / 3; }
+  {{ root }} .sc-cpt__header--dl .sc-cpt__dl-wrap { grid-column: 3; grid-row: 1; justify-self: end; }
+  {{ root }} .sc-cpt__sub {
+    margin: 0 0 12px;
+    color: var(--sc-cpt-sub-c);
+    font-size: var(--sc-cpt-sub-fs);
+    letter-spacing: var(--sc-cpt-sub-ls);
+    line-height: 1.4;
+    {% if s.subheading_uppercase %}text-transform: uppercase;{% endif %}
+  }
+  {{ root }} .sc-cpt__heading {
+    margin: 0;
+    color: var(--sc-cpt-h-c);
+    font-size: var(--sc-cpt-h-fs);
+    line-height: 1.2;
+    font-weight: {{ s.heading_weight }};
+    letter-spacing: normal;
+  }
+  {{ root }} .sc-cpt__hl { position: relative; display: inline-block; white-space: nowrap; }
+  {{ root }} .sc-cpt__hl--color { color: var(--sc-cpt-hl-c); }
+  {{ root }} .sc-cpt__hl--underline { text-decoration: underline; text-decoration-color: var(--sc-cpt-hl-c); text-decoration-thickness: 0.08em; text-underline-offset: 0.18em; }
+  {{ root }} .sc-cpt__hl--swoosh { padding-bottom: 0.22em; }
+  {{ root }} .sc-cpt__hl--swoosh svg { position: absolute; left: 0; bottom: 0; width: 100%; height: 0.28em; color: var(--sc-cpt-hl-c); overflow: visible; }
+
+  /* Download button */
+  {{ root }} .sc-cpt__dl {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 10px 18px;
+    font-size: 14px; line-height: 1.2;
+    text-decoration: none;
+    border-radius: var(--sc-cpt-dl-radius);
+    border: 1px solid var(--sc-cpt-text);
+    color: var(--sc-cpt-text);
+    background: transparent;
+    transition: opacity .2s ease, background-color .2s ease, color .2s ease;
+  }
+  {{ root }} .sc-cpt__dl:hover { background: var(--sc-cpt-text); color: var(--sc-cpt-bg); }
+  {{ root }} .sc-cpt__dl--solid { background: var(--sc-cpt-accent); border-color: var(--sc-cpt-accent); color: #fff; }
+  {{ root }} .sc-cpt__dl--solid:hover { opacity: .85; background: var(--sc-cpt-accent); color: #fff; }
+  {{ root }} .sc-cpt__dl--link { border-color: transparent; padding-left: 0; padding-right: 0; text-decoration: underline; text-underline-offset: 3px; }
+  {{ root }} .sc-cpt__dl--link:hover { background: transparent; color: var(--sc-cpt-accent); }
+  {{ root }} .sc-cpt__dl svg { width: 16px; height: 16px; flex: none; }
+
+  /* Table */
+  {{ root }} .sc-cpt__scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: var(--sc-cpt-divider) transparent;
+    background: var(--sc-cpt-table-bg);
+    border-radius: var(--sc-cpt-table-radius);
+    padding: var(--sc-cpt-table-pad);
+    scroll-padding-inline: var(--sc-cpt-table-pad);
+  }
+  {{ root }} .sc-cpt__table {
+    display: grid;
+    grid-template-columns: repeat(var(--sc-cpt-cols), minmax(var(--sc-cpt-col-min), var(--sc-cpt-col-max)));
+    grid-template-rows: repeat(10, auto);
+    column-gap: var(--sc-cpt-gap);
+    justify-content: var(--sc-cpt-justify);
+    min-width: min-content;
+    margin: 0; padding: 0; list-style: none;
+  }
+  {{ root }} .sc-cpt__col {
+    display: grid;
+    grid-row: 1 / span 10;
+    grid-template-rows: subgrid;
+    align-content: start;
+    min-width: 0;
+  }
+  {{ root }} .sc-cpt__col--current { background: var(--sc-cpt-cur-bg); }
+  /* Cells are pinned to fixed rows and always rendered (some themes hide div:empty), so rows stay aligned. */
+  {{ root }} .sc-cpt__cell { display: block; min-width: 0; overflow-wrap: anywhere; }
+  {{ root }} .sc-cpt__cell:empty { display: block; padding: 0; margin: 0; border: 0; }
+  {{ root }} .sc-cpt__label { grid-row: 1; }
+  {{ root }} .sc-cpt__media { grid-row: 2; }
+  {{ root }} .sc-cpt__name { grid-row: 3; }
+  {{ root }} .sc-cpt__desc { grid-row: 4; }
+  {{ root }} .sc-cpt__price { grid-row: 5; }
+  {{ root }} .sc-cpt__spec--1 { grid-row: 6; }
+  {{ root }} .sc-cpt__spec--2 { grid-row: 7; }
+  {{ root }} .sc-cpt__spec--3 { grid-row: 8; }
+  {{ root }} .sc-cpt__spec--4 { grid-row: 9; }
+  {{ root }} .sc-cpt__spec--5 { grid-row: 10; }
+
+  {{ root }} .sc-cpt__label {
+    align-self: end;
+    padding: 0 0 8px;
+    margin-bottom: 16px;
+    border-bottom: 2px solid var(--sc-cpt-accent);
+    color: var(--sc-cpt-accent);
+    font-size: 14px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    text-align: center;
+  }
+  {{ root }} .sc-cpt__media { padding-bottom: 24px; }
+  {{ root }} .sc-cpt__media a, {{ root }} .sc-cpt__media > div {
+    display: block;
+    aspect-ratio: var(--sc-cpt-ratio);
+    background: var(--sc-cpt-img-bg);
+    overflow: hidden;
+  }
+  {{ root }} .sc-cpt__media img, {{ root }} .sc-cpt__media svg {
+    display: block; width: 100%; height: 100%;
+    object-fit: {{ s.image_fit }};
+    transition: transform .4s ease;
+  }
+  {{ root }} .sc-cpt__media svg { background: rgba(0,0,0,.05); fill: rgba(0,0,0,.25); }
+  {{ root }} .sc-cpt__media a:hover img { transform: scale(1.03); }
+
+  {{ root }} .sc-cpt__name {
+    border-top: 1px solid var(--sc-cpt-divider);
+    padding-top: 20px;
+    margin: 0;
+    font-size: var(--sc-cpt-name-fs);
+    font-weight: 400;
+    line-height: 1.3;
+    color: var(--sc-cpt-other-name);
+  }
+  {{ root }} .sc-cpt__col--current .sc-cpt__name { color: var(--sc-cpt-text); }
+  {{ root }} .sc-cpt__name a { color: inherit; text-decoration: none; }
+  {{ root }} .sc-cpt__name a:hover { text-decoration: underline; text-underline-offset: 3px; }
+  {{ root }} .sc-cpt__desc { padding-top: 6px; color: var(--sc-cpt-text2); font-size: var(--sc-cpt-desc-fs); line-height: 1.5; }
+  {{ root }} .sc-cpt__price { padding-top: 24px; padding-bottom: 12px; font-size: var(--sc-cpt-price-fs); line-height: 1.3; }
+  {{ root }} .sc-cpt__price s { margin-left: 6px; opacity: .55; font-size: .85em; }
+  {{ root }} .sc-cpt__spec {
+    padding: 14px 0;
+    border-bottom: 1px solid var(--sc-cpt-divider);
+    color: var(--sc-cpt-text2);
+    font-size: var(--sc-cpt-spec-fs);
+    line-height: 1.5;
+  }
+
+  {{ root }} .sc-cpt__notice {
+    margin: 0 0 16px; padding: 12px 16px;
+    border: 1px dashed var(--sc-cpt-divider);
+    font-size: 13px; line-height: 1.5;
+  }
+
+  @media screen and (max-width: 749px) {
+    {{ root }} .sc-cpt__header--dl { display: block; }
+    {{ root }} .sc-cpt__dl-wrap { margin-top: 16px; }
+    {{ root }} .sc-cpt__scroll { scroll-snap-type: x mandatory; }
+    {{ root }} .sc-cpt__col { scroll-snap-align: start; }
+    {{ root }} .sc-cpt__table { justify-content: start; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    {{ root }} .sc-cpt__media img { transition: none; }
+  }
+</style>
+
+<section id="ScCpt-{{ sid }}" class="sc-cpt" aria-label="{{ s.heading | strip_html | default: s.subheading | escape }}">
+  <div class="sc-cpt__inner">
+    {%- if request.design_mode and real_count < 2 -%}
+      <p class="sc-cpt__notice">
+        Add at least 2 products (max 4) – the section stays hidden on your storefront until then.
+        {%- if s.source == 'metafield' and use_mf == false %} The current product has no "sc_compare.products" metafield, so blocks are used.{% endif -%}
+      </p>
+    {%- endif -%}
+
+    {%- if subheading != blank or heading != blank or show_dl -%}
+      <div class="sc-cpt__header{% if show_dl %} sc-cpt__header--dl{% if s.heading_alignment != 'center' %} sc-cpt__header--side{% endif %}{% endif %}">
+        {%- if subheading != blank or heading != blank -%}
+          <div class="sc-cpt__titles">
+            {%- if subheading != blank -%}<p class="sc-cpt__sub">{{ subheading }}</p>{%- endif -%}
+            {%- if heading != blank -%}<h2 class="sc-cpt__heading">{{ heading }}</h2>{%- endif -%}
+          </div>
+        {%- endif -%}
+        {%- if show_dl -%}
+          <div class="sc-cpt__dl-wrap">
+            <a
+              class="sc-cpt__dl sc-cpt__dl--{{ s.download_style }}"
+              href="{{ s.download_link }}"
+              {% if s.download_new_tab %}target="_blank" rel="noopener"{% endif %}
+              {% if s.download_attribute %}download{% endif %}
+            >
+              {%- if s.download_icon -%}
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 3v12m0 0-5-5m5 5 5-5M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+              {%- endif -%}
+              <span>{{ dl_text }}</span>
+            </a>
+          </div>
+        {%- endif -%}
+      </div>
+    {%- endif -%}
+
+    {%- if col_count > 0 -%}
+      <div class="sc-cpt__scroll">
+        <ul class="sc-cpt__table" role="list">
+          {%- for col in col_list -%}
+            {%- liquid
+              assign b = nil
+              assign p = nil
+              assign is_current = false
+              if use_mf
+                assign p = all_products[col]
+                if s.add_current and forloop.first
+                  assign is_current = true
+                endif
+              else
+                assign bi = col | plus: 0
+                assign b = section.blocks[bi]
+                assign p = b.settings.product
+                if b.settings.this_model
+                  assign is_current = true
+                  if p == blank
+                    assign p = cur
+                  endif
+                endif
+              endif
+              if s.auto_detect_current and p != blank and cur != blank and p.id == cur.id
+                assign is_current = true
+              endif
+
+              assign c_img = nil
+              if b != nil and b.settings.image != blank
+                assign c_img = b.settings.image
+              elsif p != blank
+                assign c_img = p.featured_media.preview_image
+              endif
+
+              assign c_name = ''
+              if b != nil and b.settings.title != blank
+                assign c_name = b.settings.title | escape
+              elsif p != blank
+                assign c_name = p.title | escape
+              endif
+              assign is_placeholder = false
+              if c_name == blank
+                assign is_placeholder = true
+                assign c_name = 'Select a product'
+              endif
+
+              assign c_alt = c_name
+              if c_img != blank and c_img.alt != blank
+                assign c_alt = c_img.alt | escape
+              endif
+
+              assign c_url = ''
+              if s.link_products and p != blank and is_current == false
+                assign c_url = p.url
+              endif
+
+              assign c_desc = ''
+              if s.show_description
+                if b != nil and b.settings.description != blank
+                  assign c_desc = b.settings.description | escape | newline_to_br
+                elsif p != blank
+                  assign c_desc = p.metafields.sc_compare.short_description.value | escape | newline_to_br
+                endif
+              endif
+
+              assign c_price = ''
+              if s.show_price
+                if b != nil and b.settings.price_text != blank
+                  assign c_price = b.settings.price_text | escape
+                elsif p != blank
+                  assign c_price = p.price | money
+                  if p.price_varies and s.price_from_text != blank
+                    assign c_price = s.price_from_text | escape | append: ' ' | append: c_price
+                  endif
+                  if s.show_compare_price and p.compare_at_price > p.price
+                    assign c_cmp = p.compare_at_price | money
+                    assign c_price = c_price | append: '<s>' | append: c_cmp | append: '</s>'
+                  endif
+                endif
+              endif
+
+              assign mf_specs = nil
+              if p != blank
+                assign mf_spec_field = p.metafields.sc_compare.specifications
+                if mf_spec_field != blank
+                  if mf_spec_field.type contains 'list'
+                    assign mf_specs = mf_spec_field.value
+                  else
+                    assign mf_specs = mf_spec_field.value | newline_to_br | split: '<br />'
+                  endif
+                endif
+              endif
+            -%}
+            <li
+              class="sc-cpt__col{% if is_current %} sc-cpt__col--current{% endif %}"
+              {% if b != nil %}{{ b.shopify_attributes }}{% endif %}
+              aria-label="{{ c_name | strip_html }}{% if is_current %} – {{ s.this_model_label | escape }}{% endif %}"
+            >
+              <div class="sc-cpt__cell sc-cpt__label">{% if is_current %}{{ s.this_model_label | escape }}{% endif %}</div>
+
+              <div class="sc-cpt__cell sc-cpt__media">
+                {%- if c_url != blank -%}<a href="{{ c_url }}" tabindex="-1" aria-hidden="true">{%- else -%}<div>{%- endif -%}
+                {%- if c_img != blank -%}
+                  {{ c_img | image_url: width: 900 | image_tag: loading: 'lazy', widths: '300, 450, 600, 900', sizes: '(min-width: 750px) 360px, 75vw', alt: c_alt }}
+                {%- else -%}
+                  {{ 'product-1' | placeholder_svg_tag }}
+                {%- endif -%}
+                {%- if c_url != blank -%}</a>{%- else -%}</div>{%- endif -%}
+              </div>
+
+              <h3 class="sc-cpt__cell sc-cpt__name">
+                {%- if c_url != blank -%}<a href="{{ c_url }}">{{ c_name }}</a>{%- else -%}{{ c_name }}{%- endif -%}
+              </h3>
+
+              <div class="sc-cpt__cell sc-cpt__desc">{{ c_desc | strip }}</div>
+              <div class="sc-cpt__cell sc-cpt__price">{% if c_price != blank %}{{ c_price }}{% endif %}</div>
+
+              {%- for i in (1..5) -%}
+                {%- liquid
+                  assign spec = ''
+                  if s.max_specs >= i
+                    assign spec_key = 'spec_' | append: i
+                    if b != nil and b.settings[spec_key] != blank
+                      assign spec = b.settings[spec_key] | escape
+                    elsif mf_specs != nil
+                      assign spec_idx = i | minus: 1
+                      assign spec = mf_specs[spec_idx] | strip | escape
+                    endif
+                    if is_placeholder and spec == blank and i <= 2
+                      assign spec = 'Specification ' | append: i
+                    endif
+                  endif
+                -%}
+                <div class="sc-cpt__cell sc-cpt__spec sc-cpt__spec--{{ i }}">{{ spec }}</div>
+              {%- endfor -%}
+            </li>
+          {%- endfor -%}
+        </ul>
+      </div>
+    {%- endif -%}
+  </div>
+</section>
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "SC – Compare products",
+  "tag": "div",
+  "class": "sc-cpt-section",
+  "max_blocks": 4,
+  "enabled_on": { "templates": ["product"] },
+  "settings": [
+    { "type": "header", "content": "Products" },
+    {
+      "type": "select",
+      "id": "source",
+      "label": "Product source",
+      "options": [
+        { "value": "blocks", "label": "Blocks" },
+        { "value": "metafield", "label": "Product metafield" }
+      ],
+      "default": "blocks",
+      "info": "Metafield: uses the current product's \"sc_compare.products\" (list of products). Blocks are used when it is empty."
+    },
+    { "type": "checkbox", "id": "add_current", "label": "Metafield source: show current product first", "default": true },
+    { "type": "checkbox", "id": "auto_detect_current", "label": "Highlight the product being viewed automatically", "default": true },
+    { "type": "text", "id": "this_model_label", "label": "Current product label", "default": "This model" },
+    { "type": "checkbox", "id": "link_products", "label": "Link images and names to products", "default": true },
+    { "type": "checkbox", "id": "show_description", "label": "Show short description", "default": true },
+    { "type": "checkbox", "id": "show_price", "label": "Show price", "default": true },
+    { "type": "checkbox", "id": "show_compare_price", "label": "Show compare-at price", "default": false },
+    { "type": "text", "id": "price_from_text", "label": "Prefix when price varies", "default": "From", "info": "Leave empty to hide." },
+    { "type": "range", "id": "max_specs", "label": "Specification rows", "min": 0, "max": 5, "step": 1, "default": 5 },
+
+    { "type": "header", "content": "Subheading" },
+    { "type": "text", "id": "subheading", "label": "Text", "default": "Compare products" },
+    { "type": "color", "id": "subheading_color", "label": "Colour", "info": "Empty uses the accent colour." },
+    { "type": "range", "id": "subheading_size", "label": "Size", "min": 10, "max": 30, "step": 1, "unit": "px", "default": 14 },
+    { "type": "range", "id": "subheading_size_mobile", "label": "Size (mobile)", "min": 10, "max": 24, "step": 1, "unit": "px", "default": 12 },
+    { "type": "range", "id": "subheading_letter_spacing", "label": "Letter spacing", "min": 0, "max": 6, "step": 0.5, "unit": "px", "default": 2 },
+    { "type": "checkbox", "id": "subheading_uppercase", "label": "Uppercase", "default": true },
+
+    { "type": "header", "content": "Heading" },
+    { "type": "text", "id": "heading", "label": "Text", "default": "Setting new standards of performance" },
+    { "type": "text", "id": "heading_highlight", "label": "Highlighted word", "default": "performance", "info": "Highlighted where it appears in the heading, otherwise added at the end." },
+    {
+      "type": "select",
+      "id": "highlight_style",
+      "label": "Highlight style",
+      "options": [
+        { "value": "swoosh", "label": "Hand-drawn underline" },
+        { "value": "underline", "label": "Straight underline" },
+        { "value": "color", "label": "Colour only" }
+      ],
+      "default": "swoosh"
+    },
+    { "type": "color", "id": "highlight_color", "label": "Highlight colour", "info": "Empty uses the accent colour." },
+    { "type": "color", "id": "heading_color", "label": "Colour", "info": "Empty uses the text colour." },
+    { "type": "range", "id": "heading_size", "label": "Size", "min": 18, "max": 72, "step": 1, "unit": "px", "default": 40 },
+    { "type": "range", "id": "heading_size_mobile", "label": "Size (mobile)", "min": 16, "max": 48, "step": 1, "unit": "px", "default": 28 },
+    {
+      "type": "select",
+      "id": "heading_weight",
+      "label": "Weight",
+      "options": [
+        { "value": "300", "label": "Light" },
+        { "value": "400", "label": "Regular" },
+        { "value": "500", "label": "Medium" },
+        { "value": "700", "label": "Bold" }
+      ],
+      "default": "500"
+    },
+    {
+      "type": "select",
+      "id": "heading_alignment",
+      "label": "Subheading and heading alignment",
+      "options": [
+        { "value": "left", "label": "Left" },
+        { "value": "center", "label": "Center" },
+        { "value": "right", "label": "Right" }
+      ],
+      "default": "center"
+    },
+
+    { "type": "header", "content": "Download button" },
+    { "type": "checkbox", "id": "show_download", "label": "Show download button", "default": false },
+    { "type": "text", "id": "download_text", "label": "Button text", "default": "Download datasheet" },
+    { "type": "url", "id": "download_link", "label": "Link", "info": "Paste a file URL from Content › Files (e.g. a PDF datasheet) or any page." },
+    { "type": "checkbox", "id": "download_icon", "label": "Show download icon", "default": true },
+    { "type": "checkbox", "id": "download_new_tab", "label": "Open in new tab", "default": true },
+    { "type": "checkbox", "id": "download_attribute", "label": "Force file download", "default": false, "info": "Only works for files on your own domain." },
+    {
+      "type": "select",
+      "id": "download_style",
+      "label": "Style",
+      "options": [
+        { "value": "outline", "label": "Outline" },
+        { "value": "solid", "label": "Solid (accent)" },
+        { "value": "link", "label": "Text link" }
+      ],
+      "default": "outline"
+    },
+    { "type": "range", "id": "download_radius", "label": "Corner radius", "min": 0, "max": 30, "step": 1, "unit": "px", "default": 4 },
+
+    { "type": "header", "content": "Product columns" },
+    {
+      "type": "select",
+      "id": "image_ratio",
+      "label": "Image ratio",
+      "options": [
+        { "value": "square", "label": "Square" },
+        { "value": "portrait", "label": "Portrait (4:5)" },
+        { "value": "landscape", "label": "Landscape (4:3)" },
+        { "value": "wide", "label": "Wide (16:9)" }
+      ],
+      "default": "landscape"
+    },
+    {
+      "type": "select",
+      "id": "image_fit",
+      "label": "Image fit",
+      "options": [
+        { "value": "contain", "label": "Fit" },
+        { "value": "cover", "label": "Fill" }
+      ],
+      "default": "contain"
+    },
+    { "type": "color", "id": "image_background", "label": "Image background" },
+    { "type": "range", "id": "column_max_width", "label": "Column max width", "min": 220, "max": 600, "step": 10, "unit": "px", "default": 360 },
+    { "type": "range", "id": "column_width_mobile", "label": "Column width (mobile)", "min": 180, "max": 340, "step": 10, "unit": "px", "default": 260, "info": "Columns scroll sideways on mobile." },
+    { "type": "range", "id": "column_gap", "label": "Space between columns", "min": 0, "max": 60, "step": 2, "unit": "px", "default": 12 },
+    {
+      "type": "select",
+      "id": "table_alignment",
+      "label": "Columns alignment",
+      "options": [
+        { "value": "start", "label": "Left" },
+        { "value": "center", "label": "Center" }
+      ],
+      "default": "start"
+    },
+    { "type": "range", "id": "name_size", "label": "Product name size", "min": 14, "max": 32, "step": 1, "unit": "px", "default": 20 },
+    { "type": "range", "id": "description_size", "label": "Description size", "min": 12, "max": 20, "step": 1, "unit": "px", "default": 15 },
+    { "type": "range", "id": "price_size", "label": "Price size", "min": 12, "max": 30, "step": 1, "unit": "px", "default": 18 },
+    { "type": "range", "id": "spec_size", "label": "Specification size", "min": 11, "max": 20, "step": 1, "unit": "px", "default": 14 },
+    { "type": "checkbox", "id": "accent_other_names", "label": "Accent colour on other product names", "default": true },
+    { "type": "color", "id": "current_column_background", "label": "Current product column background" },
+
+    { "type": "header", "content": "Colours" },
+    { "type": "color", "id": "text_color", "label": "Text", "default": "#1A1A1A" },
+    { "type": "color", "id": "secondary_text_color", "label": "Description and specification text", "default": "#4D4D4D" },
+    { "type": "color", "id": "accent_color", "label": "Accent (current product, highlights)", "default": "#9A5A2E" },
+    { "type": "color", "id": "divider_color", "label": "Divider lines", "default": "#CFCFCF" },
+    { "type": "color", "id": "background", "label": "Section background", "default": "#EFEFEF" },
+    { "type": "color", "id": "table_background", "label": "Table background" },
+    { "type": "range", "id": "table_radius", "label": "Table corner radius", "min": 0, "max": 40, "step": 1, "unit": "px", "default": 0 },
+    { "type": "range", "id": "table_padding", "label": "Table padding", "min": 0, "max": 80, "step": 4, "unit": "px", "default": 0 },
+    { "type": "range", "id": "table_padding_mobile", "label": "Table padding (mobile)", "min": 0, "max": 40, "step": 2, "unit": "px", "default": 0 },
+
+    { "type": "header", "content": "Width" },
+    { "type": "checkbox", "id": "enable_custom_max_width", "label": "Custom max-width", "default": true },
+    { "type": "range", "id": "custom_max_width", "label": "Max-width", "min": 400, "max": 2500, "step": 25, "unit": "px", "default": 1750 },
+
+    { "type": "header", "content": "Section spacing" },
+    { "type": "range", "id": "space_top", "label": "Top", "min": 0, "max": 200, "step": 5, "unit": "px", "default": 100 },
+    { "type": "range", "id": "space_bottom", "label": "Bottom", "min": 0, "max": 200, "step": 5, "unit": "px", "default": 100 },
+    { "type": "range", "id": "space_left", "label": "Left", "min": 0, "max": 100, "step": 5, "unit": "px", "default": 40 },
+    { "type": "range", "id": "space_right", "label": "Right", "min": 0, "max": 100, "step": 5, "unit": "px", "default": 40 },
+
+    { "type": "header", "content": "Section spacing (mobile)" },
+    { "type": "range", "id": "space_top_mobile", "label": "Top (mobile)", "min": 0, "max": 100, "step": 5, "unit": "px", "default": 50 },
+    { "type": "range", "id": "space_bottom_mobile", "label": "Bottom (mobile)", "min": 0, "max": 100, "step": 5, "unit": "px", "default": 50 },
+    { "type": "range", "id": "space_left_mobile", "label": "Left (mobile)", "min": 0, "max": 50, "step": 2, "unit": "px", "default": 16 },
+    { "type": "range", "id": "space_right_mobile", "label": "Right (mobile)", "min": 0, "max": 50, "step": 2, "unit": "px", "default": 16 }
+  ],
+  "blocks": [
+    {
+      "type": "product",
+      "name": "Product",
+      "limit": 4,
+      "settings": [
+        { "type": "product", "id": "product", "label": "Product" },
+        { "type": "checkbox", "id": "this_model", "label": "This model (current product)", "default": false, "info": "Highlights this column. With no product selected, the product being viewed is used." },
+        { "type": "header", "content": "Overrides (optional)" },
+        { "type": "paragraph", "content": "Filled fields replace the product data. Description and specs otherwise come from the sc_compare.short_description and sc_compare.specifications metafields." },
+        { "type": "image_picker", "id": "image", "label": "Image" },
+        { "type": "text", "id": "title", "label": "Name" },
+        { "type": "textarea", "id": "description", "label": "Short description" },
+        { "type": "text", "id": "price_text", "label": "Price text" },
+        { "type": "header", "content": "Specifications" },
+        { "type": "text", "id": "spec_1", "label": "Specification 1" },
+        { "type": "text", "id": "spec_2", "label": "Specification 2" },
+        { "type": "text", "id": "spec_3", "label": "Specification 3" },
+        { "type": "text", "id": "spec_4", "label": "Specification 4" },
+        { "type": "text", "id": "spec_5", "label": "Specification 5" }
+      ]
+    }
+  ],
+  "presets": [
+    {
+      "name": "SC – Compare products",
+      "blocks": [
+        { "type": "product", "settings": { "this_model": true } },
+        { "type": "product" },
+        { "type": "product" }
+      ]
+    }
+  ]
+}
+{% endschema %}

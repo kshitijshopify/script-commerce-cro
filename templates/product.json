@@ -7,7 +7,7 @@
  * made to this file may be overwritten.
  * ------------------------------------------------------------
  */
- {
+{
   "sections": {
     "main": {
       "type": "main-product",
@@ -584,6 +584,129 @@
         "padding_bottom": 12
       }
     },
+    "sc_pdp_compare_products_table_xRxUT6": {
+      "type": "sc-pdp-compare-products-table",
+      "blocks": {
+        "product_P9AGYQ": {
+          "type": "product",
+          "settings": {
+            "product": "",
+            "this_model": true,
+            "title": "",
+            "description": "",
+            "price_text": "",
+            "spec_1": "Specification 1",
+            "spec_2": "Specification 2",
+            "spec_3": "Specification 3",
+            "spec_4": "",
+            "spec_5": ""
+          }
+        },
+        "product_hrzV6r": {
+          "type": "product",
+          "settings": {
+            "product": "the-collection-snowboard-oxygen",
+            "this_model": false,
+            "title": "",
+            "description": "",
+            "price_text": "",
+            "spec_1": "Specification 1",
+            "spec_2": "Specification 2",
+            "spec_3": "Specification 3",
+            "spec_4": "",
+            "spec_5": ""
+          }
+        },
+        "product_J4FDkp": {
+          "type": "product",
+          "settings": {
+            "product": "the-collection-snowboard-hydrogen",
+            "this_model": false,
+            "title": "",
+            "description": "",
+            "price_text": "",
+            "spec_1": "Specification 1",
+            "spec_2": "Specification 2",
+            "spec_3": "Specification 3",
+            "spec_4": "",
+            "spec_5": ""
+          }
+        }
+      },
+      "block_order": [
+        "product_P9AGYQ",
+        "product_hrzV6r",
+        "product_J4FDkp"
+      ],
+      "name": "SC – Compare products",
+      "settings": {
+        "source": "blocks",
+        "add_current": true,
+        "auto_detect_current": true,
+        "this_model_label": "This model",
+        "link_products": true,
+        "show_description": true,
+        "show_price": true,
+        "show_compare_price": false,
+        "price_from_text": "From",
+        "max_specs": 5,
+        "subheading": "Compare products",
+        "subheading_color": "",
+        "subheading_size": 14,
+        "subheading_size_mobile": 12,
+        "subheading_letter_spacing": 2,
+        "subheading_uppercase": true,
+        "heading": "Setting new standards of performance",
+        "heading_highlight": "performance",
+        "highlight_style": "swoosh",
+        "highlight_color": "",
+        "heading_color": "",
+        "heading_size": 40,
+        "heading_size_mobile": 28,
+        "heading_weight": "500",
+        "heading_alignment": "center",
+        "show_download": false,
+        "download_text": "Download datasheet",
+        "download_link": "",
+        "download_icon": true,
+        "download_new_tab": true,
+        "download_attribute": false,
+        "download_style": "outline",
+        "download_radius": 4,
+        "image_ratio": "landscape",
+        "image_fit": "contain",
+        "image_background": "",
+        "column_max_width": 360,
+        "column_width_mobile": 260,
+        "column_gap": 12,
+        "table_alignment": "start",
+        "name_size": 20,
+        "description_size": 15,
+        "price_size": 18,
+        "spec_size": 14,
+        "accent_other_names": true,
+        "current_column_background": "",
+        "text_color": "#1A1A1A",
+        "secondary_text_color": "#4D4D4D",
+        "accent_color": "#9A5A2E",
+        "divider_color": "#CFCFCF",
+        "background": "#EFEFEF",
+        "table_background": "",
+        "table_radius": 0,
+        "table_padding": 0,
+        "table_padding_mobile": 0,
+        "enable_custom_max_width": true,
+        "custom_max_width": 1750,
+        "space_top": 100,
+        "space_bottom": 100,
+        "space_left": 40,
+        "space_right": 40,
+        "space_top_mobile": 50,
+        "space_bottom_mobile": 50,
+        "space_left_mobile": 16,
+        "space_right_mobile": 16
+      }
+    },
     "sc_pdp_product_tabs_qWKKc3": {
       "type": "sc-pdp-product-tabs",
       "blocks": {
@@ -802,6 +925,7 @@
   },
   "order": [
     "main",
+    "sc_pdp_compare_products_table_xRxUT6",
     "sc_pdp_product_tabs_qWKKc3",
     "sc_sticky_atc_KMbGMa",
     "disclosures",
