@@ -7,7 +7,7 @@
  * made to this file may be overwritten.
  * ------------------------------------------------------------
  */
-{
+ {
   "sections": {
     "main": {
       "type": "main-product",
@@ -17,6 +17,33 @@
           "settings": {
             "text": "{{ product.vendor }}",
             "text_style": "uppercase"
+          }
+        },
+        "cro_product_badges_zwUQGG": {
+          "type": "cro_product_badges",
+          "settings": {
+            "sc_badge_space_top": 10,
+            "sc_badge_space_bottom": 16,
+            "sc_badge_position": "top-left",
+            "sc_show_badge_icon": true,
+            "sc_badge_tb_padding": 4,
+            "sc_badge_lr_padding": 8,
+            "sc_badge_corner_radius": 3,
+            "sc_custom_font_family": false,
+            "sc_font_family": "assistant_n4",
+            "sc_badge_text_uppercase": true,
+            "sc_badge_text_size": 12,
+            "sc_badge_text_size_mobile": 12,
+            "sc_badge_font_weight": 600,
+            "sc_color_badge_1": "#ffffff",
+            "sc_border_badge_1": "#fe660e",
+            "sc_background_badge_1": "#fe660e",
+            "sc_color_badge_2": "#282828",
+            "sc_border_badge_2": "#282828",
+            "sc_background_badge_2": "rgba(0,0,0,0)",
+            "sc_color_badge_3": "#ffffff",
+            "sc_border_badge_3": "#282828",
+            "sc_background_badge_3": "#282828"
           }
         },
         "title": {
@@ -238,19 +265,29 @@
           "type": "sc_highlight_guarantees",
           "settings": {
             "enable": true,
-            "heading": "365-day money-back guarantee!",
-            "content": "<p>\"We stand 100% behind the quality of everything we make.\" — Founder</p>",
-            "footer_text": "300,000 happy customers",
-            "footer_link_text": "View reviews",
-            "footer_background": "#8782B9",
-            "footer_text_color": "#ffffff",
+            "text_color": "rgba(0,0,0,0)",
             "background": "#ffffff",
+            "corner_radius": 12,
             "show_shadow": true,
             "show_border": true,
-            "corner_radius": 12,
+            "border_color": "#e6e6e6",
+            "space_top": 16,
+            "space_bottom": 16,
             "show_image": true,
+            "image_size": "default",
             "image_position": "top",
-            "image_size": "default"
+            "thumbnail_radius": 0,
+            "heading": "365-day money-back guarantee!",
+            "heading_size": 20,
+            "content": "<p>\"We stand 100% behind the quality of everything we make.\" — Founder</p>",
+            "content_size": 14,
+            "footer_text_size": 14,
+            "footer_text_color": "#ffffff",
+            "footer_background": "#8782b9",
+            "footer_text": "300,000 happy customers",
+            "footer_link_text": "View reviews",
+            "footer_link_url": "",
+            "open_in_new_tab": false
           }
         },
         "sc_payment_icons_bar": {
@@ -494,6 +531,7 @@
       },
       "block_order": [
         "vendor",
+        "cro_product_badges_zwUQGG",
         "title",
         "sc_product_teaser",
         "price",
