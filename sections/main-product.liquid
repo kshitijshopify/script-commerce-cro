@@ -97,7 +97,9 @@
                   >
                     {{- block.settings.text -}}
                   </p>
-                {%- when 'cro_product_badges' -%}
+                {%- when 'sc_pdp_size_slider' -%}
+                  {%- render 'sc-size-slider', product: product, block: block -%}
+                {%- when 'sc_product_badges' -%}
                   {%- render 'sc_product_badges', product: product, block: block -%}
                 {%- when 'title' -%}
                   <div class="product__title"{{ block.shopify_attributes }}>
@@ -824,16 +826,40 @@
       ]
     },
     {
-      "type": "cro_product_badges",
-      "name": "CRO | Product Badges",
+      "type": "sc_pdp_size_slider",
+      "name": "SC | Size Slider",
       "limit": 1,
       "settings": [
         {
           "type": "header",
           "content": "Metafields (Required)",
-          "info": "Fill the product metafield 'CRO | Product Badges' (custom.cro_product_badges, list of single line text, max 3 items). 1st item = Badge 01, 2nd = Badge 02, 3rd = Badge 03. [Manage metafields](/admin/settings/custom_data/product/metafields)"
+          "info": "Needs the metaobject 'SC | PDP | Size Slider' (sc_pdp_size_slider) and the product metafield 'SC | Size Slider' (custom.sc_size_slider). Shown only when a product has a value. [Metaobjects](/admin/content/metaobjects) · [Metafields](/admin/settings/custom_data/product/metafields)"
         },
-        { "type": "header", "content": "CRO | Product Badges settings" },
+        { "type": "range", "id": "sc_ss_space_top", "min": -16, "max": 32, "step": 1, "unit": "px", "label": "Space top", "default": 16 },
+        { "type": "range", "id": "sc_ss_space_bottom", "min": -16, "max": 32, "step": 1, "unit": "px", "label": "Space bottom", "default": 16 },
+        { "type": "range", "id": "sc_ss_heading_size", "min": 12, "max": 20, "step": 1, "unit": "px", "label": "Heading size", "default": 18 },
+        { "type": "range", "id": "sc_ss_content_size", "min": 10, "max": 16, "step": 1, "unit": "px", "label": "Content size", "default": 14 },
+        { "type": "range", "id": "sc_ss_corner_radius", "min": 0, "max": 16, "step": 1, "unit": "px", "label": "Corner radius", "default": 6 },
+        { "type": "checkbox", "id": "sc_ss_show_border", "label": "Show border", "default": true },
+        { "type": "color", "id": "sc_ss_border_color", "label": "Border color", "default": "#eeeae9" },
+        { "type": "color", "id": "sc_ss_text_color", "label": "Text color", "default": "#282828" },
+        { "type": "color", "id": "sc_ss_background", "label": "Background", "default": "#FFFFFF" },
+        { "type": "range", "id": "sc_ss_scale_size", "min": 1, "max": 8, "step": 0.5, "unit": "px", "label": "Scale thickness", "default": 4 },
+        { "type": "color", "id": "sc_ss_scale_color", "label": "Scale color", "default": "#D9D9D9" },
+        { "type": "color", "id": "sc_ss_active_scale_color", "label": "Active scale color", "default": "#010101" }
+      ]
+    },
+    {
+      "type": "sc_product_badges",
+      "name": "SC | Product Badges",
+      "limit": 1,
+      "settings": [
+        {
+          "type": "header",
+          "content": "Metafields (Required)",
+          "info": "Fill the product metafield 'SC | Product Badges' (custom.sc_product_badges, list of single line text, max 3 items). 1st item = Badge 01, 2nd = Badge 02, 3rd = Badge 03. [Manage metafields](/admin/settings/custom_data/product/metafields)"
+        },
+        { "type": "header", "content": "SC | Product Badges settings" },
         { "type": "range", "id": "sc_badge_space_top", "min": 0, "max": 32, "step": 1, "unit": "px", "label": "Space top", "default": 0 },
         { "type": "range", "id": "sc_badge_space_bottom", "min": 0, "max": 32, "step": 1, "unit": "px", "label": "Space bottom", "default": 16 },
         {
