@@ -706,6 +706,8 @@
                   {% render 'sc-pdp-bulletpoints', block: block, product: product %}
                 {%- when 'sc_payment_icons_bar' -%}
                   {% render 'sc-payment-icons-bar', placement: 'pdp', product: product, block: block %}
+                {%- when 'sc_payment_bar' -%}
+                  {% render 'sc-payment-bar', placement: 'pdp', block: block %}
                 {%- when 'icon-with-text' -%}
                   {% render 'icon-with-text', block: block %}
               {%- endcase -%}
@@ -4906,6 +4908,17 @@
           "step": 2,
           "unit": "px",
           "default": 20
+        }
+      ]
+    },
+    {
+      "type": "sc_payment_bar",
+      "name": "SC – Payment bar",
+      "limit": 1,
+      "settings": [
+        {
+          "type": "paragraph",
+          "content": "Payment icons + installment / invoice message. Place directly below Buy buttons. All options are global – edit them in Theme settings → SC – Styling of payment bar, so the product page and cart always match."
         }
       ]
     },

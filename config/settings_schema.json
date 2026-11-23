@@ -2125,6 +2125,119 @@
     ]
   },
   {
+    "name": "SC – Styling of payment bar",
+    "settings": [
+      {
+        "type": "paragraph",
+        "content": "Payment icons + optional installment / invoice message below Add to cart, on the cart page and in the cart drawer. On the product page, add the \"SC – Payment bar\" block to place it. Icons are visual only – make sure your store actually accepts the methods you select."
+      },
+      {
+        "type": "checkbox",
+        "id": "sc_pb_enable",
+        "label": "Enable payment bar",
+        "default": true
+      },
+      {
+        "type": "color",
+        "id": "sc_pb_bg",
+        "label": "Background color",
+        "default": "#F4F4F4"
+      },
+      {
+        "type": "select",
+        "id": "sc_pb_corners",
+        "label": "Corner style",
+        "options": [
+          { "value": "rounded", "label": "Rounded" },
+          { "value": "square", "label": "Square" }
+        ],
+        "default": "square"
+      },
+      {
+        "type": "select",
+        "id": "sc_pb_icon_style",
+        "label": "Icon style",
+        "options": [
+          { "value": "grayscale", "label": "Grayscale" },
+          { "value": "colorful", "label": "Full colour" }
+        ],
+        "default": "colorful"
+      },
+      {
+        "type": "header",
+        "content": "Payment methods"
+      },
+      {
+        "type": "paragraph",
+        "content": "For a clean single row, don't enable more than six icons."
+      },
+      { "type": "checkbox", "id": "sc_pb_m_paypal", "label": "PayPal", "default": true },
+      { "type": "checkbox", "id": "sc_pb_m_master", "label": "Mastercard", "default": true },
+      { "type": "checkbox", "id": "sc_pb_m_visa", "label": "Visa", "default": true },
+      { "type": "checkbox", "id": "sc_pb_m_amex", "label": "Amex", "default": true },
+      { "type": "checkbox", "id": "sc_pb_m_klarna", "label": "Klarna", "default": true },
+      { "type": "checkbox", "id": "sc_pb_m_apple_pay", "label": "Apple Pay", "default": true },
+      { "type": "checkbox", "id": "sc_pb_m_klarna_pay_later", "label": "Klarna Pay Later", "default": false },
+      { "type": "checkbox", "id": "sc_pb_m_sofort", "label": "Sofort", "default": false },
+      { "type": "checkbox", "id": "sc_pb_m_bitcoin", "label": "Bitcoin", "default": false },
+      { "type": "checkbox", "id": "sc_pb_m_shopify_pay", "label": "Shop Pay", "default": false },
+      {
+        "type": "header",
+        "content": "Installment / invoice message"
+      },
+      {
+        "type": "checkbox",
+        "id": "sc_pb_msg_pdp",
+        "label": "Show message on product page",
+        "default": true
+      },
+      {
+        "type": "checkbox",
+        "id": "sc_pb_msg_cart",
+        "label": "Show message on cart",
+        "default": false
+      },
+      {
+        "type": "select",
+        "id": "sc_pb_msg_provider",
+        "label": "Payment provider",
+        "options": [
+          { "value": "klarna", "label": "Klarna" },
+          { "value": "paypal", "label": "PayPal" }
+        ],
+        "default": "klarna"
+      },
+      {
+        "type": "image_picker",
+        "id": "sc_pb_msg_logo",
+        "label": "Provider logo",
+        "info": "Optional. Leave empty to use the provider's standard icon."
+      },
+      {
+        "type": "text",
+        "id": "sc_pb_msg_text",
+        "label": "Message text",
+        "default": "Bequem auf Raten zahlen"
+      },
+      {
+        "type": "color",
+        "id": "sc_pb_msg_color",
+        "label": "Text color",
+        "default": "#282828"
+      },
+      {
+        "type": "range",
+        "id": "sc_pb_msg_font_size",
+        "label": "Font size",
+        "min": 10,
+        "max": 40,
+        "step": 1,
+        "unit": "px",
+        "default": 16
+      }
+    ]
+  },
+  {
     "name": "SC – Free gift",
     "settings": [
       {

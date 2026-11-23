@@ -101,6 +101,10 @@
             "show_gift_card_recipient": true
           }
         },
+        "sc_payment_bar": {
+          "type": "sc_payment_bar",
+          "settings": {}
+        },
         "sc_payment_icons_bar": {
           "type": "sc_payment_icons_bar",
           "settings": {}
@@ -379,6 +383,7 @@
         "sc_pdp_quantity_discounts",
         "sc_inventory_status",
         "buy_buttons",
+        "sc_payment_bar",
         "sc_payment_icons_bar",
         "sc_store_benefits",
         "sc_social_proof_banner",
