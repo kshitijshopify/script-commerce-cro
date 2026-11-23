@@ -97,8 +97,10 @@
                   >
                     {{- block.settings.text -}}
                   </p>
+                {%- when 'cro_product_badges' -%}
+                  {%- render 'sc_product_badges', product: product, block: block -%}
                 {%- when 'title' -%}
-                  <div class="product__title" {{ block.shopify_attributes }}>
+                  <div class="product__title"{{ block.shopify_attributes }}>
                     <h1>{{ product.title | escape }}</h1>
                     <a href="{{ product.url }}" class="product__title">
                       <h2 class="h1">
@@ -819,6 +821,56 @@
           "default": "body",
           "label": "t:sections.main-product.blocks.text.settings.text_style.label"
         }
+      ]
+    },
+    {
+      "type": "cro_product_badges",
+      "name": "CRO | Product Badges",
+      "limit": 1,
+      "settings": [
+        {
+          "type": "header",
+          "content": "Metafields (Required)",
+          "info": "Fill the product metafield 'CRO | Product Badges' (custom.cro_product_badges, list of single line text, max 3 items). 1st item = Badge 01, 2nd = Badge 02, 3rd = Badge 03. [Manage metafields](/admin/settings/custom_data/product/metafields)"
+        },
+        { "type": "header", "content": "CRO | Product Badges settings" },
+        { "type": "range", "id": "sc_badge_space_top", "min": 0, "max": 32, "step": 1, "unit": "px", "label": "Space top", "default": 0 },
+        { "type": "range", "id": "sc_badge_space_bottom", "min": 0, "max": 32, "step": 1, "unit": "px", "label": "Space bottom", "default": 16 },
+        {
+          "type": "select",
+          "id": "sc_badge_position",
+          "label": "Alignment",
+          "options": [
+            { "value": "top-left", "label": "Left" },
+            { "value": "top-right", "label": "Right" }
+          ],
+          "default": "top-left"
+        },
+        { "type": "checkbox", "id": "sc_show_badge_icon", "label": "Show icon", "default": true },
+        { "type": "range", "id": "sc_badge_tb_padding", "min": 0, "max": 16, "step": 1, "unit": "px", "label": "Top-bottom padding", "default": 4 },
+        { "type": "range", "id": "sc_badge_lr_padding", "min": 0, "max": 24, "step": 1, "unit": "px", "label": "Left-right padding", "default": 8 },
+        { "type": "range", "id": "sc_badge_corner_radius", "min": 0, "max": 32, "step": 1, "unit": "px", "label": "Corner radius", "default": 3 },
+        { "type": "checkbox", "id": "sc_custom_font_family", "label": "Custom font-family", "default": false },
+        { "type": "font_picker", "id": "sc_font_family", "label": "Font-family", "default": "assistant_n4" },
+        { "type": "checkbox", "id": "sc_badge_text_uppercase", "label": "Text uppercase", "default": true },
+        { "type": "range", "id": "sc_badge_text_size", "min": 10, "max": 18, "step": 1, "unit": "px", "label": "Text size", "default": 12 },
+        { "type": "range", "id": "sc_badge_text_size_mobile", "min": 10, "max": 18, "step": 1, "unit": "px", "label": "Text size (mobile)", "default": 12 },
+        { "type": "range", "id": "sc_badge_font_weight", "min": 100, "max": 900, "step": 100, "label": "Font weight", "default": 600 },
+        { "type": "header", "content": "Badge: 01 settings" },
+        { "type": "image_picker", "id": "sc_icon_badge_1", "label": "Icon image" },
+        { "type": "color", "id": "sc_color_badge_1", "label": "Text color", "default": "#ffffff" },
+        { "type": "color", "id": "sc_border_badge_1", "label": "Border color", "default": "#fe660e" },
+        { "type": "color", "id": "sc_background_badge_1", "label": "Background", "default": "#fe660e" },
+        { "type": "header", "content": "Badge: 02 settings" },
+        { "type": "image_picker", "id": "sc_icon_badge_2", "label": "Icon image" },
+        { "type": "color", "id": "sc_color_badge_2", "label": "Text color", "default": "#282828" },
+        { "type": "color", "id": "sc_border_badge_2", "label": "Border color", "default": "#282828" },
+        { "type": "color", "id": "sc_background_badge_2", "label": "Background", "default": "rgba(0,0,0,0)" },
+        { "type": "header", "content": "Badge: 03 settings" },
+        { "type": "image_picker", "id": "sc_icon_badge_3", "label": "Icon image" },
+        { "type": "color", "id": "sc_color_badge_3", "label": "Text color", "default": "#ffffff" },
+        { "type": "color", "id": "sc_border_badge_3", "label": "Border color", "default": "#282828" },
+        { "type": "color", "id": "sc_background_badge_3", "label": "Background", "default": "#282828" }
       ]
     },
     {

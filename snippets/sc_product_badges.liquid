@@ -1,0 +1,75 @@
+{%- comment -%}
+  SC | Product Badges
+  Renders up to 3 badges from list metafield custom.cro_product_badges (list of single line text).
+  Accepts: product, block
+{%- endcomment -%}
+
+{%- assign sc_badges = product.metafields.custom.cro_product_badges.value -%}
+
+{%- if sc_badges.size > 0 -%}
+  {%- assign sc_id = block.id -%}
+  <div class="sc_badges sc_badges--{{ block.settings.sc_badge_position }}" id="sc_badges-{{ sc_id }}" {{ block.shopify_attributes }}>
+    <style>
+      {% if block.settings.sc_custom_font_family %}
+        {% assign sc_font_url = block.settings.sc_font_family | font_url %}
+        @font-face {
+          font-family: '{{ block.settings.sc_font_family.family }}';
+          src: url({{ sc_font_url }}) format('woff2');
+          font-weight: {{ block.settings.sc_font_family.weight }};
+          font-style: normal;
+        }
+        #sc_badges-{{ sc_id }} {
+          font-family: '{{ block.settings.sc_font_family.family }}', sans-serif;
+        }
+      {% endif %}
+      #sc_badges-{{ sc_id }} {
+        margin-top: {{ block.settings.sc_badge_space_top }}px;
+        margin-bottom: {{ block.settings.sc_badge_space_bottom }}px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      #sc_badges-{{ sc_id }}.sc_badges--top-right { justify-content: flex-end; }
+      #sc_badges-{{ sc_id }} .sc_badge {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        font-size: {{ block.settings.sc_badge_text_size }}px;
+        line-height: 1.1;
+        font-weight: {{ block.settings.sc_badge_font_weight }};
+        padding: {{ block.settings.sc_badge_tb_padding }}px {{ block.settings.sc_badge_lr_padding }}px;
+        border-radius: {{ block.settings.sc_badge_corner_radius }}px;
+        border: 1px solid transparent;
+        {% if block.settings.sc_badge_text_uppercase %}text-transform: uppercase;{% endif %}
+      }
+      #sc_badges-{{ sc_id }} .sc_badge img { width: 14px; height: auto; display: block; }
+      {% for i in (1..3) %}
+        {%- assign sc_color_key = 'sc_color_badge_' | append: i -%}
+        {%- assign sc_border_key = 'sc_border_badge_' | append: i -%}
+        {%- assign sc_bg_key = 'sc_background_badge_' | append: i -%}
+        #sc_badges-{{ sc_id }} .sc_badge--{{ i }} {
+          color: {{ block.settings[sc_color_key] }};
+          border-color: {{ block.settings[sc_border_key] }};
+          background: {{ block.settings[sc_bg_key] }};
+        }
+      {% endfor %}
+      @media (max-width: 749px) {
+        #sc_badges-{{ sc_id }} .sc_badge { font-size: {{ block.settings.sc_badge_text_size_mobile }}px; }
+      }
+    </style>
+
+    {%- for sc_item in sc_badges limit: 3 -%}
+      {%- assign sc_text = sc_item | strip -%}
+      {%- assign sc_icon_key = 'sc_icon_badge_' | append: forloop.index -%}
+      {%- assign sc_icon = block.settings[sc_icon_key] -%}
+      {%- if sc_text != blank -%}
+        <div class="sc_badge sc_badge--{{ forloop.index }}">
+          {%- if block.settings.sc_show_badge_icon and sc_icon != blank -%}
+            {{- sc_icon | image_url: width: 56 | image_tag: loading: 'lazy', widths: '28, 56', alt: sc_icon.alt -}}
+          {%- endif -%}
+          <span>{{ sc_text | escape }}</span>
+        </div>
+      {%- endif -%}
+    {%- endfor -%}
+  </div>
+{%- endif -%}

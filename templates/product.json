@@ -7,7 +7,7 @@
  * made to this file may be overwritten.
  * ------------------------------------------------------------
  */
-{
+ {
   "sections": {
     "main": {
       "type": "main-product",
@@ -17,6 +17,33 @@
           "settings": {
             "text": "{{ product.vendor }}",
             "text_style": "uppercase"
+          }
+        },
+        "cro_product_badges_zwUQGG": {
+          "type": "cro_product_badges",
+          "settings": {
+            "sc_badge_space_top": 10,
+            "sc_badge_space_bottom": 16,
+            "sc_badge_position": "top-left",
+            "sc_show_badge_icon": true,
+            "sc_badge_tb_padding": 4,
+            "sc_badge_lr_padding": 8,
+            "sc_badge_corner_radius": 3,
+            "sc_custom_font_family": false,
+            "sc_font_family": "assistant_n4",
+            "sc_badge_text_uppercase": true,
+            "sc_badge_text_size": 12,
+            "sc_badge_text_size_mobile": 12,
+            "sc_badge_font_weight": 600,
+            "sc_color_badge_1": "#ffffff",
+            "sc_border_badge_1": "#fe660e",
+            "sc_background_badge_1": "#fe660e",
+            "sc_color_badge_2": "#282828",
+            "sc_border_badge_2": "#282828",
+            "sc_background_badge_2": "rgba(0,0,0,0)",
+            "sc_color_badge_3": "#ffffff",
+            "sc_border_badge_3": "#282828",
+            "sc_background_badge_3": "#282828"
           }
         },
         "title": {
@@ -508,6 +535,7 @@
       },
       "block_order": [
         "vendor",
+        "cro_product_badges_zwUQGG",
         "title",
         "sc_product_teaser",
         "price",
