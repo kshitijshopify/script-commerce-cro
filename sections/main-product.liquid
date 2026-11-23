@@ -702,12 +702,17 @@
                   {% render 'sc-pdp-variant-cards', block: block, product: product, section: section %}
                 {%- when 'sc_pdp_quantity_discounts' -%}
                   {% render 'sc-pdp-quantity-discounts', block: block, product: product, section: section %}
+                {%- when 'sc_product_teaser' -%}
+                  {% render 'sc-product-teaser', product: product, placement: 'product', block: block %}
+                  {%- comment -%}Teaser sits under the title. Cards use the theme setting.{%- endcomment -%}
                 {%- when 'sc_bulletpoints' -%}
                   {% render 'sc-pdp-bulletpoints', block: block, product: product %}
                 {%- when 'sc_payment_icons_bar' -%}
                   {% render 'sc-payment-icons-bar', placement: 'pdp', product: product, block: block %}
                 {%- when 'sc_payment_bar' -%}
                   {% render 'sc-payment-bar', placement: 'pdp', block: block %}
+                {%- when 'sc_highlight_guarantees' -%}
+                  {% render 'sc-pdp-highlight-guarantees', block: block %}
                 {%- when 'icon-with-text' -%}
                   {% render 'icon-with-text', block: block %}
               {%- endcase -%}
@@ -2942,6 +2947,221 @@
       ]
     },
     {
+      "type": "sc_highlight_guarantees",
+      "name": "SC – Highlight guarantee",
+      "limit": 1,
+      "settings": [
+        {
+          "type": "checkbox",
+          "id": "enable",
+          "label": "Show guarantee card",
+          "default": true
+        },
+        {
+          "type": "paragraph",
+          "content": "A card for a money-back promise or founder quote. Place it directly under the buy buttons. The image is optional."
+        },
+        {
+          "type": "color",
+          "id": "text_color",
+          "label": "Text color",
+          "info": "Transparent uses the surrounding text color.",
+          "default": "rgba(0,0,0,0)"
+        },
+        {
+          "type": "color",
+          "id": "background",
+          "label": "Background",
+          "default": "#ffffff"
+        },
+        {
+          "type": "range",
+          "id": "corner_radius",
+          "min": 0,
+          "max": 24,
+          "step": 1,
+          "unit": "px",
+          "label": "Corner radius",
+          "default": 12
+        },
+        {
+          "type": "checkbox",
+          "id": "show_shadow",
+          "label": "Show shadow",
+          "default": true
+        },
+        {
+          "type": "checkbox",
+          "id": "show_border",
+          "label": "Show border",
+          "default": true
+        },
+        {
+          "type": "color",
+          "id": "border_color",
+          "label": "Border color",
+          "default": "#e6e6e6"
+        },
+        {
+          "type": "range",
+          "id": "space_top",
+          "min": 0,
+          "max": 40,
+          "step": 1,
+          "unit": "px",
+          "label": "Top space",
+          "default": 16
+        },
+        {
+          "type": "range",
+          "id": "space_bottom",
+          "min": 0,
+          "max": 40,
+          "step": 1,
+          "unit": "px",
+          "label": "Bottom space",
+          "default": 16
+        },
+        {
+          "type": "header",
+          "content": "Image"
+        },
+        {
+          "type": "checkbox",
+          "id": "show_image",
+          "label": "Show image",
+          "info": "Uses a default team photo until you upload your own.",
+          "default": true
+        },
+        {
+          "type": "image_picker",
+          "id": "image",
+          "label": "Image",
+          "info": "Optional. Replaces the default team photo."
+        },
+        {
+          "type": "select",
+          "id": "image_size",
+          "label": "Size",
+          "info": "Used when the image sits on top.",
+          "options": [
+            { "value": "default", "label": "Default" },
+            { "value": "small", "label": "Small" },
+            { "value": "medium", "label": "Medium" },
+            { "value": "large", "label": "Large" }
+          ],
+          "default": "default"
+        },
+        {
+          "type": "select",
+          "id": "image_position",
+          "label": "Position",
+          "options": [
+            { "value": "top", "label": "Top" },
+            { "value": "left", "label": "Left" },
+            { "value": "right", "label": "Right" }
+          ],
+          "default": "top"
+        },
+        {
+          "type": "range",
+          "id": "thumbnail_radius",
+          "min": 0,
+          "max": 24,
+          "step": 1,
+          "unit": "px",
+          "label": "Image corner radius",
+          "default": 0
+        },
+        {
+          "type": "header",
+          "content": "Message"
+        },
+        {
+          "type": "inline_richtext",
+          "id": "heading",
+          "label": "Heading",
+          "default": "365-day money-back guarantee!"
+        },
+        {
+          "type": "range",
+          "id": "heading_size",
+          "min": 14,
+          "max": 28,
+          "step": 1,
+          "unit": "px",
+          "label": "Heading size",
+          "default": 20
+        },
+        {
+          "type": "richtext",
+          "id": "content",
+          "label": "Supporting text",
+          "default": "<p>\"We stand 100% behind the quality of everything we make.\" — Founder</p>"
+        },
+        {
+          "type": "range",
+          "id": "content_size",
+          "min": 12,
+          "max": 20,
+          "step": 1,
+          "unit": "px",
+          "label": "Text size",
+          "default": 14
+        },
+        {
+          "type": "header",
+          "content": "Footer"
+        },
+        {
+          "type": "range",
+          "id": "footer_text_size",
+          "min": 12,
+          "max": 20,
+          "step": 1,
+          "unit": "px",
+          "label": "Text size",
+          "default": 14
+        },
+        {
+          "type": "color",
+          "id": "footer_text_color",
+          "label": "Text color",
+          "default": "#ffffff"
+        },
+        {
+          "type": "color",
+          "id": "footer_background",
+          "label": "Background",
+          "default": "#8782B9"
+        },
+        {
+          "type": "inline_richtext",
+          "id": "footer_text",
+          "label": "Text",
+          "default": "300,000 happy customers"
+        },
+        {
+          "type": "text",
+          "id": "footer_link_text",
+          "label": "Link text",
+          "default": "View reviews"
+        },
+        {
+          "type": "url",
+          "id": "footer_link_url",
+          "label": "Link",
+          "info": "Leave empty to show the link text without a destination."
+        },
+        {
+          "type": "checkbox",
+          "id": "open_in_new_tab",
+          "label": "Open link in a new tab",
+          "default": false
+        }
+      ]
+    },
+    {
       "type": "sc_store_benefits",
       "name": "SC – Store benefits",
       "limit": 1,
@@ -4934,6 +5154,61 @@
       ]
     },
     {
+      "type": "sc_product_teaser",
+      "name": "SC – Product teaser",
+      "limit": 1,
+      "settings": [
+        {
+          "type": "checkbox",
+          "id": "enable",
+          "label": "Show on the product page",
+          "default": true,
+          "info": "Collection cards have their own switch in Theme settings → SC – Product teaser."
+        },
+        {
+          "type": "paragraph",
+          "content": "A short line under the title, from the product rich text metafield custom.cro_product_teaser. Nothing is shown when that metafield is empty. Place this block under the title and above the price."
+        },
+        {
+          "type": "range",
+          "id": "text_size",
+          "min": 12,
+          "max": 20,
+          "step": 1,
+          "unit": "px",
+          "label": "Text size",
+          "default": 14
+        },
+        {
+          "type": "color",
+          "id": "text_color",
+          "label": "Text color",
+          "default": "rgba(0,0,0,0)",
+          "info": "Transparent uses the surrounding text color."
+        },
+        {
+          "type": "range",
+          "id": "space_top",
+          "min": 0,
+          "max": 24,
+          "step": 1,
+          "unit": "px",
+          "label": "Space above",
+          "default": 6
+        },
+        {
+          "type": "range",
+          "id": "space_bottom",
+          "min": 0,
+          "max": 24,
+          "step": 1,
+          "unit": "px",
+          "label": "Space below",
+          "default": 8
+        }
+      ]
+    },
+    {
       "type": "sc_bulletpoints",
       "name": "SC – PDP Bulletpoints",
       "limit": 1,
@@ -4943,15 +5218,21 @@
           "content": "Content"
         },
         {
+          "type": "checkbox",
+          "id": "enable",
+          "label": "Show bulletpoints",
+          "default": true
+        },
+        {
           "type": "paragraph",
-          "content": "Bullets come from a product metafield (Single line text – List of values). Default: standard.cro_pdp_bulletpoints. Formatting: **bold**, *italic*, __underline__."
+          "content": "Place under the price. A product metafield replaces the bullets below when it has a value. Title, icon, colours and spacing always come from these settings. Metafield: custom.cro_pdp_bulletpoints — Single line text, list of values. Each value is Lead | explanation."
         },
         {
           "type": "text",
           "id": "metafield_key",
           "label": "Metafield (namespace.key)",
-          "default": "standard.cro_pdp_bulletpoints",
-          "info": "List of single line text (recommended). Single/multi-line text also works – one bullet per line."
+          "default": "custom.cro_pdp_bulletpoints",
+          "info": "Single line text, list of values. One value per bullet: Lead | explanation. A value with no | is a plain line. When this metafield has any value, it replaces every theme-editor bullet."
         },
         {
           "type": "range",
@@ -4960,13 +5241,111 @@
           "max": 10,
           "step": 1,
           "label": "Maximum bullets",
-          "default": 5
+          "default": 6
+        },
+        {
+          "type": "header",
+          "content": "Title"
+        },
+        {
+          "type": "richtext",
+          "id": "heading",
+          "label": "Title",
+          "default": "<p>Why you'll love it</p>"
+        },
+        {
+          "type": "range",
+          "id": "heading_size",
+          "min": 14,
+          "max": 28,
+          "step": 1,
+          "unit": "px",
+          "label": "Title size",
+          "default": 18
+        },
+        {
+          "type": "header",
+          "content": "Bullets"
+        },
+        {
+          "type": "paragraph",
+          "content": "Shown when this product's metafield is empty. The lead is bold. Leave a row blank to hide it."
+        },
+        {
+          "type": "text",
+          "id": "bullet_1_lead",
+          "label": "Bullet 1 lead",
+          "default": "All-mountain shape"
+        },
+        {
+          "type": "text",
+          "id": "bullet_1_text",
+          "label": "Bullet 1 text",
+          "default": "Stable on groomers and in softer snow."
+        },
+        {
+          "type": "text",
+          "id": "bullet_2_lead",
+          "label": "Bullet 2 lead",
+          "default": "Sintered base"
+        },
+        {
+          "type": "text",
+          "id": "bullet_2_text",
+          "label": "Bullet 2 text",
+          "default": "Holds wax and stays fast between tunes."
+        },
+        {
+          "type": "text",
+          "id": "bullet_3_lead",
+          "label": "Bullet 3 lead",
+          "default": "Durable edges"
+        },
+        {
+          "type": "text",
+          "id": "bullet_3_text",
+          "label": "Bullet 3 text",
+          "default": "Grip on hardpack without catching."
+        },
+        {
+          "type": "text",
+          "id": "bullet_4_lead",
+          "label": "Bullet 4 lead",
+          "default": "Lightweight core"
+        },
+        {
+          "type": "text",
+          "id": "bullet_4_text",
+          "label": "Bullet 4 text",
+          "default": "Easy to turn from the first run to the last."
+        },
+        {
+          "type": "text",
+          "id": "bullet_5_lead",
+          "label": "Bullet 5 lead",
+          "default": "365-day guarantee"
+        },
+        {
+          "type": "text",
+          "id": "bullet_5_text",
+          "label": "Bullet 5 text",
+          "default": "Ride it at home, or send it back."
+        },
+        {
+          "type": "text",
+          "id": "bullet_6_lead",
+          "label": "Bullet 6 lead"
+        },
+        {
+          "type": "text",
+          "id": "bullet_6_text",
+          "label": "Bullet 6 text"
         },
         {
           "type": "textarea",
           "id": "fallback_bullets",
-          "label": "Fallback bullets",
-          "info": "Optional. One bullet per line. Shown only when the product has no metafield bullets."
+          "label": "Extra bullets",
+          "info": "Optional. One per line, after the six rows: Lead | explanation. Also replaced when the metafield has a value."
         },
         {
           "type": "checkbox",
@@ -5006,7 +5385,7 @@
           "step": 1,
           "unit": "px",
           "label": "Gap between items",
-          "default": 3
+          "default": 10
         },
         {
           "type": "header",
@@ -5032,7 +5411,7 @@
           "step": 1,
           "unit": "px",
           "label": "Corner radius",
-          "default": 6
+          "default": 8
         },
         {
           "type": "range",
@@ -5049,7 +5428,7 @@
           "type": "color",
           "id": "background",
           "label": "Background",
-          "default": "rgba(0,0,0,0)",
+          "default": "#FAF3F1",
           "info": "Transparent = no box background."
         },
         {
@@ -5121,8 +5500,12 @@
           "type": "select",
           "id": "default_icon",
           "label": "Default icon",
-          "default": "check",
+          "default": "sparkle",
           "options": [
+            {
+              "value": "sparkle",
+              "label": "Sparkle"
+            },
             {
               "value": "check",
               "label": "Check (thin)"

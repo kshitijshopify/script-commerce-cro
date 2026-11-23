@@ -23,27 +23,160 @@
           "type": "title",
           "settings": {}
         },
+        "sc_product_teaser": {
+          "type": "sc_product_teaser",
+          "settings": {
+            "enable": true,
+            "text_size": 14,
+            "text_color": "rgba(0,0,0,0)",
+            "space_top": 6,
+            "space_bottom": 8
+          }
+        },
         "price": {
           "type": "price",
           "settings": {}
         },
+        "sc_bulletpoints": {
+          "type": "sc_bulletpoints",
+          "settings": {
+            "enable": true,
+            "metafield_key": "custom.cro_pdp_bulletpoints",
+            "max_items": 6,
+            "heading": "<p>Why you'll love it</p>",
+            "heading_size": 18,
+            "bullet_1_lead": "All-mountain shape",
+            "bullet_1_text": "Stable on groomers and in softer snow.",
+            "bullet_2_lead": "Sintered base",
+            "bullet_2_text": "Holds wax and stays fast between tunes.",
+            "bullet_3_lead": "Durable edges",
+            "bullet_3_text": "Grip on hardpack without catching.",
+            "bullet_4_lead": "Lightweight core",
+            "bullet_4_text": "Easy to turn from the first run to the last.",
+            "bullet_5_lead": "365-day guarantee",
+            "bullet_5_text": "Ride it at home, or send it back.",
+            "bullet_6_lead": "",
+            "bullet_6_text": "",
+            "fallback_bullets": "",
+            "enable_formatting": true,
+            "space_top": 16,
+            "space_bottom": 16,
+            "gap_items": 10,
+            "show_border": true,
+            "border_color": "#eeeae9",
+            "border_radius": 8,
+            "box_padding": 16,
+            "background": "#faf3f1",
+            "text_color": "rgba(0,0,0,0)",
+            "list_style": "svg",
+            "icon_source": "auto",
+            "default_icon": "sparkle",
+            "icon_as_svg": "",
+            "icon_as_size": 14,
+            "icon_width": 18,
+            "icon_color": "rgba(0,0,0,0)",
+            "icon_background": "rgba(0,0,0,0)",
+            "icon_margin_right": 8,
+            "font_size": 16,
+            "font_size_mobile": 16,
+            "font_weight": "inherit"
+          }
+        },
         "variant_picker": {
           "type": "variant_picker",
+          "disabled": true,
           "settings": {
             "picker_type": "button",
             "swatch_shape": "circle"
           }
         },
-        "sc_pdp_variant_cards": {
+        "sc_pdp_variant_cards_rMFiNN": {
           "type": "sc_pdp_variant_cards",
-          "settings": {}
-        },
-        "quantity_selector": {
-          "type": "quantity_selector",
-          "settings": {}
+          "settings": {
+            "enable": true,
+            "heading_text": "[option]: [value]",
+            "show_price": false,
+            "show_unit_price": true,
+            "mass_unit": "kg",
+            "savings_text": "Save [percent]%",
+            "savings_bg": "#4a4a4a",
+            "savings_color": "#ffffff",
+            "popular_label": "Bestseller",
+            "popular_bg": "#f5a623",
+            "popular_color": "#1a1a1a",
+            "columns_desktop": 4,
+            "card_radius": 10,
+            "card_border": "#d4d4d4",
+            "selected_border": "#1a1a1a",
+            "card_text": "#1a1a1a",
+            "card_muted": "#7a7a7a",
+            "margin_top": 8,
+            "margin_bottom": 20
+          }
         },
         "sc_quantity_selector": {
           "type": "sc_quantity_selector",
+          "settings": {
+            "layout": "text_badge",
+            "mode": "quantity",
+            "heading": "Choose your quantity:",
+            "show_selected": true,
+            "default_option": 1,
+            "hide_theme_quantity": true,
+            "hide_theme_variant_picker": false,
+            "o1_text": "1 x",
+            "o1_quantity": 1,
+            "o1_value": "",
+            "o1_badge": "",
+            "o1_badge_color": "#9b3b4a",
+            "o1_bestseller": "",
+            "o1_bestseller_color": "#1a1a1a",
+            "o2_text": "2 x",
+            "o2_quantity": 2,
+            "o2_value": "",
+            "o2_badge": "10%",
+            "o2_badge_color": "#9b3b4a",
+            "o2_bestseller": "Bestseller",
+            "o2_bestseller_color": "#1a1a1a",
+            "o3_text": "3 x",
+            "o3_quantity": 3,
+            "o3_value": "",
+            "o3_badge": "15%",
+            "o3_badge_color": "#9b3b4a",
+            "o3_bestseller": "",
+            "o3_bestseller_color": "#1a1a1a",
+            "o4_text": "4 x",
+            "o4_quantity": 4,
+            "o4_value": "",
+            "o4_badge": "20%",
+            "o4_badge_color": "#9b3b4a",
+            "o4_bestseller": "",
+            "o4_bestseller_color": "#1a1a1a",
+            "o5_text": "",
+            "o5_quantity": 5,
+            "o5_value": "",
+            "o5_badge": "",
+            "o5_badge_color": "#9b3b4a",
+            "o5_bestseller": "",
+            "o5_bestseller_color": "#1a1a1a",
+            "active_style": "border",
+            "active_color": "#000000",
+            "active_text_color": "#ffffff",
+            "text_color": "#000000",
+            "border_color": "#e5e5e5",
+            "background_color": "",
+            "badge_text_color": "#ffffff",
+            "radius": 0,
+            "option_height": 60,
+            "font_size": 17,
+            "font_size_mobile": 15,
+            "mobile_layout": "auto",
+            "margin_top": 10,
+            "margin_bottom": 16
+          }
+        },
+        "quantity_selector": {
+          "type": "quantity_selector",
           "settings": {}
         },
         "sc_inventory_status": {
@@ -101,9 +234,24 @@
             "show_gift_card_recipient": true
           }
         },
-        "sc_payment_bar": {
-          "type": "sc_payment_bar",
-          "settings": {}
+        "sc_highlight_guarantees": {
+          "type": "sc_highlight_guarantees",
+          "settings": {
+            "enable": true,
+            "heading": "365-day money-back guarantee!",
+            "content": "<p>\"We stand 100% behind the quality of everything we make.\" — Founder</p>",
+            "footer_text": "300,000 happy customers",
+            "footer_link_text": "View reviews",
+            "footer_background": "#8782B9",
+            "footer_text_color": "#ffffff",
+            "background": "#ffffff",
+            "show_shadow": true,
+            "show_border": true,
+            "corner_radius": 12,
+            "show_image": true,
+            "image_position": "top",
+            "image_size": "default"
+          }
         },
         "sc_payment_icons_bar": {
           "type": "sc_payment_icons_bar",
@@ -342,48 +490,21 @@
           "settings": {
             "share_label": "Share"
           }
-        },
-        "sc_bulletpoints": {
-          "type": "sc_bulletpoints",
-          "settings": {
-            "metafield_key": "standard.cro_pdp_bulletpoints",
-            "max_items": 5,
-            "enable_formatting": true,
-            "space_top": 16,
-            "space_bottom": 16,
-            "gap_items": 3,
-            "show_border": true,
-            "border_color": "#EEEAE9",
-            "border_radius": 6,
-            "box_padding": 16,
-            "background": "rgba(0,0,0,0)",
-            "text_color": "rgba(0,0,0,0)",
-            "list_style": "svg",
-            "icon_source": "auto",
-            "default_icon": "check",
-            "icon_as_size": 14,
-            "icon_width": 18,
-            "icon_color": "rgba(0,0,0,0)",
-            "icon_background": "rgba(0,0,0,0)",
-            "icon_margin_right": 8,
-            "font_size": 16,
-            "font_size_mobile": 16,
-            "font_weight": "inherit"
-          }
         }
       },
       "block_order": [
         "vendor",
         "title",
+        "sc_product_teaser",
         "price",
         "sc_bulletpoints",
         "variant_picker",
+        "sc_pdp_variant_cards_rMFiNN",
         "sc_quantity_selector",
         "quantity_selector",
-        "sc_pdp_quantity_discounts",
         "sc_inventory_status",
         "buy_buttons",
-        "sc_payment_bar",
+        "sc_highlight_guarantees",
         "sc_payment_icons_bar",
         "sc_store_benefits",
         "sc_social_proof_banner",
@@ -405,6 +526,103 @@
         "enable_video_looping": false,
         "padding_top": 36,
         "padding_bottom": 12
+      }
+    },
+    "sc_pdp_product_tabs_qWKKc3": {
+      "type": "sc-pdp-product-tabs",
+      "blocks": {
+        "description_nPta76": {
+          "type": "description",
+          "settings": {
+            "title": "Description",
+            "area_expanded": true
+          }
+        },
+        "faq_fkJJK8": {
+          "type": "faq",
+          "settings": {
+            "title": "FAQ's",
+            "area_expanded": false,
+            "faq_title_1": "How long does shipping take?",
+            "faq_content_1": "<p>Most orders arrive within 3–5 business days.</p>",
+            "faq_open_default_1": false,
+            "faq_title_2": "Can I return my order?",
+            "faq_content_2": "<p>Yes, returns are accepted within 30 days of delivery.</p>",
+            "faq_open_default_2": false,
+            "faq_title_3": "",
+            "faq_content_3": "",
+            "faq_open_default_3": false,
+            "faq_title_4": "",
+            "faq_content_4": "",
+            "faq_open_default_4": false,
+            "faq_title_5": "",
+            "faq_content_5": "",
+            "faq_open_default_5": false,
+            "faq_title_6": "",
+            "faq_content_6": "",
+            "faq_open_default_6": false,
+            "faq_title_7": "",
+            "faq_content_7": "",
+            "faq_open_default_7": false,
+            "faq_title_8": "",
+            "faq_content_8": "",
+            "faq_open_default_8": false,
+            "faq_title_9": "",
+            "faq_content_9": "",
+            "faq_open_default_9": false,
+            "faq_title_10": "",
+            "faq_content_10": "",
+            "faq_open_default_10": false,
+            "faq_title_11": "",
+            "faq_content_11": "",
+            "faq_open_default_11": false,
+            "faq_title_12": "",
+            "faq_content_12": "",
+            "faq_open_default_12": false
+          }
+        },
+        "content_yTmycE": {
+          "type": "content",
+          "settings": {
+            "title": "Shipping",
+            "area_expanded": false,
+            "content": "<p>Free shipping on all orders. Orders are processed within 1–2 business days.</p>",
+            "page": ""
+          }
+        },
+        "liquid_FxKt3P": {
+          "type": "liquid",
+          "settings": {
+            "title": "Size",
+            "area_expanded": false,
+            "liquid": ""
+          }
+        }
+      },
+      "block_order": [
+        "description_nPta76",
+        "faq_fkJJK8",
+        "content_yTmycE",
+        "liquid_FxKt3P"
+      ],
+      "name": "SC PDP Product Tabs",
+      "settings": {
+        "section_width": "container",
+        "enable_custom_max_width": true,
+        "custom_max_width": 930,
+        "text_color": "",
+        "background": "",
+        "border_color": "",
+        "tab_font_size": 13,
+        "tab_gap": 56,
+        "space_top": 60,
+        "space_bottom": 60,
+        "space_left": 0,
+        "space_right": 0,
+        "space_top_mobile": 40,
+        "space_bottom_mobile": 40,
+        "space_left_mobile": 0,
+        "space_right_mobile": 0
       }
     },
     "sc_sticky_atc_KMbGMa": {
@@ -528,6 +746,7 @@
   },
   "order": [
     "main",
+    "sc_pdp_product_tabs_qWKKc3",
     "sc_sticky_atc_KMbGMa",
     "disclosures",
     "related-products"

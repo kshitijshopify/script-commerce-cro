@@ -1,0 +1,441 @@
+{%- comment -%}
+  Theme block entry point (Horizon and other themes whose sections accept @theme blocks).
+  Settings mirror the "sc_bulletpoints" block in sections/main-product.liquid.
+  Place it under the price, above the variant picker.
+{%- endcomment -%}
+{%- liquid
+  assign sc_product = closest.product
+  if sc_product == blank
+    assign sc_product = product
+  endif
+-%}
+{% render 'sc-pdp-bulletpoints', block: block, product: sc_product %}
+
+{% schema %}
+{
+  "name": "SC – PDP Bulletpoints",
+  "settings": [
+    {
+      "type": "header",
+      "content": "Content"
+    },
+    {
+      "type": "checkbox",
+      "id": "enable",
+      "label": "Show bulletpoints",
+      "default": true
+    },
+    {
+      "type": "paragraph",
+      "content": "Place under the price. A product metafield replaces the bullets below when it has a value. Title, icon, colours and spacing always come from these settings. Metafield: custom.cro_pdp_bulletpoints — Single line text, list of values. Each value is Lead | explanation."
+    },
+    {
+      "type": "text",
+      "id": "metafield_key",
+      "label": "Metafield (namespace.key)",
+      "default": "custom.cro_pdp_bulletpoints",
+      "info": "Single line text, list of values. One value per bullet: Lead | explanation. A value with no | is a plain line. When this metafield has any value, it replaces every theme-editor bullet."
+    },
+    {
+      "type": "range",
+      "id": "max_items",
+      "min": 1,
+      "max": 10,
+      "step": 1,
+      "label": "Maximum bullets",
+      "default": 6
+    },
+    {
+      "type": "header",
+      "content": "Title"
+    },
+    {
+      "type": "richtext",
+      "id": "heading",
+      "label": "Title",
+      "default": "<p>Why you'll love it</p>"
+    },
+    {
+      "type": "range",
+      "id": "heading_size",
+      "min": 14,
+      "max": 28,
+      "step": 1,
+      "unit": "px",
+      "label": "Title size",
+      "default": 18
+    },
+    {
+      "type": "header",
+      "content": "Bullets"
+    },
+    {
+      "type": "paragraph",
+      "content": "Shown when this product's metafield is empty. The lead is bold. Leave a row blank to hide it."
+    },
+    {
+      "type": "text",
+      "id": "bullet_1_lead",
+      "label": "Bullet 1 lead",
+      "default": "All-mountain shape"
+    },
+    {
+      "type": "text",
+      "id": "bullet_1_text",
+      "label": "Bullet 1 text",
+      "default": "Stable on groomers and in softer snow."
+    },
+    {
+      "type": "text",
+      "id": "bullet_2_lead",
+      "label": "Bullet 2 lead",
+      "default": "Sintered base"
+    },
+    {
+      "type": "text",
+      "id": "bullet_2_text",
+      "label": "Bullet 2 text",
+      "default": "Holds wax and stays fast between tunes."
+    },
+    {
+      "type": "text",
+      "id": "bullet_3_lead",
+      "label": "Bullet 3 lead",
+      "default": "Durable edges"
+    },
+    {
+      "type": "text",
+      "id": "bullet_3_text",
+      "label": "Bullet 3 text",
+      "default": "Grip on hardpack without catching."
+    },
+    {
+      "type": "text",
+      "id": "bullet_4_lead",
+      "label": "Bullet 4 lead",
+      "default": "Lightweight core"
+    },
+    {
+      "type": "text",
+      "id": "bullet_4_text",
+      "label": "Bullet 4 text",
+      "default": "Easy to turn from the first run to the last."
+    },
+    {
+      "type": "text",
+      "id": "bullet_5_lead",
+      "label": "Bullet 5 lead",
+      "default": "365-day guarantee"
+    },
+    {
+      "type": "text",
+      "id": "bullet_5_text",
+      "label": "Bullet 5 text",
+      "default": "Ride it at home, or send it back."
+    },
+    {
+      "type": "text",
+      "id": "bullet_6_lead",
+      "label": "Bullet 6 lead"
+    },
+    {
+      "type": "text",
+      "id": "bullet_6_text",
+      "label": "Bullet 6 text"
+    },
+    {
+      "type": "textarea",
+      "id": "fallback_bullets",
+      "label": "Extra bullets",
+      "info": "Optional. One per line, after the six rows: Lead | explanation. Also replaced when the metafield has a value."
+    },
+    {
+      "type": "checkbox",
+      "id": "enable_formatting",
+      "label": "Allow **bold**, *italic*, __underline__",
+      "default": true
+    },
+    {
+      "type": "header",
+      "content": "Spacing"
+    },
+    {
+      "type": "range",
+      "id": "space_top",
+      "min": 0,
+      "max": 32,
+      "step": 1,
+      "unit": "px",
+      "label": "Space top",
+      "default": 16
+    },
+    {
+      "type": "range",
+      "id": "space_bottom",
+      "min": 0,
+      "max": 32,
+      "step": 1,
+      "unit": "px",
+      "label": "Space bottom",
+      "default": 16
+    },
+    {
+      "type": "range",
+      "id": "gap_items",
+      "min": 0,
+      "max": 16,
+      "step": 1,
+      "unit": "px",
+      "label": "Gap between items",
+      "default": 10
+    },
+    {
+      "type": "header",
+      "content": "Container"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_border",
+      "label": "Show border",
+      "default": true
+    },
+    {
+      "type": "color",
+      "id": "border_color",
+      "label": "Border color",
+      "default": "#EEEAE9"
+    },
+    {
+      "type": "range",
+      "id": "border_radius",
+      "min": 0,
+      "max": 16,
+      "step": 1,
+      "unit": "px",
+      "label": "Corner radius",
+      "default": 8
+    },
+    {
+      "type": "range",
+      "id": "box_padding",
+      "min": 0,
+      "max": 32,
+      "step": 1,
+      "unit": "px",
+      "label": "Inner padding",
+      "default": 16,
+      "info": "Used when the border or a background is shown."
+    },
+    {
+      "type": "color",
+      "id": "background",
+      "label": "Background",
+      "default": "#FAF3F1",
+      "info": "Transparent = no box background."
+    },
+    {
+      "type": "color",
+      "id": "text_color",
+      "label": "Text color",
+      "default": "rgba(0,0,0,0)",
+      "info": "Transparent = theme text color."
+    },
+    {
+      "type": "header",
+      "content": "List style"
+    },
+    {
+      "type": "select",
+      "id": "list_style",
+      "label": "List style",
+      "default": "svg",
+      "options": [
+        {
+          "value": "disc",
+          "label": "Disc"
+        },
+        {
+          "value": "circle",
+          "label": "Circle"
+        },
+        {
+          "value": "decimal",
+          "label": "Decimal (1, 2, 3)"
+        },
+        {
+          "value": "svg",
+          "label": "Icon (SVG / image)"
+        }
+      ]
+    },
+    {
+      "type": "header",
+      "content": "Icon",
+      "info": "Used when List style = Icon."
+    },
+    {
+      "type": "select",
+      "id": "icon_source",
+      "label": "Icon source",
+      "default": "auto",
+      "options": [
+        {
+          "value": "auto",
+          "label": "Auto (image → SVG → default)"
+        },
+        {
+          "value": "default",
+          "label": "Default icon"
+        },
+        {
+          "value": "svg",
+          "label": "Custom SVG"
+        },
+        {
+          "value": "image",
+          "label": "Uploaded image"
+        }
+      ],
+      "info": "If the selected source is empty or invalid, the default icon is shown."
+    },
+    {
+      "type": "select",
+      "id": "default_icon",
+      "label": "Default icon",
+      "default": "sparkle",
+      "options": [
+        {
+          "value": "sparkle",
+          "label": "Sparkle"
+        },
+        {
+          "value": "check",
+          "label": "Check (thin)"
+        },
+        {
+          "value": "check_circle",
+          "label": "Check in filled circle"
+        },
+        {
+          "value": "check_circle_outline",
+          "label": "Check in outlined circle"
+        }
+      ]
+    },
+    {
+      "type": "image_picker",
+      "id": "icon_as_image",
+      "label": "Icon as image"
+    },
+    {
+      "type": "html",
+      "id": "icon_as_svg",
+      "label": "Icon as SVG",
+      "info": "Paste one <svg>…</svg>. Scripts, event handlers, links and <style> are not allowed – invalid SVG falls back to the default icon. Use fill/stroke=\"currentColor\" to follow Icon color."
+    },
+    {
+      "type": "range",
+      "id": "icon_as_size",
+      "min": 5,
+      "max": 24,
+      "step": 1,
+      "unit": "px",
+      "label": "Icon size",
+      "default": 14
+    },
+    {
+      "type": "range",
+      "id": "icon_width",
+      "min": 5,
+      "max": 36,
+      "step": 1,
+      "unit": "px",
+      "label": "Icon box size",
+      "default": 18,
+      "info": "Box around the icon (useful with Icon background)."
+    },
+    {
+      "type": "color",
+      "id": "icon_color",
+      "label": "Icon / marker color",
+      "default": "rgba(0,0,0,0)",
+      "info": "Transparent = text color."
+    },
+    {
+      "type": "color",
+      "id": "icon_background",
+      "label": "Icon background",
+      "default": "rgba(0,0,0,0)"
+    },
+    {
+      "type": "range",
+      "id": "icon_margin_right",
+      "min": 0,
+      "max": 32,
+      "step": 1,
+      "unit": "px",
+      "label": "Icon right margin",
+      "default": 8
+    },
+    {
+      "type": "header",
+      "content": "Typography"
+    },
+    {
+      "type": "range",
+      "id": "font_size",
+      "min": 0,
+      "max": 24,
+      "step": 1,
+      "unit": "px",
+      "label": "Font size (desktop)",
+      "default": 16,
+      "info": "0 = theme default size."
+    },
+    {
+      "type": "range",
+      "id": "font_size_mobile",
+      "min": 0,
+      "max": 20,
+      "step": 1,
+      "unit": "px",
+      "label": "Font size (mobile)",
+      "default": 16,
+      "info": "0 = same as desktop. Applies below 750px."
+    },
+    {
+      "type": "select",
+      "id": "font_weight",
+      "label": "Font weight",
+      "default": "inherit",
+      "options": [
+        {
+          "value": "inherit",
+          "label": "Theme default"
+        },
+        {
+          "value": "400",
+          "label": "Regular"
+        },
+        {
+          "value": "500",
+          "label": "Medium"
+        },
+        {
+          "value": "600",
+          "label": "Semibold"
+        },
+        {
+          "value": "700",
+          "label": "Bold"
+        }
+      ]
+    }
+  ],
+  "presets": [
+    {
+      "name": "SC – PDP Bulletpoints"
+    }
+  ]
+}
+{% endschema %}

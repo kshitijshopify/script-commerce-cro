@@ -1,0 +1,99 @@
+{% doc %}
+  Short product teaser under the title, from a product rich text metafield.
+
+  @param {product} product - The product whose teaser is shown
+  @param {string} placement - `card` for collection cards, `product` for the product page
+  @param {block} [block] - Product-page block. Required when placement is `product`
+
+  Renders nothing when the metafield is empty, or when that placement is turned off.
+  Card visibility and size come from Theme settings → SC – Product teaser.
+  Product-page visibility and size come from the block.
+
+  @example
+  {% render 'sc-product-teaser', product: card_product, placement: 'card' %}
+{% enddoc %}
+
+{% stylesheet %}
+  .sc-teaser {
+    display: block;
+    margin: 0;
+    font-weight: 400;
+    line-height: 1.4;
+    letter-spacing: normal;
+    color: var(--sc-teaser-color, inherit);
+    font-size: var(--sc-teaser-size, 13px);
+  }
+  .sc-teaser :is(p, h1, h2, h3, h4, ul, ol) {
+    margin: 0;
+    font: inherit;
+    letter-spacing: inherit;
+    color: inherit;
+  }
+  .sc-teaser :is(p, ul, ol) + :is(p, ul, ol) { margin-top: 0.35em; }
+  .sc-teaser a { color: inherit; }
+  .sc-teaser--card {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    -webkit-line-clamp: var(--sc-teaser-lines, 2);
+  }
+{% endstylesheet %}
+
+{%- liquid
+  assign teaser_product = product
+  if teaser_product == blank
+    assign teaser_product = closest.product
+  endif
+
+  assign show = false
+  if placement == 'card'
+    if settings.sc_teaser_show_card
+      assign show = true
+    endif
+    assign size = settings.sc_teaser_card_size | default: 13
+    assign lines = settings.sc_teaser_card_lines | default: 2
+    assign color = settings.sc_teaser_card_color
+    assign space_top = 4
+    assign space_bottom = 6
+  elsif placement == 'product' and block != blank
+    assign show = true
+    if block.settings.enable == false
+      assign show = false
+    endif
+    assign size = block.settings.text_size | default: 14
+    assign lines = 0
+    assign color = block.settings.text_color
+    assign space_top = block.settings.space_top | default: 6
+    assign space_bottom = block.settings.space_bottom | default: 8
+  endif
+
+  assign mf_key = settings.sc_teaser_metafield | strip | remove: 'product.metafields.' | default: 'custom.cro_product_teaser'
+  assign mf_parts = mf_key | split: '.'
+  assign teaser = blank
+  if teaser_product != blank and mf_parts.size == 2
+    assign teaser = teaser_product.metafields[mf_parts.first][mf_parts.last]
+  endif
+
+  assign teaser_plain = ''
+  if teaser != blank
+    assign teaser_plain = teaser | metafield_text | strip
+  endif
+-%}
+
+{%- if show and teaser_plain != blank -%}
+  <div
+    class="sc-teaser sc-teaser--{{ placement }}"
+    style="margin-top: {{ space_top }}px; margin-bottom: {{ space_bottom }}px; --sc-teaser-size: {{ size }}px;{% if lines > 0 %} --sc-teaser-lines: {{ lines }};{% endif %}{% if color != blank and color.alpha > 0 %} --sc-teaser-color: {{ color }};{% endif %}"
+    {% if block %}{{ block.shopify_attributes }}{% endif %}
+  >
+    {%- if teaser.type == 'single_line_text_field' or teaser.type == 'multi_line_text_field' -%}
+      {{ teaser_plain | escape | newline_to_br }}
+    {%- else -%}
+      {{ teaser | metafield_tag }}
+    {%- endif -%}
+  </div>
+{%- elsif placement == 'product' and request.design_mode and show -%}
+  <div class="sc-teaser" {{ block.shopify_attributes }} style="margin: {{ space_top }}px 0 {{ space_bottom }}px; font-size: 13px; opacity: .6; font-style: italic;">
+    Product teaser: fill {{ mf_key | escape }} (Rich text) on this product. Nothing shows when it is empty.
+  </div>
+{%- endif -%}
