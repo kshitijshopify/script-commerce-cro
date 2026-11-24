@@ -117,6 +117,14 @@
             "swatch_shape": "circle"
           }
         },
+        "sc_color_variant_selector": {
+          "type": "sc_color_variant_selector",
+          "disabled": true,
+          "settings": {
+            "enable": true,
+            "display_mode": "swatch"
+          }
+        },
         "sc_pdp_variant_cards_rMFiNN": {
           "type": "sc_pdp_variant_cards",
           "settings": {
@@ -554,6 +562,7 @@
         "price",
         "sc_bulletpoints",
         "variant_picker",
+        "sc_color_variant_selector",
         "sc_pdp_variant_cards_rMFiNN",
         "sc_quantity_selector",
         "quantity_selector",

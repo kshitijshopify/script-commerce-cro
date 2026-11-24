@@ -702,6 +702,8 @@
                   {% render 'sc-inventory-status', block: block, product: product, section: section %}
                 {%- when 'sc_pdp_cross_sell' -%}
                   {% render 'sc-pdp-cross-sell', block: block, product: product %}
+                {%- when 'sc_color_variant_selector' -%}
+                  {% render 'sc-color-variant-selector', block: block, product: product, section: section %}
                 {%- when 'sc_pdp_variant_cards' -%}
                   {% render 'sc-pdp-variant-cards', block: block, product: product, section: section %}
                 {%- when 'sc_pdp_quantity_discounts' -%}
@@ -5031,6 +5033,390 @@
           "unit": "px",
           "default": 750,
           "info": "Screens narrower than this use the mobile settings."
+        }
+      ]
+    },
+    {
+      "type": "sc_color_variant_selector",
+      "name": "SC – Color variant",
+      "limit": 1,
+      "settings": [
+        {
+          "type": "checkbox",
+          "id": "enable",
+          "label": "Enable block",
+          "default": true
+        },
+        {
+          "type": "select",
+          "id": "display_mode",
+          "label": "Display mode",
+          "default": "swatch",
+          "options": [
+            {
+              "value": "swatch",
+              "label": "Color swatches"
+            },
+            {
+              "value": "image",
+              "label": "Product images"
+            },
+            {
+              "value": "button",
+              "label": "Text buttons"
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "id": "color_option_names",
+          "label": "Color option names",
+          "default": "Color, Colour, Farbe, Couleur, Kleur, Colore, Färg, Farve, Kolor",
+          "info": "Comma-separated. The first product option with one of these names is shown here (any position). Other options stay in the theme's variant picker."
+        },
+        {
+          "type": "textarea",
+          "id": "color_order",
+          "label": "Color order (optional)",
+          "info": "One color name per line (or comma-separated). Listed colors come first, the rest follow in product order."
+        },
+        {
+          "type": "select",
+          "id": "alignment",
+          "label": "Alignment",
+          "default": "left",
+          "options": [
+            {
+              "value": "left",
+              "label": "Left"
+            },
+            {
+              "value": "center",
+              "label": "Center"
+            },
+            {
+              "value": "right",
+              "label": "Right"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": "Keep the theme's Variant picker block on the page: its Color option is hidden automatically and it handles price, gallery and Add to cart updates."
+        },
+        {
+          "type": "header",
+          "content": "Active color label"
+        },
+        {
+          "type": "checkbox",
+          "id": "show_label",
+          "label": "Show active color label",
+          "default": true
+        },
+        {
+          "type": "text",
+          "id": "label_prefix",
+          "label": "Label prefix",
+          "default": "Color",
+          "info": "Shown as \"Color: red\". Use [option] for the product's own option name (e.g. Farbe). Leave empty to show only the color."
+        },
+        {
+          "type": "range",
+          "id": "label_size",
+          "label": "Font size",
+          "min": 12,
+          "max": 24,
+          "step": 1,
+          "unit": "px",
+          "default": 16
+        },
+        {
+          "type": "color",
+          "id": "label_color",
+          "label": "Text color",
+          "default": "#121212"
+        },
+        {
+          "type": "color",
+          "id": "label_value_color",
+          "label": "Color name color",
+          "info": "Optional. Leave empty to use the text color."
+        },
+        {
+          "type": "checkbox",
+          "id": "label_bold",
+          "label": "Bold",
+          "default": true
+        },
+        {
+          "type": "header",
+          "content": "Color swatches"
+        },
+        {
+          "type": "select",
+          "id": "swatch_shape",
+          "label": "Shape",
+          "default": "circle",
+          "options": [
+            {
+              "value": "circle",
+              "label": "Round"
+            },
+            {
+              "value": "square",
+              "label": "Square"
+            }
+          ]
+        },
+        {
+          "type": "range",
+          "id": "swatch_size",
+          "label": "Swatch size",
+          "min": 24,
+          "max": 64,
+          "step": 2,
+          "unit": "px",
+          "default": 40
+        },
+        {
+          "type": "range",
+          "id": "swatch_spacing",
+          "label": "Spacing",
+          "min": 4,
+          "max": 24,
+          "step": 1,
+          "unit": "px",
+          "default": 10
+        },
+        {
+          "type": "range",
+          "id": "swatch_border",
+          "label": "Selected ring width",
+          "min": 1,
+          "max": 4,
+          "step": 1,
+          "unit": "px",
+          "default": 2
+        },
+        {
+          "type": "color",
+          "id": "swatch_selected_color",
+          "label": "Selected ring color",
+          "default": "#121212"
+        },
+        {
+          "type": "text",
+          "id": "hex_metafield",
+          "label": "Color metafield (variant)",
+          "default": "custom.color_hex",
+          "info": "namespace.key of a variant Color or text metafield (e.g. #c3b091). Falls back to Shopify's native swatch, then the mapping below."
+        },
+        {
+          "type": "textarea",
+          "id": "color_map",
+          "label": "Color mapping",
+          "placeholder": "red: #c3b091\nwashed black: #2b2b2b",
+          "info": "One per line: color name: CSS color. Unmapped names are tried as CSS colors (e.g. navy), otherwise grey."
+        },
+        {
+          "type": "header",
+          "content": "Product images"
+        },
+        {
+          "type": "select",
+          "id": "image_source",
+          "label": "Image source",
+          "default": "variant",
+          "options": [
+            {
+              "value": "variant",
+              "label": "Variant image"
+            },
+            {
+              "value": "metafield",
+              "label": "Color image metafield"
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "id": "image_metafield",
+          "label": "Image metafield (variant)",
+          "default": "custom.color_image",
+          "info": "namespace.key of a variant File (image) metafield. Falls back to the variant image."
+        },
+        {
+          "type": "range",
+          "id": "thumb_width",
+          "label": "Thumbnail width",
+          "min": 48,
+          "max": 160,
+          "step": 4,
+          "unit": "px",
+          "default": 96
+        },
+        {
+          "type": "select",
+          "id": "thumb_ratio",
+          "label": "Thumbnail shape",
+          "default": "portrait",
+          "options": [
+            {
+              "value": "portrait",
+              "label": "Portrait (3:4)"
+            },
+            {
+              "value": "square",
+              "label": "Square"
+            }
+          ]
+        },
+        {
+          "type": "range",
+          "id": "thumb_spacing",
+          "label": "Spacing",
+          "min": 4,
+          "max": 24,
+          "step": 1,
+          "unit": "px",
+          "default": 10
+        },
+        {
+          "type": "range",
+          "id": "thumb_border",
+          "label": "Selected frame width",
+          "min": 1,
+          "max": 4,
+          "step": 1,
+          "unit": "px",
+          "default": 2
+        },
+        {
+          "type": "color",
+          "id": "thumb_selected_color",
+          "label": "Selected frame color",
+          "default": "#121212"
+        },
+        {
+          "type": "header",
+          "content": "Text buttons"
+        },
+        {
+          "type": "select",
+          "id": "button_shape",
+          "label": "Button shape",
+          "default": "pill",
+          "options": [
+            {
+              "value": "round",
+              "label": "Round"
+            },
+            {
+              "value": "pill",
+              "label": "Pill"
+            },
+            {
+              "value": "square",
+              "label": "Square"
+            }
+          ]
+        },
+        {
+          "type": "range",
+          "id": "button_font_size",
+          "label": "Font size",
+          "min": 12,
+          "max": 20,
+          "step": 1,
+          "unit": "px",
+          "default": 15
+        },
+        {
+          "type": "checkbox",
+          "id": "button_bold",
+          "label": "Bold",
+          "default": false
+        },
+        {
+          "type": "range",
+          "id": "button_spacing",
+          "label": "Spacing",
+          "min": 4,
+          "max": 24,
+          "step": 1,
+          "unit": "px",
+          "default": 10
+        },
+        {
+          "type": "color",
+          "id": "button_text",
+          "label": "Text color",
+          "default": "#121212"
+        },
+        {
+          "type": "color",
+          "id": "button_bg",
+          "label": "Background",
+          "default": "#ffffff"
+        },
+        {
+          "type": "color",
+          "id": "button_border_color",
+          "label": "Border color",
+          "default": "#d4d4d4"
+        },
+        {
+          "type": "color",
+          "id": "button_sel_text",
+          "label": "Selected text color",
+          "default": "#ffffff"
+        },
+        {
+          "type": "color",
+          "id": "button_sel_bg",
+          "label": "Selected background",
+          "default": "#121212"
+        },
+        {
+          "type": "color",
+          "id": "button_sel_border_color",
+          "label": "Selected border color",
+          "default": "#121212"
+        },
+        {
+          "type": "range",
+          "id": "button_sel_border",
+          "label": "Selected border width",
+          "min": 1,
+          "max": 3,
+          "step": 1,
+          "unit": "px",
+          "default": 1
+        },
+        {
+          "type": "header",
+          "content": "Spacing"
+        },
+        {
+          "type": "range",
+          "id": "margin_top",
+          "label": "Top margin",
+          "min": 0,
+          "max": 40,
+          "step": 2,
+          "unit": "px",
+          "default": 0
+        },
+        {
+          "type": "range",
+          "id": "margin_bottom",
+          "label": "Bottom margin",
+          "min": 0,
+          "max": 40,
+          "step": 2,
+          "unit": "px",
+          "default": 16
         }
       ]
     },
