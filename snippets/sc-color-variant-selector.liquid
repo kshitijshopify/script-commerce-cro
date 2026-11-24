@@ -1,0 +1,946 @@
+{%- comment -%}
+  SC – PDP Color Variant Selector (PDP block)
+  ----------------------------------------------------------------------------
+  Replaces the theme's Color option picker with one of three display modes:
+    - swatch : round / square color swatches
+    - image  : product image thumbnails (one per color)
+    - button : text buttons (round / pill / square)
+  Shows an active label, e.g. "Color: red". Other options (Size, Material ...) stay in the
+  theme's own picker and keep working.
+
+  Install (Dawn-style section):
+    1. Copy this snippet.
+    2. In the product section's block loop:
+         {%- when 'sc_color_variant_selector' -%}
+           {% render 'sc-color-variant-selector', block: block, product: product, section: section %}
+    3. Add the "sc_color_variant_selector" block schema (see sections/main-product.liquid).
+    Keep the theme's own Variant picker block on the page – it is hidden for the Color option
+    automatically and does the actual variant switching (price, gallery, URL, Add to cart).
+
+  Color option: the first option whose name matches "Color option names" (any position).
+
+  Swatch color, first match wins:
+    1. Variant metafield (setting "Color metafield", e.g. custom.color_hex – color or text)
+    2. Shopify native swatch (Settings > Metafields / category metaobject color or image)
+    3. "Color mapping" setting lines, e.g. "red: #c3b091"
+    4. The color name itself as a CSS color (e.g. "red", "navy"), else neutral grey.
+
+  Thumbnail image: variant featured image of that color, or the variant image metafield
+  (setting "Image metafield", e.g. custom.color_image) when chosen as source.
+
+  Theme independence:
+  - Clicking a color checks the matching input in the theme's (hidden) picker and fires a native
+    "change" event, so the theme updates price, media, availability, URL and Add to cart itself.
+  - No theme picker found: the form's name="id" input + ?variant= are set and the page reloads
+    to the exact variant (full combination of all options is resolved).
+  - Availability is recomputed from the variant list whenever other options change.
+{%- endcomment -%}
+
+{%- liquid
+  assign s = block.settings
+  assign p = product
+  assign uid = 'sc-cvs-' | append: block.id
+  assign mode = s.display_mode | default: 'swatch'
+
+  assign color_option = nil
+  assign option_names = s.color_option_names | default: 'Color, Colour, Farbe' | downcase | split: ','
+  if p != blank
+    for opt in p.options_with_values
+      assign oname = opt.name | strip | downcase
+      for n in option_names
+        assign nn = n | strip
+        if nn != blank and oname == nn
+          assign color_option = opt
+          break
+        endif
+      endfor
+      if color_option
+        break
+      endif
+    endfor
+  endif
+-%}
+
+{%- if s.enable != false -%}
+  {%- if color_option == nil -%}
+    {%- if request.design_mode -%}
+      <div {{ block.shopify_attributes }} style="padding:10px;font-size:13px;opacity:.6;font-style:italic;">
+        SC – Color variant selector: no option named
+        "{{ s.color_option_names | default: 'Color' | escape }}" on this product. Preview a product with a Color option or edit "Color option names".
+      </div>
+    {%- endif -%}
+  {%- else -%}
+    {%- liquid
+      assign cpos0 = color_option.position | minus: 1
+      assign values = color_option.values
+      assign current = p.selected_or_first_available_variant
+
+      # ---------- order: merchant list first, then product order ----------
+      assign order_names = s.color_order | newline_to_br | replace: '<br />', ',' | downcase | split: ','
+      assign idx = ','
+      for n in order_names
+        assign nn = n | strip
+        if nn == blank
+          continue
+        endif
+        for value in values
+          assign vn = value.name | downcase
+          assign key = ',' | append: forloop.index0 | append: ','
+          if vn == nn
+            unless idx contains key
+              assign idx = idx | append: forloop.index0 | append: ','
+            endunless
+          endif
+        endfor
+      endfor
+      for value in values
+        assign key = ',' | append: forloop.index0 | append: ','
+        unless idx contains key
+          assign idx = idx | append: forloop.index0 | append: ','
+        endunless
+      endfor
+      assign order_arr = idx | split: ','
+
+      # ---------- metafield keys ----------
+      assign hex_parts = s.hex_metafield | strip | split: '.'
+      assign img_parts = s.image_metafield | strip | split: '.'
+      assign map_lines = s.color_map | newline_to_br | split: '<br />'
+
+      assign option_name_esc = color_option.name | escape
+      assign prefix = s.label_prefix | strip | escape | replace: '[option]', option_name_esc | strip
+      assign selected_name = color_option.selected_value.name | default: '' | escape
+
+      assign thumb_w = s.thumb_width | default: 96
+      assign thumb_sizes = thumb_w | append: 'px'
+    -%}
+
+    <style>
+      /* Hide only the theme's own Color option (other options stay visible). */
+      {%- if section.id != blank and values.first.id != blank %}
+      #shopify-section-{{ section.id }} :is(fieldset, .product-form__input, .variant-option, .selector-wrapper):not(:has(fieldset)):has([data-option-value-id="{{ values.first.id }}"]):not(#{{ uid }} *)
+      { display: none !important; }
+      {%- endif %}
+      [data-sc-cvs-hidden] { display: none !important; }
+
+      #{{ uid }} {
+        display: block;
+        box-sizing: border-box;
+        width: 100%;
+        max-width: 100%;
+        margin: var(--sc-cvs-mt) 0 var(--sc-cvs-mb);
+        text-align: var(--sc-cvs-align);
+        line-height: 1.35;
+        letter-spacing: normal;
+        text-transform: none;
+      }
+      #{{ uid }} *, #{{ uid }} *::before, #{{ uid }} *::after { box-sizing: border-box; }
+
+      #{{ uid }} .sc-cvs__label {
+        margin: 0 0 12px;
+        padding: 0;
+        font-size: var(--sc-cvs-label-fs);
+        font-weight: var(--sc-cvs-label-fw);
+        line-height: 1.4;
+        color: var(--sc-cvs-label-c);
+        overflow-wrap: anywhere;
+      }
+      #{{ uid }} .sc-cvs__label-value { color: var(--sc-cvs-value-c, inherit); }
+
+      #{{ uid }} .sc-cvs__list {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: var(--sc-cvs-justify);
+        gap: var(--sc-cvs-gap);
+        margin: 0;
+        padding: 0;
+      }
+
+      #{{ uid }} .sc-cvs__item {
+        -webkit-appearance: none;
+        appearance: none;
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 0;
+        min-height: 0;
+        margin: 0;
+        padding: 0;
+        font: inherit;
+        letter-spacing: normal;
+        text-transform: none;
+        text-decoration: none;
+        color: inherit;
+        background: none;
+        border: 0;
+        box-shadow: none;
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+      }
+      #{{ uid }} .sc-cvs__item::before,
+      #{{ uid }} .sc-cvs__item::after { content: none; }
+      #{{ uid }} .sc-cvs__item:focus { outline: none; }
+      #{{ uid }} .sc-cvs__item:focus-visible { outline: 2px solid var(--sc-cvs-sel); outline-offset: 3px; }
+      #{{ uid }} .sc-cvs__item[disabled] { cursor: not-allowed; }
+
+      /* Unavailable: diagonal strike for swatches / images */
+      #{{ uid }} .sc-cvs__strike {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background: linear-gradient(to top right, transparent calc(50% - 1px), rgba(0,0,0,.55) calc(50% - 1px), rgba(0,0,0,.55) calc(50% + 1px), transparent calc(50% + 1px));
+        border-radius: inherit;
+      }
+
+      /* ---------- Mode 1: swatches ---------- */
+      #{{ uid }} .sc-cvs__item--swatch {
+        width: var(--sc-cvs-sw);
+        height: var(--sc-cvs-sw);
+        padding: calc(var(--sc-cvs-bw) + 2px);
+        border-radius: var(--sc-cvs-sw-radius);
+        border: var(--sc-cvs-bw) solid transparent;
+        transition: border-color .15s ease;
+      }
+      #{{ uid }} .sc-cvs__swatch {
+        position: relative;
+        display: block;
+        width: 100%;
+        height: 100%;
+        border-radius: var(--sc-cvs-sw-radius);
+        background-color: var(--sc-cvs-c, #e5e5e5);
+        background-size: cover;
+        background-position: center;
+        box-shadow: inset 0 0 0 1px rgba(0,0,0,.14);
+        overflow: hidden;
+      }
+      @media (hover: hover) {
+        #{{ uid }} .sc-cvs__item--swatch:not([disabled]):hover { border-color: rgba(0,0,0,.25); }
+      }
+      #{{ uid }} .sc-cvs__item--swatch.is-selected { border-color: var(--sc-cvs-sel); }
+      #{{ uid }} .sc-cvs__item--swatch.is-unavailable .sc-cvs__swatch { opacity: .45; }
+
+      /* ---------- Mode 2: product images ---------- */
+      #{{ uid }} .sc-cvs__item--image {
+        width: var(--sc-cvs-tw);
+        aspect-ratio: var(--sc-cvs-ratio);
+        border: var(--sc-cvs-bw) solid transparent;
+        background: #f3f3f3;
+        overflow: hidden;
+        transition: border-color .15s ease;
+      }
+      #{{ uid }} .sc-cvs__item--image img {
+        display: block;
+        width: 100%;
+        height: 100%;
+        max-width: none;
+        object-fit: cover;
+      }
+      #{{ uid }} .sc-cvs__thumb-text {
+        padding: 4px;
+        font-size: 12px;
+        line-height: 1.2;
+        overflow-wrap: anywhere;
+      }
+      @media (hover: hover) {
+        #{{ uid }} .sc-cvs__item--image:not([disabled]):hover { border-color: rgba(0,0,0,.25); }
+      }
+      #{{ uid }} .sc-cvs__item--image.is-selected { border-color: var(--sc-cvs-sel); }
+      #{{ uid }} .sc-cvs__item--image.is-unavailable img,
+      #{{ uid }} .sc-cvs__item--image.is-unavailable .sc-cvs__thumb-text { opacity: .4; }
+
+      /* ---------- Mode 3: text buttons ---------- */
+      #{{ uid }} .sc-cvs__item--button {
+        min-height: calc(var(--sc-cvs-btn-fs) * 2.8);
+        padding: 0 calc(var(--sc-cvs-btn-fs) * 1.6);
+        font-size: var(--sc-cvs-btn-fs);
+        font-weight: var(--sc-cvs-btn-fw);
+        line-height: 1.2;
+        color: var(--sc-cvs-btn-c);
+        background: var(--sc-cvs-btn-bg);
+        border: 1px solid var(--sc-cvs-btn-border);
+        border-radius: var(--sc-cvs-btn-radius);
+        box-shadow: inset 0 0 0 calc(var(--sc-cvs-bw) - 1px) transparent;
+        transition: background-color .15s ease, color .15s ease, border-color .15s ease;
+      }
+      @media (hover: hover) {
+        #{{ uid }} .sc-cvs__item--button:not([disabled]):not(.is-selected):hover { border-color: var(--sc-cvs-btn-sel-border); }
+      }
+      #{{ uid }} .sc-cvs__item--button.is-selected {
+        color: var(--sc-cvs-btn-sel-c);
+        background: var(--sc-cvs-btn-sel-bg);
+        border-color: var(--sc-cvs-btn-sel-border);
+        box-shadow: inset 0 0 0 calc(var(--sc-cvs-bw) - 1px) var(--sc-cvs-btn-sel-border);
+      }
+      #{{ uid }} .sc-cvs__item--button.is-unavailable { opacity: .5; }
+      #{{ uid }} .sc-cvs__item--button.is-unavailable .sc-cvs__text { text-decoration: line-through; }
+      #{{ uid }} .sc-cvs__text { overflow-wrap: anywhere; }
+
+      @media screen and (max-width: 749px) {
+        #{{ uid }} .sc-cvs__item--image { width: min(var(--sc-cvs-tw), calc((100% - var(--sc-cvs-gap) * 3) / 4 + 30px)); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #{{ uid }} .sc-cvs__item { transition: none; }
+      }
+    </style>
+
+    {%- liquid
+      case s.alignment
+        when 'center'
+          assign justify = 'center'
+        when 'right'
+          assign justify = 'flex-end'
+        else
+          assign justify = 'flex-start'
+      endcase
+
+      case mode
+        when 'image'
+          assign gap = s.thumb_spacing
+          assign bw = s.thumb_border
+          assign sel = s.thumb_selected_color
+        when 'button'
+          assign gap = s.button_spacing
+          assign bw = s.button_sel_border
+          assign sel = s.button_sel_border_color
+        else
+          assign gap = s.swatch_spacing
+          assign bw = s.swatch_border
+          assign sel = s.swatch_selected_color
+      endcase
+
+      case s.button_shape
+        when 'square'
+          assign btn_radius = '0px'
+        when 'round'
+          assign btn_radius = '8px'
+        else
+          assign btn_radius = '999px'
+      endcase
+    -%}
+
+    <sc-color-variant-selector
+      id="{{ uid }}"
+      class="sc-cvs sc-cvs--{{ mode }}"
+      data-product-id="{{ p.id }}"
+      data-variant-id="{{ current.id }}"
+      data-color-index="{{ cpos0 }}"
+      style="
+        --sc-cvs-mt: {{ s.margin_top | default: 0 }}px;
+        --sc-cvs-mb: {{ s.margin_bottom | default: 0 }}px;
+        --sc-cvs-align: {{ s.alignment | default: 'left' }};
+        --sc-cvs-justify: {{ justify }};
+        --sc-cvs-gap: {{ gap | default: 10 }}px;
+        --sc-cvs-bw: {{ bw | default: 2 }}px;
+        --sc-cvs-sel: {{ sel | default: '#121212' }};
+        --sc-cvs-label-fs: {{ s.label_size | default: 16 }}px;
+        --sc-cvs-label-fw: {% if s.label_bold %}700{% else %}400{% endif %};
+        --sc-cvs-label-c: {{ s.label_color | default: 'inherit' }};
+        {%- if s.label_value_color != blank and s.label_value_color.alpha != 0 %}--sc-cvs-value-c: {{ s.label_value_color }};{% endif %}
+        --sc-cvs-sw: {{ s.swatch_size | default: 40 }}px;
+        --sc-cvs-sw-radius: {% if s.swatch_shape == 'square' %}4px{% else %}50%{% endif %};
+        --sc-cvs-tw: {{ thumb_w }}px;
+        --sc-cvs-ratio: {% if s.thumb_ratio == 'square' %}1 / 1{% else %}3 / 4{% endif %};
+        --sc-cvs-btn-fs: {{ s.button_font_size | default: 15 }}px;
+        --sc-cvs-btn-fw: {% if s.button_bold %}700{% else %}400{% endif %};
+        --sc-cvs-btn-c: {{ s.button_text | default: '#121212' }};
+        --sc-cvs-btn-bg: {{ s.button_bg | default: '#ffffff' }};
+        --sc-cvs-btn-border: {{ s.button_border_color | default: '#d4d4d4' }};
+        --sc-cvs-btn-sel-c: {{ s.button_sel_text | default: '#ffffff' }};
+        --sc-cvs-btn-sel-bg: {{ s.button_sel_bg | default: '#121212' }};
+        --sc-cvs-btn-sel-border: {{ s.button_sel_border_color | default: '#121212' }};
+        --sc-cvs-btn-radius: {{ btn_radius }};
+      "
+      {{ block.shopify_attributes }}
+    >
+      {%- if s.show_label -%}
+        <p class="sc-cvs__label" id="{{ uid }}-label">
+          {%- if prefix != blank -%}{{ prefix }}: {% endif -%}
+          <span class="sc-cvs__label-value" data-sc-cvs-value>{{ selected_name }}</span>
+        </p>
+      {%- endif -%}
+
+      <div
+        class="sc-cvs__list"
+        role="radiogroup"
+        {% if s.show_label %}aria-labelledby="{{ uid }}-label"{% else %}aria-label="{{ color_option.name | escape }}"{% endif %}
+      >
+        {%- for i in order_arr -%}
+          {%- if i == blank -%}{%- continue -%}{%- endif -%}
+          {%- liquid
+            assign i_num = i | plus: 0
+            assign value = values[i_num]
+            assign vname = value.name
+            assign name = vname | escape
+
+            # representative variant for this color (current combination first)
+            assign rv = value.variant
+            if rv == blank
+              for v in p.variants
+                if v.options[cpos0] == vname
+                  if rv == blank or v.available and rv.available == false
+                    assign rv = v
+                  endif
+                endif
+              endfor
+            endif
+
+            assign inner = ''
+            if mode == 'swatch'
+              assign css_color = ''
+              assign css_check = false
+              assign swatch_img = ''
+              if hex_parts.size == 2 and rv
+                assign mfv = rv.metafields[hex_parts[0]][hex_parts[1]].value
+                if mfv != blank
+                  assign css_color = mfv | append: '' | strip
+                endif
+              endif
+              if css_color == blank and value.swatch.color
+                assign css_color = 'rgb(' | append: value.swatch.color.rgb | append: ')'
+              endif
+              if css_color == blank and value.swatch.image
+                assign swatch_img = value.swatch.image | image_url: width: 120
+              endif
+              if css_color == blank and swatch_img == blank
+                assign lname = vname | downcase | strip
+                for line in map_lines
+                  assign parts = line | split: ':'
+                  if parts.size > 1
+                    assign mkey = parts.first | strip | downcase
+                    if mkey == lname
+                      assign css_color = parts.last | strip
+                      break
+                    endif
+                  endif
+                endfor
+              endif
+              if css_color == blank and swatch_img == blank
+                assign css_color = vname | downcase | remove: ' ' | remove: '-' | remove: '_'
+                assign css_check = true
+              endif
+            elsif mode == 'image'
+              assign img = nil
+              if s.image_source == 'metafield' and img_parts.size == 2 and rv
+                assign img = rv.metafields[img_parts[0]][img_parts[1]].value
+              endif
+              if img == blank and rv.featured_image
+                assign img = rv.featured_image
+              endif
+              if img == blank and value.swatch.image
+                assign img = value.swatch.image
+              endif
+            endif
+          -%}
+          <button
+            type="button"
+            role="radio"
+            class="sc-cvs__item sc-cvs__item--{{ mode }}{% if value.selected %} is-selected{% endif %}{% unless value.available %} is-unavailable{% endunless %}"
+            aria-checked="{{ value.selected }}"
+            tabindex="{% if value.selected %}0{% else %}-1{% endif %}"
+            title="{{ name }}"
+            data-sc-cvs-item
+            data-value="{{ name }}"
+            {% unless value.available %}disabled aria-disabled="true"{% endunless %}
+          >
+            {%- case mode -%}
+              {%- when 'image' -%}
+                {%- if img != blank -%}
+                  {{ img | image_url: width: 400 | image_tag: loading: 'lazy', widths: '120, 200, 300, 400', sizes: thumb_sizes, alt: vname }}
+                {%- else -%}
+                  <span class="sc-cvs__thumb-text">{{ name }}</span>
+                {%- endif -%}
+                <span class="sc-cvs__strike"{% if value.available %} hidden{% endif %}></span>
+              {%- when 'button' -%}
+                <span class="sc-cvs__text">{{ name }}</span>
+              {%- else -%}
+                <span
+                  class="sc-cvs__swatch"
+                  {% if css_check %}data-sc-cvs-css{% endif %}
+                  style="{% if css_color != blank %}--sc-cvs-c: {{ css_color | escape }};{% endif %}{% if swatch_img != blank %}background-image: url({{ swatch_img }});{% endif %}"
+                >
+                  <span class="sc-cvs__strike"{% if value.available %} hidden{% endif %}></span>
+                </span>
+                <span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;">{{ name }}</span>
+            {%- endcase -%}
+          </button>
+        {%- endfor -%}
+      </div>
+
+      <script type="application/json" data-sc-cvs-variants>
+        [{%- for v in p.variants -%}{"id":{{ v.id }},"a":{{ v.available }},"o":{{ v.options | json }}}{%- unless forloop.last -%},{%- endunless -%}{%- endfor -%}]
+      </script>
+    </sc-color-variant-selector>
+
+    <script>
+      (function () {
+        if (!window.customElements || window.customElements.get('sc-color-variant-selector')) return;
+
+        var VARIANT_EVENTS = [
+          'variant:change', 'variant:changed', 'variant:update', 'variantChange', 'variant-change',
+          'on:variant:change', 'theme:variant:change', 'product:variant-change', 'product:variantChange',
+          'shopify:variant:change'
+        ];
+        var PICKER_SELECTORS = 'variant-selects, variant-radios, variant-picker, variant-swatches, product-variants, variant-selection, [data-variant-picker], .variant-picker, .product-form__variants, .product-options, .selector-wrapper';
+        var SKIP_NAMES = /^(id|quantity|selling_plan|product-id|section-id)$|^(properties|attributes)/;
+        var EXCLUDE_CONTAINERS = 'quick-add-modal, dialog, [role="dialog"]';
+
+        /* Shared with other SC blocks: emit an event when themes update ?variant= */
+        if (!window.__scInvHistoryPatched && window.history) {
+          window.__scInvHistoryPatched = true;
+          ['pushState', 'replaceState'].forEach(function (fn) {
+            var orig = window.history[fn];
+            if (typeof orig !== 'function') return;
+            window.history[fn] = function () {
+              var result = orig.apply(this, arguments);
+              try { window.dispatchEvent(new Event('sc:urlchange')); } catch (e) {}
+              return result;
+            };
+          });
+        }
+
+        function toArray(list) { return Array.prototype.slice.call(list || []); }
+        function idFromDetail(detail) {
+          if (!detail || typeof detail !== 'object') return null;
+          var v = detail.variant || detail.resource || detail.selectedVariant || detail.currentVariant || detail.newVariant;
+          if (v && typeof v === 'object' && v.id) return String(v.id);
+          if (detail.variantId) return String(detail.variantId);
+          return null;
+        }
+
+        class ScColorVariantSelector extends HTMLElement {
+          connectedCallback() {
+            if (this._connected) return;
+            this._connected = true;
+            var json = this.querySelector('[data-sc-cvs-variants]');
+            try { this.variants = JSON.parse(json ? json.textContent : '[]') || []; } catch (e) { this.variants = []; }
+            this.cpos = parseInt(this.dataset.colorIndex, 10) || 0;
+            this.items = toArray(this.querySelectorAll('[data-sc-cvs-item]'));
+            this.valueEl = this.querySelector('[data-sc-cvs-value]');
+            this.current = String(this.dataset.variantId || '');
+            this.scope = this.closest('[id^="shopify-section-"]') || this.closest('section, main') || document;
+
+            var cur = this.variantById(this.current);
+            this.selection = cur ? cur.o.slice() : [];
+            var active = this.items.filter(function (b) { return b.classList.contains('is-selected'); })[0];
+            this.activeValue = active ? active.dataset.value : (this.selection[this.cpos] || '');
+
+            /* option values per position (maps theme inputs to options) */
+            this.optionSets = [];
+            this.variants.forEach(function (v) {
+              v.o.forEach(function (val, i) { (this.optionSets[i] = this.optionSets[i] || {})[val] = true; }, this);
+            }, this);
+
+            /* swatches named after a color: fall back to grey if the name isn't a CSS color */
+            if (window.CSS && CSS.supports) {
+              toArray(this.querySelectorAll('[data-sc-cvs-css]')).forEach(function (el) {
+                var c = el.style.getPropertyValue('--sc-cvs-c').trim();
+                if (!c || !CSS.supports('color', c)) el.style.setProperty('--sc-cvs-c', '#e5e5e5');
+              });
+            }
+
+            this._onClick = this.onClick.bind(this);
+            this._onKey = this.onKey.bind(this);
+            this._onOver = this.onOver.bind(this);
+            this._onOut = this.onOut.bind(this);
+            this._onEvent = this.onVariantEvent.bind(this);
+            this._onChange = this.onChange.bind(this);
+            this._onSync = this.scheduleSync.bind(this);
+
+            this.addEventListener('click', this._onClick);
+            this.addEventListener('keydown', this._onKey);
+            this.addEventListener('pointerover', this._onOver);
+            this.addEventListener('pointerout', this._onOut);
+            VARIANT_EVENTS.forEach(function (n) { document.addEventListener(n, this._onEvent); }, this);
+            document.addEventListener('change', this._onChange, true);
+            window.addEventListener('sc:urlchange', this._onSync);
+            window.addEventListener('popstate', this._onSync);
+            if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', this._onSync, { once: true });
+
+            /* themes re-render their picker after a change: re-hide + re-read */
+            if (window.MutationObserver && this.scope !== document) {
+              var self = this;
+              this._mo = new MutationObserver(function (list) {
+                for (var i = 0; i < list.length; i++) {
+                  if (!self.contains(list[i].target)) { self.scheduleSync(); return; }
+                }
+              });
+              this._mo.observe(this.scope, { childList: true, subtree: true });
+            }
+
+            this.sync();
+          }
+
+          disconnectedCallback() {
+            this._connected = false;
+            this.removeEventListener('click', this._onClick);
+            this.removeEventListener('keydown', this._onKey);
+            this.removeEventListener('pointerover', this._onOver);
+            this.removeEventListener('pointerout', this._onOut);
+            VARIANT_EVENTS.forEach(function (n) { document.removeEventListener(n, this._onEvent); }, this);
+            document.removeEventListener('change', this._onChange, true);
+            window.removeEventListener('sc:urlchange', this._onSync);
+            window.removeEventListener('popstate', this._onSync);
+            if (this._mo) this._mo.disconnect();
+            clearTimeout(this._t1); clearTimeout(this._t2); clearTimeout(this._verify);
+          }
+
+          /* ---------- data ---------- */
+
+          variantById(id) {
+            id = String(id || '');
+            for (var i = 0; i < this.variants.length; i++) if (String(this.variants[i].id) === id) return this.variants[i];
+            return null;
+          }
+
+          findVariant(opts) {
+            for (var i = 0; i < this.variants.length; i++) {
+              var v = this.variants[i];
+              var ok = v.o.length === opts.length;
+              for (var j = 0; ok && j < opts.length; j++) if (v.o[j] !== opts[j]) ok = false;
+              if (ok) return v;
+            }
+            return null;
+          }
+
+          /* Full option combination currently chosen (variant, overlaid with the theme picker state). */
+          currentSelection() {
+            var base = this.variantById(this.readVariantId() || this.current);
+            var sel = base ? base.o.slice() : this.selection.slice();
+            var groups = this.mapGroups();
+            groups.forEach(function (g, pos) {
+              if (!g) return;
+              var val = null;
+              if (g.type === 'radio') {
+                g.els.forEach(function (el) { if (el.checked) val = el.value; });
+              } else if (g.el.selectedIndex > -1) {
+                var o = g.el.options[g.el.selectedIndex];
+                val = this.optionSets[pos] && this.optionSets[pos][o.value] ? o.value : (o.textContent || '').trim();
+              }
+              if (val && this.optionSets[pos] && this.optionSets[pos][val]) sel[pos] = val;
+            }, this);
+            if (this.pending && Date.now() < this.pending.until) sel[this.cpos] = this.pending.value;
+            else this.pending = null;
+            return sel;
+          }
+
+          /* ---------- interaction ---------- */
+
+          onClick(event) {
+            var btn = event.target.closest && event.target.closest('[data-sc-cvs-item]');
+            if (!btn || !this.contains(btn)) return;
+            event.preventDefault();
+            this.choose(btn);
+          }
+
+          onKey(event) {
+            var btn = event.target.closest && event.target.closest('[data-sc-cvs-item]');
+            if (!btn) return;
+            var enabled = this.items.filter(function (b) { return !b.disabled; });
+            var i = enabled.indexOf(btn);
+            if (!enabled.length) return;
+            var next = -1;
+            switch (event.key) {
+              case 'ArrowRight': case 'ArrowDown': next = (i + 1) % enabled.length; break;
+              case 'ArrowLeft': case 'ArrowUp': next = (i - 1 + enabled.length) % enabled.length; break;
+              case 'Home': next = 0; break;
+              case 'End': next = enabled.length - 1; break;
+              default: return;
+            }
+            event.preventDefault();
+            enabled[next].focus({ preventScroll: true });
+            this.choose(enabled[next]);
+          }
+
+          /* Desktop: preview the hovered color name in the label. */
+          onOver(event) {
+            if (!this.valueEl || event.pointerType !== 'mouse') return;
+            var btn = event.target.closest && event.target.closest('[data-sc-cvs-item]');
+            if (btn) this.valueEl.textContent = btn.dataset.value || '';
+          }
+          onOut(event) {
+            if (!this.valueEl || event.pointerType !== 'mouse') return;
+            if (event.relatedTarget && this.contains(event.relatedTarget) && event.relatedTarget.closest('[data-sc-cvs-item]')) return;
+            this.valueEl.textContent = this.activeValue || '';
+          }
+
+          choose(btn) {
+            if (btn.disabled) return;
+            var value = btn.dataset.value;
+            var sel = this.currentSelection();
+            sel[this.cpos] = value;
+            var variant = this.findVariant(sel);
+            if (!variant || !variant.a) return;
+
+            var already = value === this.activeValue && String(variant.id) === this.readVariantId();
+            this.selection = sel;
+            this.current = String(variant.id);
+            this.pending = { value: value, until: Date.now() + 2500 };
+            this.render(sel);
+            if (already) return;
+
+            var driven = this.driveThemePicker(value);
+            if (driven === null) {
+              /* no theme picker on the page: set the form + URL, then load the exact variant */
+              this.setFormVariant(String(variant.id));
+              this.emit(variant);
+              try {
+                var url = new URL(window.location.href);
+                url.searchParams.set('variant', variant.id);
+                if (/\/products\//.test(url.pathname)) window.location.replace(url.toString());
+              } catch (e) {}
+              return;
+            }
+
+            /* Safety net: Add to cart must post the chosen variant. */
+            var self = this;
+            var id = String(variant.id);
+            clearTimeout(this._verify);
+            this._verify = setTimeout(function () {
+              if (self.current !== id) return;
+              var formId = self.readVariantId();
+              if (formId !== null && formId !== id) self.setFormVariant(id);
+            }, 1500);
+          }
+
+          emit(variant) {
+            try {
+              document.dispatchEvent(new CustomEvent('variant:change', { bubbles: true, detail: { variant: variant, variantId: variant.id, source: 'sc-color-variant-selector' } }));
+            } catch (e) {}
+          }
+
+          /* ---------- theme picker ---------- */
+
+          pickerRoots() {
+            var self = this;
+            var roots = toArray(this.scope.querySelectorAll(PICKER_SELECTORS)).filter(function (r) {
+              return !self.contains(r) && !r.contains(self) && !(r.closest && r.closest(EXCLUDE_CONTAINERS));
+            });
+            return roots.filter(function (r) { return !roots.some(function (o) { return o !== r && o.contains(r); }); });
+          }
+
+          mapGroups() {
+            var self = this;
+            var roots = this.pickerRoots();
+            var fromScope = !roots.length;
+            if (fromScope) roots = [this.scope];
+            var groups = [];
+            var byName = {};
+            var seen = [];
+            roots.forEach(function (root) {
+              toArray(root.querySelectorAll('input[type="radio"], select')).forEach(function (el) {
+                if (seen.indexOf(el) !== -1 || self.contains(el)) return;
+                seen.push(el);
+                if (el.name && SKIP_NAMES.test(el.name)) return;
+                if (el.closest(EXCLUDE_CONTAINERS) || !self.belongsToUs(el)) return;
+                if (el.tagName === 'SELECT') {
+                  var values = [];
+                  toArray(el.options).forEach(function (o) { values.push(o.value, (o.textContent || '').trim()); });
+                  groups.push({ type: 'select', el: el, values: values, root: root });
+                } else {
+                  var key = (el.form ? 'f' : '') + (el.name || '_');
+                  if (!byName[key]) {
+                    byName[key] = { type: 'radio', els: [], values: [], root: root };
+                    groups.push(byName[key]);
+                  }
+                  byName[key].els.push(el);
+                  byName[key].values.push(el.value, el.getAttribute('data-value') || '');
+                }
+              });
+            });
+
+            var result = [];
+            var used = [];
+            this.optionSets.forEach(function (set, pos) {
+              var best = -1;
+              var bestScore = 0;
+              groups.forEach(function (g, i) {
+                if (used[i]) return;
+                var score = 0;
+                g.values.forEach(function (v) { if (v && set[v]) score++; });
+                if (score > bestScore) { bestScore = score; best = i; }
+              });
+              if (best > -1) { used[best] = true; result[pos] = groups[best]; }
+            });
+            return result;
+          }
+
+          /* Returns true (changed), false (already selected) or null (no theme control for Color). */
+          driveThemePicker(value) {
+            var g = this.mapGroups()[this.cpos];
+            if (!g) return null;
+            if (g.type === 'radio') {
+              var input = null;
+              g.els.forEach(function (el) { if (!input && el.value === value) input = el; });
+              if (!input) g.els.forEach(function (el) { if (!input && el.getAttribute('data-value') === value) input = el; });
+              if (!input) return null;
+              if (input.checked) return false;
+              g.els.forEach(function (el) { if (el !== input) el.checked = false; });
+              input.checked = true;
+              input.dispatchEvent(new Event('change', { bubbles: true }));
+              return true;
+            }
+            var sel = g.el;
+            var match = null;
+            toArray(sel.options).forEach(function (o) { if (!match && o.value === value) match = o; });
+            if (!match) toArray(sel.options).forEach(function (o) { if (!match && (o.textContent || '').trim() === value) match = o; });
+            if (!match) return null;
+            if (match.selected) return false;
+            toArray(sel.options).forEach(function (o) { o.removeAttribute('selected'); });
+            match.setAttribute('selected', 'selected');
+            match.selected = true;
+            sel.dispatchEvent(new Event('change', { bubbles: true }));
+            return true;
+          }
+
+          /* Hide only the Color group of the theme picker. */
+          hidePicker() {
+            var self = this;
+            var groups = this.mapGroups();
+            var g = groups[this.cpos];
+            if (!g) return;
+            var ctrls = g.type === 'radio' ? g.els : [g.el];
+            var others = [];
+            groups.forEach(function (o) {
+              if (o && o !== g) others = others.concat(o.type === 'radio' ? o.els : [o.el]);
+            });
+            /* climb to the smallest wrapper holding all Color controls and nothing else */
+            var el = ctrls[0];
+            while (el.parentElement && el.parentElement !== this.scope) {
+              var parent = el.parentElement;
+              if (parent.tagName === 'FORM' || parent.contains(self)) break;
+              if (others.some(function (c) { return parent.contains(c); })) break;
+              el = parent;
+              if (!ctrls.every(function (c) { return parent.contains(c); })) continue;
+              if (parent.matches('fieldset, .product-form__input, .variant-option, .selector-wrapper') || parent.matches(PICKER_SELECTORS)) break;
+            }
+            if (el === ctrls[0] || !ctrls.every(function (c) { return el.contains(c); })) return;
+            if (!el.hasAttribute('data-sc-cvs-hidden')) el.setAttribute('data-sc-cvs-hidden', '');
+          }
+
+          /* ---------- product form ---------- */
+
+          belongsToUs(node) {
+            if (!node || !node.closest) return true;
+            var form = node.closest('form') || node.form;
+            var pid = form && form.querySelector('[name="product-id"]');
+            return !pid || !pid.value || pid.value === this.dataset.productId;
+          }
+
+          productForms() {
+            var self = this;
+            return toArray(document.querySelectorAll('form[action*="/cart/add"]')).filter(function (form) {
+              if (form.closest(EXCLUDE_CONTAINERS)) return false;
+              var pid = form.querySelector('[name="product-id"]');
+              if (pid && pid.value) return pid.value === self.dataset.productId;
+              return self.scope !== document && self.scope.contains(form);
+            });
+          }
+
+          setFormVariant(id) {
+            this.productForms().forEach(function (form) {
+              var field = form.elements ? form.elements.namedItem('id') : null;
+              if (!field) return;
+              var fields = field.tagName ? [field] : toArray(field);
+              fields.forEach(function (f) {
+                if (String(f.value) === id) return;
+                if (f.tagName === 'SELECT' && !toArray(f.options).some(function (o) { return o.value === id; })) return;
+                f.disabled = false;
+                f.value = id;
+                f.dispatchEvent(new Event('change', { bubbles: true }));
+              });
+            });
+            if (/\/products\//.test(window.location.pathname)) {
+              try {
+                var url = new URL(window.location.href);
+                if (url.searchParams.get('variant') !== id) {
+                  url.searchParams.set('variant', id);
+                  window.history.replaceState(window.history.state, '', url.toString());
+                }
+              } catch (e) {}
+            }
+          }
+
+          readVariantId() {
+            var forms = this.productForms();
+            var hasField = false;
+            for (var i = 0; i < forms.length; i++) {
+              var field = forms[i].elements ? forms[i].elements.namedItem('id') : null;
+              if (field && !field.tagName && field.length) field = field[0];
+              if (field) {
+                hasField = true;
+                if (field.value) return String(field.value);
+              }
+            }
+            if (hasField) return '';
+            try {
+              var fromUrl = new URL(window.location.href).searchParams.get('variant');
+              if (fromUrl) return fromUrl;
+            } catch (e) {}
+            return null;
+          }
+
+          /* ---------- keeping in sync ---------- */
+
+          onVariantEvent(event) {
+            if (event.detail && event.detail.source === 'sc-color-variant-selector') return;
+            if (event.target && event.target !== document && event.target.closest && !this.belongsToUs(event.target)) return;
+            var id = idFromDetail(event.detail);
+            if (id && this.variantById(id) && !this.pending) this.current = id;
+            this.scheduleSync();
+          }
+
+          onChange(event) {
+            var t = event.target;
+            if (!t || this.contains(t) || !this.belongsToUs(t)) return;
+            this.scheduleSync();
+          }
+
+          scheduleSync() {
+            var self = this;
+            clearTimeout(this._t1); clearTimeout(this._t2);
+            this._t1 = setTimeout(function () { self.sync(); }, 60);
+            this._t2 = setTimeout(function () { self.sync(); }, 600);
+          }
+
+          sync() {
+            this.hidePicker();
+            var formId = this.readVariantId();
+            if (formId && this.variantById(formId)) this.current = formId;
+            var sel = this.currentSelection();
+            this.selection = sel;
+            this.render(sel);
+          }
+
+          /* Selected state + availability of every color for the other selected options. */
+          render(sel) {
+            var cpos = this.cpos;
+            this.activeValue = sel[cpos] || '';
+            this.items.forEach(function (btn) {
+              var value = btn.dataset.value;
+              var combo = sel.slice();
+              combo[cpos] = value;
+              var v = this.findVariant(combo);
+              var available = !!(v && v.a);
+              var on = value === this.activeValue;
+              btn.classList.toggle('is-selected', on);
+              btn.classList.toggle('is-unavailable', !available);
+              btn.setAttribute('aria-checked', on ? 'true' : 'false');
+              btn.tabIndex = on ? 0 : -1;
+              btn.disabled = !available;
+              if (available) btn.removeAttribute('aria-disabled'); else btn.setAttribute('aria-disabled', 'true');
+              var strike = btn.querySelector('.sc-cvs__strike');
+              if (strike) strike.hidden = available;
+            }, this);
+            if (!this.items.some(function (b) { return b.tabIndex === 0; })) {
+              var first = this.items.filter(function (b) { return !b.disabled; })[0];
+              if (first) first.tabIndex = 0;
+            }
+            if (this.valueEl && !this.matches(':hover')) this.valueEl.textContent = this.activeValue;
+          }
+        }
+
+        window.customElements.define('sc-color-variant-selector', ScColorVariantSelector);
+      })();
+    </script>
+  {%- endif -%}
+{%- endif -%}
