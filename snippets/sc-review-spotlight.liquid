@@ -1,0 +1,447 @@
+{%- comment -%}
+  SC – PDP Review Spotlight (PDP block)
+  ----------------------------------------------------------------------------
+  Compact carousel of up to 10 curated reviews inside the product buy box.
+  Each slide: star rating, bold title, short content, page dots underneath.
+
+  Data source (product metafield → one metaobject entry):
+    standard.cro_pdp_review_spotlight   (falls back to standard.cro_review_spotlight)
+    Type: Metaobject / Mixed reference, limited to one "cro_review_spotlight" entry.
+  Metaobject "CRO | Review Spotlight" (type cro_review_spotlight) fields:
+    name (display name), rating_1..rating_10 (integer 1–5),
+    title_1..title_10 (single-line text), content_1..content_10 (multi-line text)
+  Only reviews with a non-empty title are shown. No data → nothing renders.
+
+  Install (Dawn-style section):
+    1. Copy this snippet.
+    2. In the product section's block loop:
+         {%- when 'sc_review_spotlight' -%}
+           {% render 'sc-review-spotlight', block: block, product: product %}
+    3. Add the "sc_review_spotlight" block schema (see sections/main-product.liquid).
+
+  Theme independence: no Flickity or theme JS needed. The carousel is a small
+  <sc-review-spotlight> custom element (slide / fade, swipe, loop, autoplay, dots,
+  adaptive height, seamless loop). Autoplay pauses while the mouse is over the block.
+  CSS is scoped to the block id.
+{%- endcomment -%}
+
+{%- liquid
+  assign s = block.settings
+  assign uid = 'sc-rs-' | append: block.id
+
+  assign spotlight = nil
+  if product != blank
+    assign spotlight = product.metafields.standard.cro_pdp_review_spotlight.value
+    if spotlight == blank
+      assign spotlight = product.metafields.standard.cro_review_spotlight.value
+    endif
+  endif
+
+  assign review_count = 0
+  if spotlight != blank
+    for i in (1..10)
+      assign title_key = 'title_' | append: i
+      assign t = spotlight[title_key].value | default: spotlight[title_key] | strip
+      if t != blank
+        assign review_count = review_count | plus: 1
+      endif
+    endfor
+  endif
+-%}
+
+{%- if review_count > 0 -%}
+  <style>
+    #{{ uid }} {
+      --sc-rs-text: {{ s.text_color | default: '#000000' }};
+      --sc-rs-bg: {{ s.background | default: '#F8F8F8' }};
+      --sc-rs-star: {{ s.rating_color | default: '#E07988' }};
+      --sc-rs-star-empty: {{ s.empty_rating_color | default: '#D9D9D9' }};
+      --sc-rs-dot: {{ s.pagination | default: '#D9D9D9' }};
+      --sc-rs-dot-active: {{ s.active_pagination | default: '#E07988' }};
+      --sc-rs-h-size: {{ s.heading_font_size | default: 16 }}px;
+      --sc-rs-c-size: {{ s.content_font_size | default: 16 }}px;
+      display: block;
+      box-sizing: border-box;
+      margin-top: {{ s.space_top | default: 0 }}px;
+      margin-bottom: {{ s.space_bottom | default: 0 }}px;
+      padding: 16px;
+      color: var(--sc-rs-text);
+      background: var(--sc-rs-bg);
+      border-radius: {{ s.rounded | default: 0 }}px;
+      text-align: left;
+      overflow: hidden;
+    }
+    #{{ uid }} *, #{{ uid }} *::before, #{{ uid }} *::after { box-sizing: border-box; }
+    #{{ uid }} .sc-rs__viewport {
+      position: relative;
+      overflow: hidden;
+      transition: height .4s ease;
+      outline: none;
+      touch-action: pan-y;
+    }
+    #{{ uid }} .sc-rs__viewport:focus-visible { box-shadow: 0 0 0 2px var(--sc-rs-dot-active); }
+    #{{ uid }} .sc-rs__track {
+      display: flex;
+      align-items: flex-start;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      transform: translate3d(0, 0, 0);
+      will-change: transform;
+    }
+    #{{ uid }}[data-draggable="true"] .sc-rs__track { cursor: grab; user-select: none; -webkit-user-select: none; }
+    #{{ uid }}.is-dragging .sc-rs__track { cursor: grabbing; }
+    #{{ uid }} .sc-rs__slide img { -webkit-user-drag: none; }
+    #{{ uid }} .sc-rs__slide { flex: 0 0 100%; width: 100%; min-width: 0; margin: 0; }
+
+    #{{ uid }}[data-fade="true"] .sc-rs__track { display: grid; transform: none !important; }
+    #{{ uid }}[data-fade="true"] .sc-rs__slide { grid-area: 1 / 1; opacity: 0; visibility: hidden; transition: opacity .5s ease, visibility .5s; }
+    #{{ uid }}[data-fade="true"] .sc-rs__slide.is-active { opacity: 1; visibility: visible; }
+
+    #{{ uid }} .sc-rs__stars { display: flex; gap: 2px; line-height: 0; }
+    #{{ uid }} .sc-rs__star { width: 12px; height: 12px; color: var(--sc-rs-star-empty); flex: none; }
+    #{{ uid }} .sc-rs__star.is-filled { color: var(--sc-rs-star); }
+    #{{ uid }} .sc-rs__title {
+      margin: 20px 0 6px;
+      font-size: var(--sc-rs-h-size);
+      line-height: 1.3;
+      font-weight: {{ s.heading_font_weight | default: '600' }};
+      font-style: {{ s.heading_font_style | default: 'normal' }};
+      color: inherit;
+      letter-spacing: normal;
+      text-transform: none;
+      overflow-wrap: anywhere;
+    }
+    #{{ uid }} .sc-rs__content {
+      margin: 0;
+      font-size: var(--sc-rs-c-size);
+      line-height: 1.5;
+      font-weight: {{ s.content_font_weight | default: '400' }};
+      font-style: {{ s.content_font_style | default: 'normal' }};
+      color: inherit;
+      overflow-wrap: anywhere;
+    }
+    #{{ uid }} .sc-rs__dots { display: flex; flex-wrap: wrap; gap: 0; margin: 14px 0 0 -4px; padding: 0; }
+    #{{ uid }} .sc-rs__dot {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 12px; height: 12px; margin: 0; padding: 0;
+      background: none; border: 0; border-radius: 50%; cursor: pointer;
+      min-width: 0; min-height: 0; box-shadow: none;
+    }
+    #{{ uid }} .sc-rs__dot::before {
+      content: ''; display: block; width: 4px; height: 4px; border-radius: 50%;
+      background: var(--sc-rs-dot); transition: background-color .2s ease;
+    }
+    #{{ uid }} .sc-rs__dot[aria-current="true"]::before { background: var(--sc-rs-dot-active); }
+    #{{ uid }} .sc-rs__dot:focus-visible { outline: 2px solid var(--sc-rs-dot-active); outline-offset: 0; }
+    #{{ uid }} .sc-rs__sr {
+      position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px;
+      overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+    }
+    @media screen and (max-width: 749px) {
+      #{{ uid }} {
+        --sc-rs-h-size: {{ s.heading_font_size_mobile | default: 16 }}px;
+        --sc-rs-c-size: {{ s.content_font_size_mobile | default: 16 }}px;
+      }
+    }
+  </style>
+
+  <sc-review-spotlight
+    id="{{ uid }}"
+    class="sc-rs"
+    role="region"
+    aria-roledescription="carousel"
+    aria-label="{{ 'Customer reviews' }}"
+    data-autoplay="{{ s.autoplay }}"
+    data-speed="{{ s.autoplay_speed | default: 5 | times: 1000 }}"
+    data-fade="{{ s.fade }}"
+    data-draggable="{{ s.draggable }}"
+    data-loop="{{ s.loop }}"
+    {{ block.shopify_attributes }}
+  >
+    <div class="sc-rs__viewport" data-sc-rs-viewport {% if review_count > 1 %}tabindex="0"{% endif %} aria-live="polite">
+      <ul class="sc-rs__track" data-sc-rs-track>
+        {%- assign n = 0 -%}
+        {%- for i in (1..10) -%}
+          {%- liquid
+            assign title_key = 'title_' | append: i
+            assign rating_key = 'rating_' | append: i
+            assign content_key = 'content_' | append: i
+            assign r_title = spotlight[title_key].value | default: spotlight[title_key] | strip
+            if r_title == blank
+              continue
+            endif
+            assign n = n | plus: 1
+            assign r_content = spotlight[content_key].value | default: spotlight[content_key] | strip
+            assign r_rating = spotlight[rating_key].value | default: spotlight[rating_key] | default: 5 | plus: 0 | round
+            if r_rating > 5
+              assign r_rating = 5
+            elsif r_rating < 0
+              assign r_rating = 0
+            endif
+          -%}
+          <li
+            class="sc-rs__slide{% if n == 1 %} is-active{% endif %}"
+            role="group"
+            aria-roledescription="slide"
+            aria-label="{{ n }} / {{ review_count }}"
+            data-sc-rs-slide
+            {% if n > 1 %}aria-hidden="true" inert{% endif %}
+          >
+            <div class="sc-rs__stars" role="img" aria-label="{{ r_rating }} / 5">
+              {%- for star in (1..5) -%}
+                <svg class="sc-rs__star{% if star <= r_rating %} is-filled{% endif %}" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path fill="currentColor" d="M12 1.5l3.09 6.83 7.41.8-5.53 5.02 1.53 7.35L12 17.77 5.5 21.5l1.53-7.35L1.5 9.13l7.41-.8L12 1.5z"/>
+                </svg>
+              {%- endfor -%}
+            </div>
+            <p class="sc-rs__title">{{ r_title | escape }}</p>
+            {%- if r_content != blank -%}
+              <p class="sc-rs__content">{{ r_content | escape | newline_to_br }}</p>
+            {%- endif -%}
+          </li>
+        {%- endfor -%}
+      </ul>
+    </div>
+
+    {%- if s.pagedots and review_count > 1 -%}
+      <div class="sc-rs__dots" data-sc-rs-dots>
+        {%- for d in (1..review_count) -%}
+          <button
+            type="button"
+            class="sc-rs__dot"
+            data-sc-rs-dot="{{ forloop.index0 }}"
+            aria-label="{{ d }} / {{ review_count }}"
+            {% if d == 1 %}aria-current="true"{% else %}aria-current="false"{% endif %}
+          ></button>
+        {%- endfor -%}
+      </div>
+    {%- endif -%}
+  </sc-review-spotlight>
+
+  {%- if review_count > 1 -%}
+    <script>
+      (function () {
+        if (!window.customElements || window.customElements.get('sc-review-spotlight')) return;
+
+        var EASE = 'transform .5s cubic-bezier(.25,.8,.25,1)';
+
+        class ScReviewSpotlight extends HTMLElement {
+          connectedCallback() {
+            this.viewport = this.querySelector('[data-sc-rs-viewport]');
+            this.track = this.querySelector('[data-sc-rs-track]');
+            if (!this.viewport || !this.track) return;
+
+            this.track.querySelectorAll('[data-sc-rs-clone]').forEach(function (c) { c.remove(); });
+            this.slides = Array.from(this.track.querySelectorAll('[data-sc-rs-slide]'));
+            this.count = this.slides.length;
+            if (this.count < 2) return;
+
+            this.dots = Array.from(this.querySelectorAll('[data-sc-rs-dot]'));
+            this.fade = this.dataset.fade === 'true';
+            this.loop = this.dataset.loop === 'true';
+            this.draggable = this.dataset.draggable === 'true';
+            this.autoplay = this.dataset.autoplay === 'true';
+            this.speed = Math.max(2000, parseInt(this.dataset.speed, 10) || 5000);
+            this.hover = false;
+            this.dragging = false;
+
+            /* Seamless loop: one clone at each end, so last → first keeps sliding forward. */
+            this.clones = this.loop && !this.fade;
+            if (this.clones) {
+              var first = this.slides[0].cloneNode(true);
+              var last = this.slides[this.count - 1].cloneNode(true);
+              [first, last].forEach(function (c) {
+                c.setAttribute('data-sc-rs-clone', '');
+                c.removeAttribute('data-sc-rs-slide');
+                c.classList.remove('is-active');
+                c.setAttribute('aria-hidden', 'true');
+                c.inert = true;
+              });
+              this.track.append(first);
+              this.track.prepend(last);
+            }
+
+            this.index = 0;
+            this.pos = this.clones ? 1 : 0;
+
+            this.ac = new AbortController();
+            var opt = { signal: this.ac.signal };
+            var self = this;
+
+            this.dots.forEach(function (dot) {
+              dot.addEventListener('click', function () {
+                self.goTo(parseInt(dot.dataset.scRsDot, 10));
+                self.schedule();
+              }, opt);
+            });
+
+            this.viewport.addEventListener('keydown', function (e) {
+              if (e.key === 'ArrowRight') { e.preventDefault(); self.step(1); self.schedule(); }
+              if (e.key === 'ArrowLeft') { e.preventDefault(); self.step(-1); self.schedule(); }
+            }, opt);
+
+            this.track.addEventListener('transitionend', function (e) {
+              if (e.target === self.track && e.propertyName === 'transform') self.settle();
+            }, opt);
+
+            if (this.draggable) this.bindDrag(opt);
+
+            if (this.autoplay) {
+              this.addEventListener('mouseenter', function () { self.hover = true; clearTimeout(self.timer); }, opt);
+              this.addEventListener('mouseleave', function () { self.hover = false; self.schedule(); }, opt);
+              document.addEventListener('visibilitychange', function () { self.schedule(); }, opt);
+            }
+
+            if ('ResizeObserver' in window) {
+              this.ro = new ResizeObserver(function () { self.updateHeight(); });
+              this.slides.forEach(function (sl) { self.ro.observe(sl); });
+            }
+            window.addEventListener('resize', function () { self.updateHeight(); }, opt);
+
+            this.update(false);
+            this.schedule();
+          }
+
+          disconnectedCallback() {
+            if (this.ac) this.ac.abort();
+            if (this.ro) this.ro.disconnect();
+            clearTimeout(this.timer);
+            cancelAnimationFrame(this.raf);
+          }
+
+          /* ---------- movement ---------- */
+          setPos(animate, offset) {
+            if (this.fade) return;
+            this.track.style.transition = animate ? EASE : 'none';
+            this.track.style.transform =
+              'translate3d(calc(' + (-this.pos * 100) + '% + ' + (offset || 0) + 'px), 0, 0)';
+            if (!animate) void this.track.offsetWidth;
+          }
+
+          /* After sliding onto a clone, jump (invisibly) to the real slide. */
+          settle() {
+            if (this.clones && (this.pos === 0 || this.pos === this.count + 1)) {
+              this.pos = this.index + 1;
+              this.setPos(false);
+            }
+          }
+
+          step(dir) {
+            this.settle();
+            var i = this.index + dir;
+            if (this.clones) {
+              this.index = (i + this.count) % this.count;
+              this.pos += dir;
+            } else if (i < 0 || i >= this.count) {
+              if (!this.loop) { this.update(true); return; }
+              this.index = (i + this.count) % this.count;
+              this.pos = this.index;
+            } else {
+              this.index = i;
+              this.pos = i;
+            }
+            this.update(true);
+          }
+
+          goTo(i) {
+            if (isNaN(i) || i === this.index) return;
+            this.settle();
+            this.index = Math.max(0, Math.min(this.count - 1, i));
+            this.pos = this.index + (this.clones ? 1 : 0);
+            this.update(true);
+          }
+
+          update(animate) {
+            this.setPos(animate);
+            var idx = this.index;
+            this.slides.forEach(function (sl, i) {
+              var on = i === idx;
+              sl.classList.toggle('is-active', on);
+              if (on) { sl.removeAttribute('aria-hidden'); sl.inert = false; }
+              else { sl.setAttribute('aria-hidden', 'true'); sl.inert = true; }
+            });
+            this.dots.forEach(function (dot, i) { dot.setAttribute('aria-current', i === idx ? 'true' : 'false'); });
+            this.updateHeight();
+          }
+
+          updateHeight() {
+            var sl = this.slides[this.index];
+            if (sl) this.viewport.style.height = sl.offsetHeight + 'px';
+          }
+
+          /* ---------- autoplay ---------- */
+          schedule() {
+            clearTimeout(this.timer);
+            if (!this.autoplay || this.hover || this.dragging || document.visibilityState === 'hidden') return;
+            var self = this;
+            this.timer = setTimeout(function () {
+              self.step(1);
+              self.schedule();
+            }, this.speed);
+          }
+
+          /* ---------- drag / swipe ---------- */
+          bindDrag(opt) {
+            var self = this;
+            var vp = this.viewport;
+            var id = null, sx = 0, sy = 0, dx = 0, axis = null;
+
+            vp.addEventListener('pointerdown', function (e) {
+              if (e.pointerType === 'mouse' && e.button !== 0) return;
+              if (e.pointerType === 'mouse') e.preventDefault(); /* no text selection while dragging */
+              id = e.pointerId; sx = e.clientX; sy = e.clientY; dx = 0; axis = null;
+              self.settle();
+              try { vp.setPointerCapture(id); } catch (err) {}
+            }, opt);
+
+            vp.addEventListener('pointermove', function (e) {
+              if (e.pointerId !== id) return;
+              var mx = e.clientX - sx, my = e.clientY - sy;
+              if (axis === null) {
+                if (Math.abs(mx) < 5 && Math.abs(my) < 5) return;
+                axis = Math.abs(mx) >= Math.abs(my) ? 'x' : 'y';
+                if (axis === 'y') { id = null; return; }
+                self.dragging = true;
+                self.classList.add('is-dragging');
+                clearTimeout(self.timer);
+              }
+              e.preventDefault();
+              dx = mx;
+              if (self.fade) return;
+              var off = dx;
+              if (!self.loop && ((self.index === 0 && dx > 0) || (self.index === self.count - 1 && dx < 0))) off = dx / 3;
+              cancelAnimationFrame(self.raf);
+              self.raf = requestAnimationFrame(function () { self.setPos(false, off); });
+            }, opt);
+
+            var end = function (e) {
+              if (e.pointerId !== id) return;
+              id = null;
+              try { vp.releasePointerCapture(e.pointerId); } catch (err) {}
+              if (!self.dragging) return;
+              self.dragging = false;
+              self.classList.remove('is-dragging');
+              cancelAnimationFrame(self.raf);
+              var threshold = Math.min(80, vp.offsetWidth * 0.12);
+              if (Math.abs(dx) > threshold) self.step(dx < 0 ? 1 : -1);
+              else self.update(true);
+              dx = 0;
+              self.schedule();
+            };
+            vp.addEventListener('pointerup', end, opt);
+            vp.addEventListener('pointercancel', end, opt);
+            vp.addEventListener('dragstart', function (e) { e.preventDefault(); }, opt);
+          }
+        }
+
+        window.customElements.define('sc-review-spotlight', ScReviewSpotlight);
+      })();
+    </script>
+  {%- endif -%}
+{%- elsif request.design_mode -%}
+  <div {{ block.shopify_attributes }} style="margin:{{ block.settings.space_top }}px 0 {{ block.settings.space_bottom }}px;padding:12px 16px;border:1px dashed #c9c9c9;font-size:13px;line-height:1.4;color:#6d7175;">
+    SC – Review Spotlight: no reviews found. Assign a "CRO | Review Spotlight" entry to this product's
+    <code>standard.cro_pdp_review_spotlight</code> metafield. (Only visible in the theme editor.)
+  </div>
+{%- endif -%}
