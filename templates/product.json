@@ -90,6 +90,10 @@
             "swatch_shape": "circle"
           }
         },
+        "sc_review_spotlight": {
+          "type": "sc_review_spotlight",
+          "settings": {}
+        },
         "sc_color_variant_selector": {
           "type": "sc_color_variant_selector",
           "disabled": true,
@@ -505,6 +509,7 @@
         "title",
         "sc_product_teaser",
         "price",
+        "sc_review_spotlight",
         "sc_bulletpoints",
         "variant_picker",
         "sc_color_variant_selector",

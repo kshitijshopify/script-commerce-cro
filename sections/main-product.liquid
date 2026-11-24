@@ -698,6 +698,8 @@
                   {% render 'sc-inventory-status', block: block, product: product, section: section %}
                 {%- when 'sc_pdp_cross_sell' -%}
                   {% render 'sc-pdp-cross-sell', block: block, product: product %}
+                {%- when 'sc_review_spotlight' -%}
+                  {% render 'sc-review-spotlight', block: block, product: product %}
                 {%- when 'sc_color_variant_selector' -%}
                   {% render 'sc-color-variant-selector', block: block, product: product, section: section %}
                 {%- when 'sc_pdp_variant_cards' -%}
@@ -4955,6 +4957,303 @@
           "unit": "px",
           "default": 750,
           "info": "Screens narrower than this use the mobile settings."
+        }
+      ]
+    },
+    {
+      "type": "sc_review_spotlight",
+      "name": "SC – Review Spotlight",
+      "limit": 1,
+      "settings": [
+        {
+          "type": "paragraph",
+          "content": "Shows up to 10 curated reviews from the product metafield standard.cro_pdp_review_spotlight (one \"CRO | Review Spotlight\" metaobject entry). Only reviews with a title are shown; nothing renders without data. Set up [Metaobjects](/admin/settings/custom_data/metaobjects) and [Metafields](/admin/settings/custom_data/product/metafields) first."
+        },
+        {
+          "type": "header",
+          "content": "Carousel"
+        },
+        {
+          "type": "checkbox",
+          "id": "autoplay",
+          "label": "Autoplay",
+          "default": false
+        },
+        {
+          "type": "range",
+          "id": "autoplay_speed",
+          "min": 2,
+          "max": 10,
+          "step": 1,
+          "unit": "s",
+          "label": "Autoplay speed",
+          "default": 5
+        },
+        {
+          "type": "checkbox",
+          "id": "fade",
+          "label": "Fade transition",
+          "default": false
+        },
+        {
+          "type": "checkbox",
+          "id": "pagedots",
+          "label": "Show pagination dots",
+          "default": true
+        },
+        {
+          "type": "checkbox",
+          "id": "draggable",
+          "label": "Draggable / swipe",
+          "default": true
+        },
+        {
+          "type": "checkbox",
+          "id": "loop",
+          "label": "Infinite loop",
+          "default": true
+        },
+        {
+          "type": "header",
+          "content": "Spacing & appearance"
+        },
+        {
+          "type": "range",
+          "id": "space_top",
+          "min": 0,
+          "max": 60,
+          "step": 1,
+          "unit": "px",
+          "label": "Top spacing",
+          "default": 16
+        },
+        {
+          "type": "range",
+          "id": "space_bottom",
+          "min": 0,
+          "max": 60,
+          "step": 1,
+          "unit": "px",
+          "label": "Bottom spacing",
+          "default": 0
+        },
+        {
+          "type": "color",
+          "id": "text_color",
+          "label": "Text color",
+          "default": "#000000"
+        },
+        {
+          "type": "color",
+          "id": "background",
+          "label": "Background color",
+          "default": "#F8F8F8"
+        },
+        {
+          "type": "range",
+          "id": "rounded",
+          "min": 0,
+          "max": 32,
+          "step": 1,
+          "unit": "px",
+          "label": "Corner radius",
+          "default": 0
+        },
+        {
+          "type": "header",
+          "content": "Star & pagination colors"
+        },
+        {
+          "type": "color",
+          "id": "rating_color",
+          "label": "Filled rating color",
+          "default": "#E07988"
+        },
+        {
+          "type": "color",
+          "id": "empty_rating_color",
+          "label": "Empty rating color",
+          "default": "#D9D9D9"
+        },
+        {
+          "type": "color",
+          "id": "pagination",
+          "label": "Pagination dot color",
+          "default": "#D9D9D9"
+        },
+        {
+          "type": "color",
+          "id": "active_pagination",
+          "label": "Active pagination dot color",
+          "default": "#E07988"
+        },
+        {
+          "type": "header",
+          "content": "Review heading"
+        },
+        {
+          "type": "range",
+          "id": "heading_font_size",
+          "min": 8,
+          "max": 36,
+          "step": 1,
+          "unit": "px",
+          "label": "Font size (desktop)",
+          "default": 16
+        },
+        {
+          "type": "range",
+          "id": "heading_font_size_mobile",
+          "min": 8,
+          "max": 36,
+          "step": 1,
+          "unit": "px",
+          "label": "Font size (mobile)",
+          "default": 16
+        },
+        {
+          "type": "select",
+          "id": "heading_font_weight",
+          "label": "Font weight",
+          "options": [
+            {
+              "value": "100",
+              "label": "100"
+            },
+            {
+              "value": "200",
+              "label": "200"
+            },
+            {
+              "value": "300",
+              "label": "300"
+            },
+            {
+              "value": "400",
+              "label": "400"
+            },
+            {
+              "value": "500",
+              "label": "500"
+            },
+            {
+              "value": "600",
+              "label": "600"
+            },
+            {
+              "value": "700",
+              "label": "700"
+            },
+            {
+              "value": "800",
+              "label": "800"
+            },
+            {
+              "value": "900",
+              "label": "900"
+            }
+          ],
+          "default": "600"
+        },
+        {
+          "type": "select",
+          "id": "heading_font_style",
+          "label": "Font style",
+          "options": [
+            {
+              "value": "normal",
+              "label": "Normal"
+            },
+            {
+              "value": "italic",
+              "label": "Italic"
+            }
+          ],
+          "default": "normal"
+        },
+        {
+          "type": "header",
+          "content": "Review content"
+        },
+        {
+          "type": "range",
+          "id": "content_font_size",
+          "min": 8,
+          "max": 36,
+          "step": 1,
+          "unit": "px",
+          "label": "Font size (desktop)",
+          "default": 16
+        },
+        {
+          "type": "range",
+          "id": "content_font_size_mobile",
+          "min": 8,
+          "max": 36,
+          "step": 1,
+          "unit": "px",
+          "label": "Font size (mobile)",
+          "default": 16
+        },
+        {
+          "type": "select",
+          "id": "content_font_weight",
+          "label": "Font weight",
+          "options": [
+            {
+              "value": "100",
+              "label": "100"
+            },
+            {
+              "value": "200",
+              "label": "200"
+            },
+            {
+              "value": "300",
+              "label": "300"
+            },
+            {
+              "value": "400",
+              "label": "400"
+            },
+            {
+              "value": "500",
+              "label": "500"
+            },
+            {
+              "value": "600",
+              "label": "600"
+            },
+            {
+              "value": "700",
+              "label": "700"
+            },
+            {
+              "value": "800",
+              "label": "800"
+            },
+            {
+              "value": "900",
+              "label": "900"
+            }
+          ],
+          "default": "400"
+        },
+        {
+          "type": "select",
+          "id": "content_font_style",
+          "label": "Font style",
+          "options": [
+            {
+              "value": "normal",
+              "label": "Normal"
+            },
+            {
+              "value": "italic",
+              "label": "Italic"
+            }
+          ],
+          "default": "normal"
         }
       ]
     },
