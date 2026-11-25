@@ -7,11 +7,42 @@
  * made to this file may be overwritten.
  * ------------------------------------------------------------
  */
-{
+ {
   "sections": {
     "main": {
       "type": "main-product",
       "blocks": {
+        "sc_social_proof_VhAwp9": {
+          "type": "sc_social_proof",
+          "settings": {
+            "avatar_1": "shopify://shop_images/person.png",
+            "avatar_2": "shopify://shop_images/person.png",
+            "name": "emma.style",
+            "show_verified": true,
+            "social_text": "<p>and 63,000 others are thrilled with us</p>",
+            "bold_text": false,
+            "avatar_shape": "round",
+            "avatar_size": 32,
+            "avatar_size_mobile": 28,
+            "avatar_overlap": 8,
+            "corner_style": "rounded",
+            "corner_radius": 14,
+            "text_alignment": "left",
+            "font_size": 15,
+            "font_size_mobile": 14,
+            "background_color": "#f8f6f3",
+            "text_color": "#000000",
+            "name_color": "",
+            "check_color": "#4c8ae7",
+            "avatar_ring_color": "#ffffff",
+            "show_border": false,
+            "border_color": "#e2ded8",
+            "margin_top": 10,
+            "margin_bottom": 10,
+            "padding_y": 12,
+            "padding_x": 16
+          }
+        },
         "vendor": {
           "type": "text",
           "settings": {
@@ -626,6 +657,7 @@
         }
       },
       "block_order": [
+        "sc_social_proof_VhAwp9",
         "vendor",
         "sc_product_badges_zwUQGG",
         "title",
