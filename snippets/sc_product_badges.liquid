@@ -1,10 +1,10 @@
 {%- comment -%}
   SC | Product Badges
-  Renders up to 3 badges from list metafield custom.cro_product_badges (list of single line text).
+  Renders up to 3 badges from list metafield custom.sc_product_badges (list of single line text).
   Accepts: product, block
 {%- endcomment -%}
 
-{%- assign sc_badges = product.metafields.custom.cro_product_badges.value -%}
+{%- assign sc_badges = product.metafields.custom.sc_product_badges.value -%}
 
 {%- if sc_badges.size > 0 -%}
   {%- assign sc_id = block.id -%}

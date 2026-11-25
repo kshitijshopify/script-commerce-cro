@@ -97,6 +97,8 @@
                   >
                     {{- block.settings.text -}}
                   </p>
+                {%- when 'sc_pdp_ugc' -%}
+                  {%- render 'sc-pdp-ugc', product: product, block: block -%}
                 {%- when 'sc_pdp_size_slider' -%}
                   {%- render 'sc-size-slider', product: product, block: block -%}
                 {%- when 'sc_product_badges' -%}
@@ -826,6 +828,90 @@
           ],
           "default": "body",
           "label": "t:sections.main-product.blocks.text.settings.text_style.label"
+        }
+      ]
+    },
+    {
+      "type": "sc_pdp_ugc",
+      "name": "SC | UGC Section",
+      "limit": 1,
+      "settings": [
+        {
+          "type": "header",
+          "content": "Metafields (Required)",
+          "info": "Needs the metaobject 'SC | PDP | UGC' (type sc_pdp_ugc) and the product metafield 'SC | PDP | UGC' (custom.sc_pdp_ugc). Shown only when a product has a value. [Metaobjects](/admin/content/metaobjects) · [Metafields](/admin/settings/custom_data/product/metafields)"
+        },
+        { "type": "range", "id": "sc_ugc_space_top", "min": 0, "max": 60, "step": 1, "unit": "px", "label": "Top space", "default": 16 },
+        { "type": "range", "id": "sc_ugc_space_bottom", "min": 0, "max": 60, "step": 1, "unit": "px", "label": "Bottom space", "default": 0 },
+        {
+          "type": "select",
+          "id": "sc_ugc_layout",
+          "label": "Layout",
+          "options": [
+            { "value": "collapsible", "label": "Collapsible" },
+            { "value": "normal", "label": "Normal" }
+          ],
+          "default": "normal"
+        },
+        { "type": "checkbox", "id": "sc_ugc_open_default", "label": "Open by default (collapsible)", "default": false },
+        { "type": "checkbox", "id": "sc_ugc_show_border", "label": "Show border bottom (collapsible)", "default": true },
+        { "type": "range", "id": "sc_ugc_button_size", "min": 10, "max": 36, "step": 1, "unit": "px", "label": "Button text size", "default": 16 },
+        { "type": "color", "id": "sc_ugc_border_color", "label": "Border color", "default": "#E4E4E4" },
+        { "type": "color", "id": "sc_ugc_arrow_color", "label": "Arrow color", "default": "#1a1a1a" },
+        { "type": "color", "id": "sc_ugc_arrow_bg", "label": "Arrow background", "default": "#E8E8E8" },
+        { "type": "header", "content": "Feedback heading" },
+        { "type": "range", "id": "sc_ugc_heading_size", "min": 10, "max": 36, "step": 1, "unit": "px", "label": "Heading size", "default": 14 },
+        { "type": "range", "id": "sc_ugc_heading_size_mobile", "min": 10, "max": 36, "step": 1, "unit": "px", "label": "Heading size (mobile)", "default": 14 },
+        {
+          "type": "select",
+          "id": "sc_ugc_heading_align",
+          "label": "Heading alignment",
+          "options": [
+            { "value": "left", "label": "Left" },
+            { "value": "center", "label": "Center" },
+            { "value": "right", "label": "Right" }
+          ],
+          "default": "center"
+        },
+        { "type": "header", "content": "Carousel" },
+        { "type": "checkbox", "id": "sc_ugc_autoplay", "label": "Autoplay", "default": false },
+        { "type": "checkbox", "id": "sc_ugc_loop", "label": "Return to first slide after the last (autoplay)", "default": true },
+        {
+          "type": "select",
+          "id": "sc_ugc_cell_align",
+          "label": "Slide alignment",
+          "options": [
+            { "value": "start", "label": "Left" },
+            { "value": "center", "label": "Center" }
+          ],
+          "default": "start"
+        },
+        { "type": "checkbox", "id": "sc_ugc_dots", "label": "Page dots", "default": true },
+        { "type": "color", "id": "sc_ugc_dots_color", "label": "Dots color", "default": "#282828" },
+        { "type": "range", "id": "sc_ugc_visible", "min": 10, "max": 100, "step": 1, "unit": "%", "label": "Visible slide width", "default": 70 },
+        { "type": "range", "id": "sc_ugc_gap", "min": 0, "max": 30, "step": 1, "unit": "px", "label": "Gap between slides", "default": 16 },
+        { "type": "range", "id": "sc_ugc_radius", "min": 0, "max": 30, "step": 1, "unit": "px", "label": "Border radius", "default": 18 },
+        {
+          "type": "select",
+          "id": "sc_ugc_ratio",
+          "label": "Aspect ratio",
+          "options": [
+            { "value": "square", "label": "Square" },
+            { "value": "classic", "label": "Classic" },
+            { "value": "widescreen", "label": "Widescreen" }
+          ],
+          "default": "square"
+        },
+        { "type": "range", "id": "sc_ugc_avatar_size", "min": 35, "max": 65, "step": 1, "unit": "px", "label": "Avatar size", "default": 48 },
+        { "type": "color", "id": "sc_ugc_rating_color", "label": "Rating stars color", "default": "#FBCE0E" },
+        { "type": "color", "id": "sc_ugc_text_color", "label": "Text color", "default": "#ffffff" },
+        { "type": "range", "id": "sc_ugc_name_size", "min": 12, "max": 18, "step": 1, "unit": "px", "label": "Name size", "default": 14 },
+        { "type": "range", "id": "sc_ugc_label_size", "min": 8, "max": 16, "step": 1, "unit": "px", "label": "Label size", "default": 10 },
+        {
+          "type": "color_background",
+          "id": "sc_ugc_shadow",
+          "label": "Image overlay",
+          "default": "linear-gradient(180deg, rgba(0, 0, 0, 0) 71.76%, rgba(0, 0, 0, 0.7) 100%)"
         }
       ]
     },
