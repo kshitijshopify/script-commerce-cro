@@ -22,7 +22,7 @@ In the theme editor: Product page > Add block > "SC | Product Badges" and drag i
 ## Step 4 – Metafield definition (Settings > Custom data > Products)
 | Name | Namespace and key | Type |
 |---|---|---|
-| CRO \| Product Badges | custom.cro_product_badges | List of single line text (item count max 3) |
+| SC \| Product Badges | custom.sc_product_badges | List of single line text (item count max 3) |
 
 Item 1 = Badge 01, item 2 = Badge 02, item 3 = Badge 03 (styling per badge in the theme editor).
 (`standard.` is a reserved namespace, so `custom.` is used.)
