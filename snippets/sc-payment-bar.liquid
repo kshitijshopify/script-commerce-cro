@@ -1,0 +1,176 @@
+{%- comment -%}
+  SC – PDP Payment Bar (PDP, Cart page, Cart drawer)
+  ----------------------------------------------------------------------------
+  One shared implementation: payment-icon row + optional installment / invoice
+  message. Liquid + scoped CSS, no JavaScript, no theme dependencies.
+  Settings: Theme settings → "SC – Styling of payment bar" (ids prefixed sc_pb_).
+
+  Install (any OS 2.0 theme):
+    1. Copy this snippet + snippets/sc-installment-payment-message.liquid.
+    2. Add the "SC – Styling of payment bar" group to config/settings_schema.json.
+    3. Render it:
+       PDP, below Add to cart (Dawn product block):
+         {% render 'sc-payment-bar', placement: 'pdp', block: block %}
+       Cart page (after checkout button):
+         {% render 'sc-payment-bar', placement: 'cart', uid: 'cart-page' %}
+       Cart drawer:
+         {% render 'sc-payment-bar', placement: 'drawer', uid: 'cart-drawer' %}
+
+  Accepts:
+  - placement: {String} 'pdp' | 'cart' | 'drawer' (default 'pdp')
+  - block:     {Object} block, for theme-editor attributes + unique id (optional)
+  - uid:       {String} unique suffix when there is no block (optional)
+
+  Notes:
+  - Icons use Shopify's native `payment_type_svg_tag` with valid payment_type keys.
+    Icons are visual only – they do not reflect which methods the store accepts.
+  - SVG ids output by Shopify (pi-visa …) are re-namespaced per instance, so
+    several bars on one page never produce duplicate ids.
+  - Static message only; no installment amounts are calculated.
+{%- endcomment -%}
+
+{%- liquid
+  assign placement = placement | default: 'pdp'
+
+  assign sc_render = settings.sc_pb_enable
+  if placement == 'cart' or placement == 'drawer'
+    if cart.item_count == 0
+      assign sc_render = false
+    endif
+  endif
+
+  assign sc_uid = uid | default: placement
+  if block.id != blank
+    assign sc_uid = block.id
+  endif
+  assign sc_uid = sc_uid | handleize | prepend: 'sc-pb-'
+-%}
+
+{%- if sc_render -%}
+  {%- liquid
+    # payment_type key : checkbox setting id (display order)
+    assign methods = 'paypal:sc_pb_m_paypal,master:sc_pb_m_master,visa:sc_pb_m_visa,american_express:sc_pb_m_amex,klarna:sc_pb_m_klarna,apple_pay:sc_pb_m_apple_pay,klarna-pay-later:sc_pb_m_klarna_pay_later,sofort:sc_pb_m_sofort,bitcoin:sc_pb_m_bitcoin,shopify_pay:sc_pb_m_shopify_pay' | split: ','
+
+    assign shown = ''
+    for pair in methods
+      assign parts = pair | split: ':'
+      assign sid = parts[1]
+      if settings[sid]
+        assign shown = shown | append: parts[0] | append: ','
+      endif
+    endfor
+    assign shown_keys = shown | split: ','
+
+    assign show_msg = false
+    if placement == 'pdp' and settings.sc_pb_msg_pdp
+      assign show_msg = true
+    elsif placement != 'pdp' and settings.sc_pb_msg_cart
+      assign show_msg = true
+    endif
+    if settings.sc_pb_msg_text == blank
+      assign show_msg = false
+    endif
+
+    assign bar_classes = 'sc-pb sc-pb--' | append: placement | append: ' sc-pb--' | append: settings.sc_pb_corners | append: ' sc-pb--' | append: settings.sc_pb_icon_style
+    if settings.sc_pb_bg == blank or settings.sc_pb_bg.alpha == 0.0
+      assign bar_classes = bar_classes | append: ' sc-pb--no-bg'
+    endif
+  -%}
+
+  {%- if shown_keys.size > 0 or show_msg -%}
+    <div id="{{ sc_uid }}" class="{{ bar_classes }}" {{ block.shopify_attributes }}>
+      {%- if shown_keys.size > 0 -%}
+        <ul class="sc-pb__list" role="list" aria-label="Payment methods">
+          {%- assign svg_prefix = '"' | append: sc_uid | append: '-pi-' -%}
+          {%- for key in shown_keys -%}
+            <li class="sc-pb__item">
+              {{- key | payment_type_svg_tag: class: 'sc-pb__svg' | replace: '"pi-', svg_prefix -}}
+            </li>
+          {%- endfor -%}
+        </ul>
+      {%- endif -%}
+
+      {%- if show_msg -%}
+        {% render 'sc-installment-payment-message', uid: sc_uid %}
+      {%- endif -%}
+    </div>
+  {%- elsif request.design_mode and placement == 'pdp' -%}
+    <p class="sc-pb__hint" {{ block.shopify_attributes }}>
+      SC – Payment bar: no payment icon selected. Edit Theme settings → SC – Styling of payment bar.
+    </p>
+  {%- endif -%}
+
+  <style>
+    .sc-pb {
+      box-sizing: border-box;
+      width: 100%;
+      max-width: 100%;
+      margin: 12px 0;
+      padding: 10px 12px;
+      background-color: {{ settings.sc_pb_bg | default: 'transparent' }};
+      overflow: hidden;
+    }
+    .sc-pb--no-bg {
+      padding-left: 0;
+      padding-right: 0;
+    }
+    .sc-pb--rounded {
+      border-radius: 10px;
+    }
+    .sc-pb--square {
+      border-radius: 0;
+    }
+    .sc-pb__list {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-around;
+      gap: 8px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      line-height: 0;
+    }
+    .sc-pb__item {
+      display: flex;
+      flex: 0 0 auto;
+      margin: 0;
+      padding: 0;
+    }
+    .sc-pb__svg {
+      display: block;
+      width: 44px;
+      height: auto;
+      aspect-ratio: 38 / 24;
+    }
+    .sc-pb--grayscale .sc-pb__svg,
+    .sc-pb--grayscale .sc-pb-msg__logo {
+      filter: grayscale(1);
+    }
+    .sc-pb__hint {
+      margin: 8px 0;
+      padding: 8px 10px;
+      font-size: 12px;
+      font-style: italic;
+      line-height: 1.4;
+      opacity: 0.7;
+      border: 1px dashed currentColor;
+    }
+    @media screen and (max-width: 749px) {
+      .sc-pb {
+        padding: 8px;
+      }
+      .sc-pb--no-bg {
+        padding-left: 0;
+        padding-right: 0;
+      }
+      .sc-pb__list {
+        gap: 6px;
+        justify-content: center;
+      }
+      .sc-pb__svg {
+        width: 38px;
+      }
+    }
+  </style>
+{%- endif -%}

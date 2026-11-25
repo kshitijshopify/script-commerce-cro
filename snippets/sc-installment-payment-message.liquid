@@ -1,0 +1,85 @@
+{%- comment -%}
+  SC – Installment / invoice message (static)
+  ----------------------------------------------------------------------------
+  Provider logo + custom text, centered. Rendered by snippets/sc-payment-bar.liquid,
+  which decides PDP / Cart visibility (sc_pb_msg_pdp / sc_pb_msg_cart).
+  Settings: Theme settings → "SC – Styling of payment bar".
+  No installment amounts are calculated – this is not Klarna On-site Messaging.
+
+  Accepts:
+  - uid: {String} unique id prefix, used to namespace SVG ids (optional)
+{%- endcomment -%}
+
+{%- liquid
+  assign provider = settings.sc_pb_msg_provider | default: 'klarna'
+  assign sc_uid = uid | default: 'sc-pb-msg'
+  assign svg_prefix = '"' | append: sc_uid | append: '-msg-pi-'
+  if provider == 'paypal'
+    assign provider_name = 'PayPal'
+  else
+    assign provider_name = 'Klarna'
+  endif
+-%}
+
+<div class="sc-pb-msg">
+  {%- if settings.sc_pb_msg_logo != blank -%}
+    {{
+      settings.sc_pb_msg_logo
+      | image_url: width: 160
+      | image_tag: class: 'sc-pb-msg__logo sc-pb-msg__logo--custom', alt: provider_name, loading: 'lazy'
+    }}
+  {%- else -%}
+    <span class="sc-pb-msg__logo" role="img" aria-label="{{ provider_name }}">
+      {{- provider | payment_type_svg_tag: class: 'sc-pb-msg__svg' | replace: '"pi-', svg_prefix -}}
+    </span>
+  {%- endif -%}
+  <span class="sc-pb-msg__text">{{ settings.sc_pb_msg_text }}</span>
+</div>
+
+<style>
+  .sc-pb-msg {
+    --sc-pb-msg-fs: {{ settings.sc_pb_msg_font_size | default: 15 }}px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 6px 8px;
+    margin-top: 12px;
+    text-align: center;
+  }
+  .sc-pb-msg:first-child {
+    margin-top: 0;
+  }
+  .sc-pb-msg__logo {
+    display: inline-flex;
+    flex: 0 0 auto;
+    line-height: 0;
+  }
+  .sc-pb-msg__svg {
+    display: block;
+    width: auto;
+    height: max(24px, calc(var(--sc-pb-msg-fs) * 1.6));
+    aspect-ratio: 38 / 24;
+  }
+  img.sc-pb-msg__logo--custom {
+    width: auto;
+    height: max(20px, calc(var(--sc-pb-msg-fs) * 1.4));
+    max-width: 120px;
+    object-fit: contain;
+  }
+  .sc-pb-msg__text {
+    min-width: 0;
+    font-size: var(--sc-pb-msg-fs);
+    line-height: 1.3;
+    color: {{ settings.sc_pb_msg_color | default: '#282828' }};
+    overflow-wrap: anywhere;
+  }
+  @media screen and (max-width: 749px) {
+    .sc-pb-msg__text {
+      font-size: clamp(12px, calc(var(--sc-pb-msg-fs) * 0.85), var(--sc-pb-msg-fs));
+    }
+    .sc-pb-msg__svg {
+      height: max(22px, calc(var(--sc-pb-msg-fs) * 1.35));
+    }
+  }
+</style>
